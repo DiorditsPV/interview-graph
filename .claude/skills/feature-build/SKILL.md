@@ -60,11 +60,20 @@ base→senior; под-колонки через `subblock`; модель `Node` 
 - **НЕ пушить и НЕ открывать PR без явной просьбы.** (Пуш в `main` триггерит автодеплой на :8800 — фичу
   туда только через merge человеком.)
 
-## 5. Обновить контекст (бэклог + каталог)
-- В спеке выставь `status: done`, заполни `verify:` (pass/fail), `review:` (ok / кратко), `branch: feature/<slug>`.
-- Помень идею в `FEATURE_IDEAS.md`: соответствующую `- [ ] <slug>: …` → `- [x] <slug> (feature/<slug>)`
-  (или перенеси в секцию «Сгенерировано»).
-- Пересобери каталог: `python3 .claude/skills/feature-build/catalog.py` (обновит корневой `FEATURES.md`).
+## 5. Обновить ledger — НА `main` (критично!)
+Код фичи остаётся на ветке. Но статус/каталог надо писать **на `main`**, иначе следующий цикл,
+читая `main`, возьмёт ту же идею снова (дубль).
+1. `git switch main` (ветку не мёржим, не удаляем).
+2. На `main`: в спеке `.claude/features/<slug>.md` выставь `status: done` + `verify`/`review`/`branch`;
+   пометь идею в `FEATURE_IDEAS.md` (`- [ ] <slug> …` → `- [x] <slug> (feature/<slug>)`);
+   пересобери каталог `python3 .claude/skills/feature-build/catalog.py` (обновит `FEATURES.md`).
+3. Коммит ledger-файлов **на main** (docs-only, БЕЗ push):
+   ```bash
+   git add FEATURE_IDEAS.md .claude/features/<slug>.md FEATURES.md
+   git commit -m "chore(<slug>): mark done + catalog"   # + трейлер Co-Authored-By
+   ```
+   (Если запускали `feature-build` вручную вне лупа и хотите оставить спеку «building» на ветке —
+   всё равно ledger на `main` должен отражать факт реализации.)
 
 ## 6. Отчитаться
 Кратко: что реализовано по слоям, результат verify + code-review, имя ветки, переиспользованные скиллы,

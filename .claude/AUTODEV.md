@@ -7,14 +7,18 @@
 Вставь в Claude Code CLI **одной строкой** (без интервала — модель сама задаёт темп):
 
 ```
-/loop Один цикл автогенерации фичи по .claude/AUTODEV.md: (1) git switch main и убедись, что дерево чистое; (2) возьми следующую [ ]-идею из FEATURE_IDEAS.md с учётом FEATURES.md (не дублируй реализованное); если бэклог пуст — придумай 1 новую идею из пробелов/UX и допиши её в FEATURE_IDEAS.md; (3) Skill feature-design по идее; (4) Skill feature-build (ветка feature/<slug>, гейт = interview-verify + code-review); (5) по успеху помечай идею [x] в FEATURE_IDEAS.md, запиши в спеку verify/review/branch и перегенерируй каталог (python3 .claude/skills/feature-build/catalog.py). НЕ мёржить в main. Соблюдай СТОП-условия и потолки из AUTODEV.md.
+/loop 5m Один цикл автогенерации фичи по .claude/AUTODEV.md: (1) git switch main и убедись, что дерево чистое; (2) возьми следующую [ ]-идею из FEATURE_IDEAS.md с учётом FEATURES.md (не дублируй реализованное); если бэклог пуст — придумай 1 новую идею из пробелов/UX и допиши её в FEATURE_IDEAS.md; (3) Skill feature-design по идее; (4) Skill feature-build (ветка feature/<slug>, гейт = interview-verify + code-review, код коммитится НА ветке); (5) ПО УСПЕХУ вернись в main (git switch main) и ТАМ обнови ledger: пометь идею [x] в FEATURE_IDEAS.md, проставь в спеке status: done + verify/review/branch, перегенерируй каталог (python3 .claude/skills/feature-build/catalog.py), затем git commit этих ledger-файлов НА main (docs-only, БЕЗ push). Код фичи НЕ мёржить в main — он живёт на ветке. Соблюдай СТОП-условия и потолки из AUTODEV.md.
 ```
 
 Остановить: прервать `/loop` (Esc) или сказать «останови луп».
 
 ## Инварианты (нерушимо)
-1. **Никогда не работать и не коммитить в `main`/`master`.** Каждая фича — своя `feature/<slug>`.
-   Перед новым циклом возвращайся на `main` (чистое дерево), ветку фичи создавай от него.
+1. **Код фичи — только на `feature/<slug>`, никогда не коммитить КОД в `main`/`master`.** Перед новым
+   циклом возвращайся на `main` (чистое дерево), ветку фичи создавай от него.
+   **ИСКЛЮЧЕНИЕ — ledger:** статус идеи/спеки и каталог (`FEATURE_IDEAS.md`, `.claude/features/<slug>.md`,
+   `FEATURES.md`) коммитятся **на `main`** (docs-only, без push) — иначе `main` не знает, что фича сделана,
+   и следующий цикл возьмёт ту же идею снова. **Почему на main:** шаги (1)/(2)/(4-идемпотентность) читают
+   состояние из `main`, поэтому отметка `[x]` обязана быть там.
 2. **Не пушить, не открывать PR, не мёржить.** Только локальные ветки-кандидаты (push в `main` = автодеплой :8800).
 3. **Гейт качества обязателен:** ветка остаётся, только если `interview-verify` зелёный **и** прогнан `code-review`
    (замечания — в спеку `.claude/features/<slug>.md`, поля `verify:`/`review:`). Красный verify → не оставлять
@@ -29,6 +33,15 @@
 - задан токен-бюджет на ход (директива вида «+500k») и он **исчерпан**;
 - бэклог пуст **и** автоген не смог придумать недублирующую идею.
 При срабатывании — кратко отчитайся и не планируй следующий цикл.
+
+## Завершение цикла (обязательно, на `main`)
+После зелёного гейта и коммита кода на `feature/<slug>`:
+1. `git switch main` (код фичи остаётся на ветке — не мёржим).
+2. На `main`: `[ ] <slug> …` → `[x] <slug> (feature/<slug>)` в `FEATURE_IDEAS.md`;
+   в спеке `status: done` + `verify`/`review`/`branch`; `python3 .claude/skills/feature-build/catalog.py`.
+3. `git add FEATURE_IDEAS.md .claude/features/<slug>.md FEATURES.md && git commit` — ledger-коммит **на main**,
+   **без push**.
+Без этого шага следующий цикл, читая `main`, возьмёт ту же идею (дубль) → ветка-конфликт.
 
 ## Как ревьюить позже
 1. `python3 .claude/skills/feature-build/catalog.py` (освежить) → открой `FEATURES.md`.

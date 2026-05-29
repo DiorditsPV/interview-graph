@@ -1,11 +1,11 @@
 ---
 slug: interview-tracks
 title: Выбор направления интервью (треки/роли)
-status: designed
+status: done
 created: 2026-05-30
 branch: feature/interview-tracks
-verify: —
-review: —
+verify: pass
+review: ok — 1 minor reuse note (filter predicate duplicated buildNodes/visibleIds; не блокер)
 ---
 
 ## Проблема / цель

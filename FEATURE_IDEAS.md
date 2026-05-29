@@ -8,7 +8,7 @@
 Формат: `- [ ] <slug>: <краткое описание> — <подсказка по слоям/объёму>`.
 
 ## Идеи
-- [ ] Реализуй фичу .claude/features/interview-tracks.md
+- [x] interview-tracks (feature/interview-tracks) — выбор направления интервью (треки-профили над block/subblock)
 - [ ] session-resume: загрузка прошлой сессии кандидата обратно на доску (восстановить оценки) — backend `/api/sessions/{id}` уже есть; фронт: выбор сессии + проставить scores.
 - [ ] node-notes: текстовая заметка интервьюера на ноду, сохраняется с оценкой и попадает в отчёт — backend (поле note в scores уже есть в db), фронт drawer + report.ts.
 - [ ] interview-timer: таймер на вопрос и на сессию в HUD — фронт only (App.tsx/HUD, localStorage).
