@@ -21,7 +21,7 @@ from pydantic import BaseModel, Field
 from .db import Database
 from .importer import load_content
 from .models import GraphResponse
-from .sampler import build_interview, load_weights
+from .sampler import build_interview, load_tracks, load_weights
 
 BASE_DIR = Path(__file__).resolve().parent.parent          # backend/
 PROJECT_DIR = BASE_DIR.parent                              # interview/
@@ -57,6 +57,7 @@ class ScoreIn(BaseModel):
 class InterviewRequest(BaseModel):
     count: int = Field(default=20, ge=1, le=200)
     difficulties: Optional[List[str]] = None
+    track: Optional[str] = None
     seed: Optional[int] = None
 
 
@@ -72,14 +73,24 @@ def get_weights() -> dict:
     return load_weights(CONTENT_DIR)
 
 
+@app.get("/api/tracks")
+def get_tracks() -> list:
+    return load_tracks(CONTENT_DIR)
+
+
 @app.post("/api/interview")
 def make_interview(req: InterviewRequest) -> dict:
     nodes, _ = load_content(CONTENT_DIR)
+    track_include = None
+    if req.track:
+        match = next((t for t in load_tracks(CONTENT_DIR) if t["id"] == req.track), None)
+        track_include = match["include"] if match else None
     order = build_interview(
         nodes,
         count=req.count,
         difficulties=req.difficulties,
         block_weights=load_weights(CONTENT_DIR),
+        track_include=track_include,
         seed=req.seed,
     )
     return {"order": order}

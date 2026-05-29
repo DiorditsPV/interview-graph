@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 
 from app.importer import load_content
 from app.models import Node
-from app.sampler import build_interview, load_weights
+from app.sampler import build_interview, load_tracks, load_weights, node_in_track
 
 CONTENT = Path(__file__).resolve().parent.parent.parent / "content"
 
@@ -96,3 +96,37 @@ def test_api_interview():
     r = _client().post("/api/interview", json={"count": 8, "seed": 1})
     assert r.status_code == 200
     assert len(r.json()["order"]) <= 8
+
+
+# --- tracks ---
+def test_load_tracks():
+    tracks = load_tracks(CONTENT)
+    ids = {t["id"] for t in tracks}
+    assert {"data-engineer", "backend", "analyst"} <= ids
+    for t in tracks:
+        assert t.get("id") and "label" in t and isinstance(t["include"], list)
+
+
+def test_node_in_track_matcher():
+    nmap = {n.id: n for n in load_content(CONTENT)[0]}
+    inc = ["python", "databases/sql", "frameworks/airflow"]
+    assert node_in_track(nmap["py-lang-01"], inc)          # python (block)
+    assert node_in_track(nmap["sql-01"], inc)              # databases/sql
+    assert node_in_track(nmap["af-orchestration-01"], inc)  # frameworks/airflow
+    assert not node_in_track(nmap["spark-batch-01"], inc)   # frameworks/pyspark — нет
+    assert node_in_track(nmap["sql-01"], [])               # пустой include = все
+
+
+def test_api_tracks_endpoint():
+    r = _client().get("/api/tracks")
+    assert r.status_code == 200
+    assert {"data-engineer", "backend", "analyst"} <= {t["id"] for t in r.json()}
+
+
+def test_interview_track_scoped():
+    nmap = {n.id: n for n in load_content(CONTENT)[0]}
+    inc = ["databases/sql", "databases/dbms", "python", "platform"]
+    order = _client().post("/api/interview", json={"count": 50, "track": "analyst", "seed": 1}).json()["order"]
+    assert order
+    for nid in order:
+        assert node_in_track(nmap[nid], inc), f"{nid} вне трека analyst"
