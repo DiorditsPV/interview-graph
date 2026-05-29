@@ -4,4 +4,4 @@
 
 | ветка | slug | описание | status | verify | review | дата | спека |
 |---|---|---|---|---|---|---|---|
-| _(пусто — заполнится по мере автогенерации)_ | | | | | | | |
+| `feature/interview-tracks` | interview-tracks | Выбор направления интервью (треки/роли) | done | pass | ok — 1 minor reuse note (filter predicate duplicated buildNodes/visibleIds; не блокер) | 2026-05-30 | .claude/features/interview-tracks.md |
