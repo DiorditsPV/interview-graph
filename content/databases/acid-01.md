@@ -6,7 +6,7 @@ kind: question
 subblock: dbms
 tags:
 - consistency
-- sql
+- architecture
 title: ACID и BASE
 topic: db-theory
 weight: 5

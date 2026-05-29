@@ -1,8 +1,7 @@
-Здесь — реестр вопросов интервью и идеи для новых.
+Реестр вопросов интервью и идеи для новых.
 
-Легенда: [x] — вопрос уже сгенерирован (в скобках id ноды), [ ] — ещё нет.
-Названия сведены с заголовками (title) самих вопросов.
-Уровень base = архитектурно-обзорные вопросы (идут перед junior).
+Легенда: [x] — сгенерирован (в скобках id ноды), [ ] — идея.
+Названия [x] сведены с заголовками (title) самих вопросов.
 
 Airflow (frameworks/airflow):
 - [x] Архитектура Airflow — base (af-architecture-01)
@@ -23,6 +22,7 @@ PySpark (frameworks/pyspark):
 - [x] repartition vs coalesce — middle (spark-batch-05)
 - [x] Spark Structured Streaming — middle (spark-batch-06)
 - [x] cache/persist и уровни хранения — middle (spark-batch-08)
+- [x] Spark: типы и стратегии джойнов — middle (spark-joins-01)
 - [x] Оптимизация skew-join [задача] — senior (spark-batch-02)
 - [x] Dynamic allocation в Spark — senior (spark-batch-03)
 - [x] Adaptive Query Execution (AQE) — senior (spark-batch-09)
@@ -35,58 +35,55 @@ dbt (frameworks/dbt):
 
 Kafka / Streaming (frameworks/streaming):
 - [x] Архитектура Kafka — base (streaming-02)
-- [x] Exactly-once: Kafka → Flink — middle (streaming-01)
+- [x] Гарантии доставки Kafka — middle (streaming-03)
 - [x] Consumer groups и rebalancing — middle (streaming-04)
 - [x] Управление офсетами Kafka — middle (streaming-05)
 - [x] Producer-тюнинг и партиционирование — middle (streaming-06)
-- [x] Гарантии доставки Kafka — senior (streaming-03)
 
 SQL (databases/sql):
 - [x] Как выполняется SQL-запрос — base (sql-architecture-01)
 - [x] Оконные функции: ROW_NUMBER / RANK — junior (sql-01)
 - [x] Топ-3 SKU по регионам [задача] — middle (sql-02)
 
-Движки и хранение — OLAP/OLTP, Trino, HDFS/S3, parquet (databases/engines):
+СУБД и движки (databases/dbms):
 - [x] Архитектура ClickHouse — base (olap-ch-arch-01)
 - [x] Архитектура PostgreSQL — base (oltp-pg-arch-01)
 - [x] Архитектура Trino — base (query-trino-arch-01)
-- [x] Устройство Apache Parquet — base (storage-02)
-- [x] Архитектура HDFS — base (storage-03)
-- [x] Объектная модель S3 — base (storage-05)
+- [x] ACID и BASE — junior (acid-01)
+- [x] CAP-теорема — middle (cap-theorem-01)
 - [x] ClickHouse: MergeTree и ORDER BY — middle (olap-ch-01)
 - [x] PostgreSQL: индексы и EXPLAIN — middle (oltp-pg-01)
-- [x] Партиционирование parquet — middle (storage-01)
+- [x] PostgreSQL: типы и алгоритмы джойнов — middle (pg-joins-01)
+- [x] PostgreSQL: уровни изоляции и MVCC — senior (pg-isolation-01)
+- [x] Trino: pushdown и federation — senior (query-trino-01)
+
+Хранилища (databases/storage):
+- [x] Архитектура HDFS — base (storage-03)
+- [x] Объектная модель S3 — base (storage-05)
 - [x] Размер блока и small files в HDFS — middle (storage-04)
 - [x] S3 как хранилище data lake — middle (storage-06)
-- [x] Trino: pushdown и federation — senior (query-trino-01)
 - [x] HDFS против S3 для data lake — senior (storage-07)
 
-Python (python/python):
+Форматы (databases/formats):
+- [x] Устройство Apache Parquet — base (storage-02)
+- [x] Партиционирование parquet — middle (storage-01)
+- [x] Табличные форматы поверх parquet — middle (tableformats-01)
+- [x] Apache Iceberg: снапшоты и метаданные — senior (iceberg-01)
+
+Python (python):
 - [x] Как устроен CPython — base (py-architecture-01)
 - [x] Генераторы vs списки — junior (py-lang-01)
 - [x] Валидация данных (pydantic) — junior (py-quality-01)
 - [x] Векторизация в pandas — middle (py-data-01)
 - [x] GIL и конкурентность — middle (py-lang-02)
 
-Платформа (platform/platform):
+Платформа (platform):
 - [x] Контейнеризация и оркестрация — base (plat-architecture-01)
 - [x] CI для Airflow DAG — junior (plat-ci-01)
 - [x] Метрики прогноза спроса — middle (domain-01)
 - [x] Lineage и data quality — middle (monitoring-01)
 - [x] Multi-stage Docker build — middle (plat-docker-01)
 
-Форматы хранения / таблоформаты (databases/formats) — идеи:
-- [x] Зачем табличные форматы (Iceberg / Hudi / Delta) поверх parquet: какие проблемы «голого» parquet на S3/HDFS они решают — ACID, эволюция схемы, time travel, конкурентная запись, компакция мелких файлов? (tableformats-01)
-- [x] Apache Iceberg: устройство снапшотов и метаданных (manifests), hidden partitioning, удобство для движков (Trino/Spark) и эволюции таблиц. (iceberg-01)
-
-Базы данных — теория и транзакции (databases/dbms) — идеи:
-- [x] CAP-теорема: consistency / availability / partition tolerance — почему при сетевом разделении приходится выбирать между C и A; примеры CP- и AP-систем. (cap-theorem-01)
-- [x] ACID: atomicity / consistency / isolation / durability — что гарантирует каждое свойство и зачем; чем отличается от BASE в распределённых хранилищах. (acid-01)
-- [x] Транзакционность в PostgreSQL: уровни изоляции (Read Committed / Repeatable Read / Serializable), MVCC, аномалии (dirty / non-repeatable / phantom read) и как PG их предотвращает. (pg-isolation-01)
-- [x] PostgreSQL — джойны: логические типы (INNER / LEFT / RIGHT / FULL / CROSS) vs физические алгоритмы (nested loop / hash join / merge join) — когда планировщик что выбирает и почему. (pg-joins-01)
-
-PySpark (frameworks/pyspark) — идеи:
-- [x] Spark — джойны: логические типы (inner / outer / semi / anti) vs физические стратегии (broadcast hash join / sort-merge join / shuffle hash join) — как Spark выбирает и как влиять (broadcast, AQE). (spark-joins-01)
-
+=== Идеи (ещё не сгенерированы) ===
 Прочие идеи (ещё не сгенерированы):
 - [ ] (добавляйте сюда новые идеи; после генерации помечайте [x] с id)

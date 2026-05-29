@@ -5,8 +5,8 @@ id: query-trino-01
 kind: question
 subblock: dbms
 tags:
-- storage
 - distributed
+- optimization
 title: 'Trino: pushdown и federation'
 topic: query-engines
 weight: 5

@@ -1,6 +1,6 @@
 ---
 block: frameworks
-difficulty: senior
+difficulty: middle
 id: streaming-03
 kind: question
 subblock: streaming

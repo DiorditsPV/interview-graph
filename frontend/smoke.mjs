@@ -88,11 +88,11 @@ console.log("OK: «Дальше» advances from a leaf node");
 const tbBtns = await page.locator(".topbar .toolbar .tb__toggle").count();
 if (tbBtns < 3) fail(`display toolbar buttons missing in topbar (got ${tbBtns})`);
 const vBefore = await page.locator(".guides__v").count();
-if (vBefore < 1) fail("vertical guides not rendered by default");
-await page.locator(".tb__toggle", { hasText: "Верт" }).click(); // выключить вертикальные
+if (vBefore !== 0) fail(`vertical guides should be off by default (got ${vBefore})`);
+await page.locator(".tb__toggle", { hasText: "Верт" }).click(); // включить вертикальные
 await page.waitForTimeout(200);
 const vAfter = await page.locator(".guides__v").count();
-if (vAfter !== 0) fail(`vertical guides did not toggle off (still ${vAfter})`);
+if (vAfter < 1) fail("vertical guides did not toggle on");
 const bgDefault = await page.locator(".react-flow__background").count();
 if (bgDefault !== 0) fail(`background should be off by default (got ${bgDefault})`);
 await page.locator(".tb__toggle", { hasText: "Точки" }).click(); // включить точки

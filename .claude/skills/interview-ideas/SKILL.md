@@ -60,8 +60,15 @@ description: >-
 3. Создай файл `content/<block>/<id>.md` (через `python-frontmatter`, нормализованный формат) или
    добавь объект в существующий `.json`.
 4. В `Q_IDEAS.txt` помени идею: `- [x] <title> — <difficulty> (<id>)` (id в скобках обязателен — по нему дедуп).
-5. Прогони **interview-verify**. Если просят обновить весь леджер — regenerator: `/tmp/gen_qideas.py`
-   (читает `/api/graph`, группирует по block/subblock, сортирует base<junior<middle<senior).
+5. Прогони **interview-verify**.
+
+## Регенерация леджера (по запросу «пересобери Q_IDEAS / сведи реестр»)
+```bash
+python3 .claude/skills/interview-ideas/regen_ledger.py
+```
+Скрипт (stdlib, нужен сервер на :8000) пересобирает `[x]`-реестр из `/api/graph` (ground truth),
+группирует по block/subblock, сортирует base<junior<middle<senior и **сохраняет** текущие `[ ]`-идеи.
+Env `API_URL` переопределяет адрес. Пиши `Q_IDEAS.txt` в корне проекта.
 
 ## Подсказка по содержанию
 Стек команды (X5, дата-инженерия): Python, Airflow, Spark/PySpark, Flink, Trino, ClickHouse, Kafka,

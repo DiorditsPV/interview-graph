@@ -168,8 +168,8 @@ export default function App() {
   const [bgVariant, setBgVariant] = useState<BgVariant>(
     () => (localStorage.getItem("bgVariant") === "dots" ? "dots" : "off"),
   );
-  const [guidesH, setGuidesH] = useState<boolean>(() => localStorage.getItem("guidesH") !== "0");
-  const [guidesV, setGuidesV] = useState<boolean>(() => localStorage.getItem("guidesV") !== "0");
+  const [guidesH, setGuidesH] = useState<boolean>(() => localStorage.getItem("guidesH") === "1");
+  const [guidesV, setGuidesV] = useState<boolean>(() => localStorage.getItem("guidesV") === "1");
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;

@@ -7,7 +7,6 @@ subblock: dbms
 tags:
 - consistency
 - concurrency
-- sql
 title: 'PostgreSQL: уровни изоляции и MVCC'
 topic: oltp-relational
 weight: 5
