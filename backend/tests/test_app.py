@@ -96,3 +96,14 @@ def test_api_interview():
     r = _client().post("/api/interview", json={"count": 8, "seed": 1})
     assert r.status_code == 200
     assert len(r.json()["order"]) <= 8
+
+
+def test_api_list_sessions_for_resume():
+    c = _client()
+    sid = c.post("/api/sessions", json={"candidate": "Resume"}).json()["id"]
+    c.post(f"/api/sessions/{sid}/score", json={"nodeId": "sql-01", "score": 5})
+    sessions = c.get("/api/sessions").json()
+    assert any(x["id"] == sid and x["candidate"] == "Resume" for x in sessions)
+    # деталь сессии содержит восстановимые оценки
+    detail = c.get(f"/api/sessions/{sid}").json()
+    assert detail["scores"]["sql-01"]["score"] == 5
