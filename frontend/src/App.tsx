@@ -1,5 +1,6 @@
 import {
   Background,
+  BackgroundVariant,
   Controls,
   MiniMap,
   Panel,
@@ -13,8 +14,10 @@ import { api } from "./api";
 import { BandsNode } from "./components/BandsNode";
 import { BlockGroupNode } from "./components/BlockGroupNode";
 import { DetailDrawer } from "./components/DetailDrawer";
+import { GuidesNode } from "./components/GuidesNode";
 import { QuestionNode } from "./components/QuestionNode";
 import { SubHeadNode } from "./components/SubHeadNode";
+import { downloadReport } from "./report";
 import {
   BLOCK_ORDER,
   CARD_H,
@@ -41,8 +44,13 @@ const nodeTypes = {
   blockGroup: BlockGroupNode,
   subhead: SubHeadNode,
   bands: BandsNode,
+  guides: GuidesNode,
 };
 const NO_EDGES: Edge[] = [];
+
+// Настройки отображения холста (фон + направляющие), сохраняются в localStorage.
+// База — без сетки; точки — единственный альтернативный вариант (переключается иконкой).
+type BgVariant = "off" | "dots";
 
 function buildNodes(
   graph: QNode[],
@@ -53,6 +61,9 @@ function buildNodes(
   activeBlocks: Record<string, boolean>,
   activeDiffs: Record<string, boolean>,
   activeTags: Record<string, boolean>,
+  activeKinds: Record<string, boolean>,
+  guidesH: boolean,
+  guidesV: boolean,
 ): Node[] {
   const nodes: Node[] = [];
   const anyTag = Object.values(activeTags).some(Boolean);
@@ -66,6 +77,18 @@ function buildNodes(
     selectable: false,
     zIndex: -5,
   });
+
+  if (guidesH || guidesV) {
+    nodes.push({
+      id: "bg-guides",
+      type: "guides",
+      position: { x: 0, y: 0 },
+      data: { columns: p.columns, bands: p.bands, width: p.width, height: p.height, guidesH, guidesV },
+      draggable: false,
+      selectable: false,
+      zIndex: -4,
+    });
+  }
 
   for (const bg of p.blockGroups) {
     const blockNodes = graph.filter((n) => n.block === bg.block);
@@ -100,7 +123,7 @@ function buildNodes(
     const pos = p.positions[n.id];
     if (!pos) continue;
     const tagOk = !anyTag || n.tags.some((t) => activeTags[t]);
-    const dimmed = !activeBlocks[n.block] || !activeDiffs[n.difficulty] || !tagOk;
+    const dimmed = !activeBlocks[n.block] || !activeDiffs[n.difficulty] || !activeKinds[n.kind] || !tagOk;
     nodes.push({
       id: n.id,
       type: "question",
@@ -118,6 +141,10 @@ function buildNodes(
 
 const ALL_BLOCKS: Record<string, boolean> = Object.fromEntries(BLOCK_ORDER.map((b) => [b, true]));
 const ALL_DIFFS: Record<string, boolean> = Object.fromEntries(DIFFS.map((d) => [d, true]));
+const KINDS = ["question", "task"] as const;
+const KIND_LABEL: Record<string, string> = { question: "вопрос", task: "задача" };
+const KIND_COLOR: Record<string, string> = { question: "#2563eb", task: "#9333ea" };
+const ALL_KINDS: Record<string, boolean> = { question: true, task: true };
 
 export default function App() {
   const [graph, setGraph] = useState<QNode[]>([]);
@@ -132,16 +159,25 @@ export default function App() {
   const [activeBlocks, setActiveBlocks] = useState<Record<string, boolean>>(ALL_BLOCKS);
   const [activeDiffs, setActiveDiffs] = useState<Record<string, boolean>>(ALL_DIFFS);
   const [activeTags, setActiveTags] = useState<Record<string, boolean>>({});
+  const [activeKinds, setActiveKinds] = useState<Record<string, boolean>>(ALL_KINDS);
   const [theme, setTheme] = useState<"light" | "dark">(
     () =>
       (localStorage.getItem("theme") as "light" | "dark") ||
       (window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light"),
   );
+  const [bgVariant, setBgVariant] = useState<BgVariant>(
+    () => (localStorage.getItem("bgVariant") === "dots" ? "dots" : "off"),
+  );
+  const [guidesH, setGuidesH] = useState<boolean>(() => localStorage.getItem("guidesH") !== "0");
+  const [guidesV, setGuidesV] = useState<boolean>(() => localStorage.getItem("guidesV") !== "0");
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem("theme", theme);
   }, [theme]);
+  useEffect(() => localStorage.setItem("bgVariant", bgVariant), [bgVariant]);
+  useEffect(() => localStorage.setItem("guidesH", guidesH ? "1" : "0"), [guidesH]);
+  useEffect(() => localStorage.setItem("guidesV", guidesV ? "1" : "0"), [guidesV]);
 
   const instance = useRef<ReactFlowInstance<Node, Edge> | null>(null);
   const nodeMap = useMemo(() => Object.fromEntries(graph.map((n) => [n.id, n])), [graph]);
@@ -164,9 +200,9 @@ export default function App() {
   const rfNodes = useMemo(
     () =>
       placement
-        ? buildNodes(graph, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags)
+        ? buildNodes(graph, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, guidesH, guidesV)
         : [],
-    [graph, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags],
+    [graph, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, guidesH, guidesV],
   );
 
   const centerOn = useCallback(
@@ -285,6 +321,7 @@ export default function App() {
   const toggleDiff = (d: Difficulty) => setActiveDiffs((s) => ({ ...s, [d]: !s[d] }));
   const toggleTag = (t: string) => setActiveTags((s) => ({ ...s, [t]: !s[t] }));
   const clearTags = () => setActiveTags({});
+  const toggleKind = (k: string) => setActiveKinds((s) => ({ ...s, [k]: !s[k] }));
 
   const scored = Object.keys(scores).length;
   const avg = scored > 0 ? (Object.values(scores).reduce((a, b) => a + b, 0) / scored).toFixed(1) : "—";
@@ -308,6 +345,36 @@ export default function App() {
       <header className="topbar">
         <strong>Интервью · граф вопросов</strong>
         <span className="muted">{graph.length} нод</span>
+
+        <div className="toolbar" role="group" aria-label="Отображение холста">
+          <button
+            className={`tb__toggle ${bgVariant === "dots" ? "tb__toggle--on" : ""}`}
+            onClick={() => setBgVariant((v) => (v === "dots" ? "off" : "dots"))}
+            aria-pressed={bgVariant === "dots"}
+            title={
+              bgVariant === "dots"
+                ? "Точки на фоне включены — нажмите, чтобы убрать"
+                : "Точки на фоне выключены — нажмите, чтобы показать"
+            }
+          >
+            ⠿ Точки
+          </button>
+          <button
+            className={`tb__toggle ${guidesV ? "tb__toggle--on" : ""}`}
+            onClick={() => setGuidesV((v) => !v)}
+            title="Вертикальные направляющие (границы блоков)"
+          >
+            ⫿ Верт.
+          </button>
+          <button
+            className={`tb__toggle ${guidesH ? "tb__toggle--on" : ""}`}
+            onClick={() => setGuidesH((v) => !v)}
+            title="Горизонтальные направляющие (уровни Base/Junior/Middle/Senior)"
+          >
+            ☰ Гор.
+          </button>
+        </div>
+
         <div className="session">
           {session ? (
             <span className="session__active">
@@ -325,7 +392,15 @@ export default function App() {
             </>
           )}
           <button
-            className="iconbtn"
+            className="iconbtn dlbtn"
+            onClick={() => downloadReport(session?.candidate ?? candidate, graph, scores)}
+            disabled={scored === 0}
+            title={scored === 0 ? "Сначала выставьте оценки" : "Скачать результаты (HTML)"}
+          >
+            📥 Скачать
+          </button>
+          <button
+            className="iconbtn themebtn"
             onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
             title="Переключить тему (светлая/тёмная)"
           >
@@ -367,7 +442,7 @@ export default function App() {
               minZoom={0.1}
               proOptions={{ hideAttribution: true }}
             >
-              <Background />
+              {bgVariant === "dots" && <Background variant={BackgroundVariant.Dots} gap={18} size={1.4} />}
               <Controls showInteractive={false} />
               <MiniMap
                 nodeColor={(n) =>
@@ -412,6 +487,23 @@ export default function App() {
                         onClick={() => toggleDiff(d)}
                       >
                         {d}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="fp__group">
+                    <div className="fp__title">Тип</div>
+                    {KINDS.map((k) => (
+                      <button
+                        key={k}
+                        className={`fp__chip ${activeKinds[k] ? "" : "fp__chip--off"}`}
+                        style={{
+                          borderColor: KIND_COLOR[k],
+                          color: activeKinds[k] ? "#fff" : KIND_COLOR[k],
+                          background: activeKinds[k] ? KIND_COLOR[k] : "transparent",
+                        }}
+                        onClick={() => toggleKind(k)}
+                      >
+                        {KIND_LABEL[k]}
                       </button>
                     ))}
                   </div>

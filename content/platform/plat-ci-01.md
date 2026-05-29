@@ -4,8 +4,8 @@ difficulty: junior
 id: plat-ci-01
 kind: question
 tags:
-- gitlab-ci
-- dag-testing
+- deployment
+- quality
 title: CI для Airflow DAG
 topic: ci-cd
 weight: 3

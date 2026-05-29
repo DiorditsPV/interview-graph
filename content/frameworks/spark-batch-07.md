@@ -5,10 +5,8 @@ id: spark-batch-07
 kind: question
 subblock: pyspark
 tags:
-- spark
-- rdd
-- dataframe
-- catalyst
+- architecture
+- optimization
 title: RDD vs DataFrame vs Dataset
 topic: distributed-batch
 weight: 13

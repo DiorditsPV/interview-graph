@@ -3,10 +3,9 @@ block: databases
 difficulty: middle
 id: storage-06
 kind: question
-subblock: engines
+subblock: storage
 tags:
-- s3
-- data-lake
+- storage
 - partitioning
 title: S3 как хранилище data lake
 topic: storage-formats

@@ -5,8 +5,7 @@ id: spark-batch-01
 kind: question
 subblock: pyspark
 tags:
-- spark
-- shuffle
+- distributed
 - optimization
 title: Shuffle в Spark
 topic: distributed-batch

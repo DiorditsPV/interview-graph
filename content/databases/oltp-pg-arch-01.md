@@ -3,11 +3,9 @@ block: databases
 difficulty: base
 id: oltp-pg-arch-01
 kind: question
-subblock: engines
+subblock: dbms
 tags:
-- postgresql
-- oltp
-- mvcc
+- consistency
 - architecture
 title: Архитектура PostgreSQL
 topic: architecture

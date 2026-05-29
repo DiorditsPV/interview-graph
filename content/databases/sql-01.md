@@ -6,7 +6,6 @@ kind: question
 subblock: sql
 tags:
 - sql
-- window-functions
 title: 'Оконные функции: ROW_NUMBER / RANK'
 topic: analytical-sql
 weight: 10

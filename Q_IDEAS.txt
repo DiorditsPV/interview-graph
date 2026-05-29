@@ -75,5 +75,18 @@ Python (python/python):
 - [x] Lineage и data quality — middle (monitoring-01)
 - [x] Multi-stage Docker build — middle (plat-docker-01)
 
-Идеи (ещё не сгенерированы):
+Форматы хранения / таблоформаты (databases/formats) — идеи:
+- [x] Зачем табличные форматы (Iceberg / Hudi / Delta) поверх parquet: какие проблемы «голого» parquet на S3/HDFS они решают — ACID, эволюция схемы, time travel, конкурентная запись, компакция мелких файлов? (tableformats-01)
+- [x] Apache Iceberg: устройство снапшотов и метаданных (manifests), hidden partitioning, удобство для движков (Trino/Spark) и эволюции таблиц. (iceberg-01)
+
+Базы данных — теория и транзакции (databases/dbms) — идеи:
+- [x] CAP-теорема: consistency / availability / partition tolerance — почему при сетевом разделении приходится выбирать между C и A; примеры CP- и AP-систем. (cap-theorem-01)
+- [x] ACID: atomicity / consistency / isolation / durability — что гарантирует каждое свойство и зачем; чем отличается от BASE в распределённых хранилищах. (acid-01)
+- [x] Транзакционность в PostgreSQL: уровни изоляции (Read Committed / Repeatable Read / Serializable), MVCC, аномалии (dirty / non-repeatable / phantom read) и как PG их предотвращает. (pg-isolation-01)
+- [x] PostgreSQL — джойны: логические типы (INNER / LEFT / RIGHT / FULL / CROSS) vs физические алгоритмы (nested loop / hash join / merge join) — когда планировщик что выбирает и почему. (pg-joins-01)
+
+PySpark (frameworks/pyspark) — идеи:
+- [x] Spark — джойны: логические типы (inner / outer / semi / anti) vs физические стратегии (broadcast hash join / sort-merge join / shuffle hash join) — как Spark выбирает и как влиять (broadcast, AQE). (spark-joins-01)
+
+Прочие идеи (ещё не сгенерированы):
 - [ ] (добавляйте сюда новые идеи; после генерации помечайте [x] с id)

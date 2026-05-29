@@ -3,11 +3,9 @@ block: databases
 difficulty: senior
 id: storage-07
 kind: question
-subblock: engines
+subblock: storage
 tags:
-- hdfs
-- s3
-- data-lake
+- storage
 title: HDFS против S3 для data lake
 topic: storage-formats
 weight: 5

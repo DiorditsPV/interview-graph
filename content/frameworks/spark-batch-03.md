@@ -5,9 +5,7 @@ id: spark-batch-03
 kind: question
 subblock: pyspark
 tags:
-- spark
-- dynamic-allocation
-- tuning
+- optimization
 title: Dynamic allocation в Spark
 topic: distributed-batch
 weight: 13

@@ -59,12 +59,20 @@ if (cardText.length > 60) fail(`card shows full question, not short title: "${ca
 console.log(`OK: card shows short title ("${cardText}")`);
 
 // 5b. Фильтр по тегам: клик по тегу гасит нерелевантные ноды.
-await page.locator(".fp__tag", { hasText: "spark" }).first().click();
+await page.locator(".fp__tag", { hasText: "optimization" }).first().click();
 await page.waitForTimeout(300);
 const dimmed = await page.locator(".qnode--dimmed").count();
 if (dimmed < 1) fail("tag filter did not dim any nodes");
 console.log(`OK: tag filter dims ${dimmed} non-matching nodes`);
 await page.locator(".fp__clear").click(); // сброс тегов
+
+// 5c. Фильтр по типу (вопрос/задача): выключение «вопрос» гасит вопросные ноды.
+await page.locator(".fp__chip", { hasText: "вопрос" }).click();
+await page.waitForTimeout(250);
+const dimmedByKind = await page.locator(".qnode--dimmed").count();
+if (dimmedByKind < 1) fail("kind filter did not dim any nodes");
+await page.locator(".fp__chip", { hasText: "вопрос" }).click(); // вернуть
+console.log(`OK: kind filter dims ${dimmedByKind} nodes`);
 
 // 6. «Дальше» на листовой ноде (без исходящих рёбер) всё равно переходит дальше.
 await page.locator(".qnode__title", { hasText: "KubernetesExecutor" }).first().click();
@@ -76,9 +84,35 @@ const afterNext = await page.locator(".hud__title").innerText();
 if (afterNext === beforeNext) fail("«Дальше» stuck on leaf node");
 console.log("OK: «Дальше» advances from a leaf node");
 
-// 7. Тёмная тема: переключатель меняет data-theme и тёмный фон.
+// 6b. Панель отображения (левая часть шапки): иконки-тумблеры направляющих и точек-фона.
+const tbBtns = await page.locator(".topbar .toolbar .tb__toggle").count();
+if (tbBtns < 3) fail(`display toolbar buttons missing in topbar (got ${tbBtns})`);
+const vBefore = await page.locator(".guides__v").count();
+if (vBefore < 1) fail("vertical guides not rendered by default");
+await page.locator(".tb__toggle", { hasText: "Верт" }).click(); // выключить вертикальные
+await page.waitForTimeout(200);
+const vAfter = await page.locator(".guides__v").count();
+if (vAfter !== 0) fail(`vertical guides did not toggle off (still ${vAfter})`);
+const bgDefault = await page.locator(".react-flow__background").count();
+if (bgDefault !== 0) fail(`background should be off by default (got ${bgDefault})`);
+await page.locator(".tb__toggle", { hasText: "Точки" }).click(); // включить точки
+await page.waitForTimeout(200);
+const bgDots = await page.locator(".react-flow__background").count();
+if (bgDots < 1) fail("dots background not shown after toggling icon");
+console.log("OK: display toolbar (icons) toggles guides + dots grid (default off)");
+
+// 7. Скачивание результатов: кнопка отдаёт .html-файл.
+const [dl] = await Promise.all([
+  page.waitForEvent("download"),
+  page.locator(".dlbtn").click(),
+]);
+const fn = dl.suggestedFilename();
+if (!fn.endsWith(".html")) fail(`download is not .html: ${fn}`);
+console.log(`OK: results download (${fn})`);
+
+// 8. Тёмная тема: переключатель меняет data-theme и тёмный фон.
 const before = await page.evaluate(() => document.documentElement.dataset.theme || "light");
-await page.locator(".iconbtn").click();
+await page.locator(".themebtn").click();
 await page.waitForTimeout(200);
 const after = await page.evaluate(() => document.documentElement.dataset.theme);
 if (after === before) fail(`theme toggle did not change theme (${before} → ${after})`);

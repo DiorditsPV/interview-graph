@@ -3,12 +3,9 @@ block: databases
 difficulty: middle
 id: storage-01
 kind: question
-subblock: engines
+subblock: formats
 tags:
-- parquet
 - partitioning
-- hdfs
-- s3
 title: Партиционирование parquet
 topic: storage-formats
 weight: 5

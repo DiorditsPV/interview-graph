@@ -5,9 +5,8 @@ id: af-orchestration-03
 kind: question
 subblock: airflow
 tags:
-- airflow
-- kubernetes
-- executor
+- deployment
+- orchestration
 title: KubernetesExecutor vs CeleryExecutor
 topic: orchestration
 weight: 16

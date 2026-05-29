@@ -5,9 +5,8 @@ id: af-orchestration-05
 kind: question
 subblock: airflow
 tags:
-- airflow
-- xcom
-- metadata-db
+- orchestration
+- architecture
 title: XCom в Airflow
 topic: orchestration
 weight: 16

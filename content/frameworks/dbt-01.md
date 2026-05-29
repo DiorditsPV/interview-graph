@@ -5,9 +5,7 @@ id: dbt-01
 kind: question
 subblock: dbt
 tags:
-- dbt
-- models
-- materializations
+- data-modeling
 title: Модели и материализации dbt
 topic: transformations
 weight: 6

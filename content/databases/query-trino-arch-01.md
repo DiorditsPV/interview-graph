@@ -3,10 +3,9 @@ block: databases
 difficulty: base
 id: query-trino-arch-01
 kind: question
-subblock: engines
+subblock: dbms
 tags:
-- trino
-- mpp
+- distributed
 - architecture
 title: Архитектура Trino
 topic: architecture

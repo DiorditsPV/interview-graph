@@ -66,7 +66,23 @@ button {
   background: var(--surface); color: var(--text); cursor: pointer; font-size: 14px;
 }
 button:hover { background: var(--hover); }
+button:disabled { opacity: .5; cursor: not-allowed; }
+button:disabled:hover { background: var(--surface); }
 .iconbtn { padding: 6px 10px; line-height: 1; }
+
+/* ---- панель отображения холста (левая часть шапки) ---- */
+.toolbar {
+  display: flex; align-items: center; gap: 8px;
+  margin-left: 14px; padding-left: 14px; border-left: 1px solid var(--border);
+}
+.tb__field { display: flex; align-items: center; gap: 6px; }
+.tb__lbl { font-size: 13px; color: var(--text-muted); }
+.tb__select {
+  padding: 5px 8px; border: 1px solid var(--border-strong); border-radius: 6px;
+  background: var(--surface); color: var(--text); font-size: 13px; cursor: pointer;
+}
+.tb__toggle { font-size: 13px; padding: 5px 10px; }
+.tb__toggle--on { background: var(--tag-bg); color: var(--tag-fg); border-color: var(--tag-fg); }
 
 .errbar {
   padding: 6px 16px; background: #fef2f2; color: #991b1b; font-size: 13px;
@@ -204,7 +220,11 @@ button:hover { background: var(--hover); }
 .hud__cancel:hover { color: #ef4444; background: none; }
 
 .bands { position: relative; pointer-events: none; }
-.bands__divider { position: absolute; height: 0; border-top: 1px dashed var(--border-strong); opacity: .7; }
+
+/* ---- переключаемые направляющие (горизонталь = уровни, вертикаль = блоки) ---- */
+.guides { position: relative; pointer-events: none; }
+.guides__h { position: absolute; left: 0; height: 0; border-top: 2.5px solid var(--border-strong); opacity: .9; }
+.guides__v { position: absolute; top: 0; width: 0; border-left: 2.5px solid var(--border-strong); opacity: .8; }
 .bands__label {
   position: absolute; display: flex; align-items: center; justify-content: center;
   font-size: 12px; font-weight: 700; letter-spacing: .12em; writing-mode: vertical-rl;

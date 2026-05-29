@@ -29,7 +29,7 @@ export const DIFF_LABEL_FULL: Record<Difficulty, string> = {
 // Предпочтительный порядок под-блоков и их подписи.
 const PREFERRED_SUB: Partial<Record<Block, string[]>> = {
   frameworks: ["airflow", "pyspark", "dbt", "streaming"],
-  databases: ["sql", "engines"],
+  databases: ["sql", "dbms", "storage", "formats"],
 };
 export const SUB_LABEL: Record<string, string> = {
   airflow: "Airflow",
@@ -37,6 +37,9 @@ export const SUB_LABEL: Record<string, string> = {
   dbt: "dbt",
   streaming: "Streaming",
   sql: "SQL",
+  dbms: "СУБД и движки",
+  storage: "Хранилища",
+  formats: "Форматы",
   engines: "Движки и хранение",
 };
 

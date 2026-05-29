@@ -5,8 +5,7 @@ id: streaming-06
 kind: question
 subblock: streaming
 tags:
-- kafka
-- producer
+- streaming
 - partitioning
 title: Producer-тюнинг и партиционирование
 topic: streaming

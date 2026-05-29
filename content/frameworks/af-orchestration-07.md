@@ -5,9 +5,7 @@ id: af-orchestration-07
 kind: question
 subblock: airflow
 tags:
-- airflow
-- sensors
-- deferrable
+- orchestration
 title: Sensors и deferrable-операторы
 topic: orchestration
 weight: 16

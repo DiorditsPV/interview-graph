@@ -5,9 +5,7 @@ id: af-orchestration-04
 kind: question
 subblock: airflow
 tags:
-- airflow
-- operators
-- custom-operator
+- orchestration
 title: Операторы и свой оператор
 topic: orchestration
 weight: 16

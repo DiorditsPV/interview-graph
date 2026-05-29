@@ -5,9 +5,7 @@ id: streaming-03
 kind: question
 subblock: streaming
 tags:
-- kafka
-- delivery-semantics
-- exactly-once
+- consistency
 title: Гарантии доставки Kafka
 topic: streaming
 weight: 6

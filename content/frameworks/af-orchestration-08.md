@@ -5,9 +5,7 @@ id: af-orchestration-08
 kind: question
 subblock: airflow
 tags:
-- airflow
-- trigger-rules
-- branching
+- orchestration
 title: Trigger rules и ветвление
 topic: orchestration
 weight: 16

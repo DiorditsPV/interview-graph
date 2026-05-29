@@ -5,9 +5,7 @@ id: spark-batch-04
 kind: question
 subblock: pyspark
 tags:
-- spark
 - architecture
-- driver-executor
 title: Архитектура PySpark
 topic: architecture
 weight: 13

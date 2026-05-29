@@ -3,11 +3,9 @@ block: databases
 difficulty: middle
 id: storage-04
 kind: question
-subblock: engines
+subblock: storage
 tags:
-- hdfs
-- small-files
-- block-size
+- partitioning
 title: Размер блока и small files в HDFS
 topic: storage-formats
 weight: 5

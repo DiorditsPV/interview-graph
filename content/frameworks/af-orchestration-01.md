@@ -5,8 +5,7 @@ id: af-orchestration-01
 kind: question
 subblock: airflow
 tags:
-- airflow
-- dag
+- orchestration
 title: DAG и идемпотентность
 topic: orchestration
 weight: 16

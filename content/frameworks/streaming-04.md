@@ -5,9 +5,7 @@ id: streaming-04
 kind: question
 subblock: streaming
 tags:
-- kafka
-- consumer-group
-- rebalancing
+- streaming
 title: Consumer groups и rebalancing
 topic: streaming
 weight: 6

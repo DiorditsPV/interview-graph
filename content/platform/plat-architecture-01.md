@@ -4,8 +4,7 @@ difficulty: base
 id: plat-architecture-01
 kind: question
 tags:
-- docker
-- kubernetes
+- deployment
 - architecture
 title: Контейнеризация и оркестрация
 topic: architecture

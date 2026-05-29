@@ -5,10 +5,8 @@ id: af-orchestration-09
 kind: question
 subblock: airflow
 tags:
-- airflow
-- connections
-- hooks
-- secrets
+- orchestration
+- deployment
 title: Connections, Hooks и секреты
 topic: orchestration
 weight: 16

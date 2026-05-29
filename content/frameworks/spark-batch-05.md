@@ -5,9 +5,7 @@ id: spark-batch-05
 kind: question
 subblock: pyspark
 tags:
-- spark
 - partitioning
-- repartition
 title: repartition vs coalesce
 topic: distributed-batch
 weight: 13

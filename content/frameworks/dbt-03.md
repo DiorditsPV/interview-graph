@@ -5,10 +5,9 @@ id: dbt-03
 kind: question
 subblock: dbt
 tags:
-- dbt
-- lineage
-- snapshots
-- ci
+- monitoring
+- data-modeling
+- deployment
 title: 'dbt на масштабе: lineage и SCD'
 topic: transformations
 weight: 6

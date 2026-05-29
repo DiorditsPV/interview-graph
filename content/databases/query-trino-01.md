@@ -3,11 +3,10 @@ block: databases
 difficulty: senior
 id: query-trino-01
 kind: question
-subblock: engines
+subblock: dbms
 tags:
-- trino
-- hive-metastore
-- federation
+- storage
+- distributed
 title: 'Trino: pushdown и federation'
 topic: query-engines
 weight: 5

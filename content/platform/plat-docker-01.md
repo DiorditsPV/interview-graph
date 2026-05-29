@@ -4,9 +4,7 @@ difficulty: middle
 id: plat-docker-01
 kind: question
 tags:
-- docker
-- kubernetes
-- multi-stage
+- deployment
 title: Multi-stage Docker build
 topic: containers
 weight: 4

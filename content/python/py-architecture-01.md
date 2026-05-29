@@ -4,8 +4,6 @@ difficulty: base
 id: py-architecture-01
 kind: question
 tags:
-- python
-- cpython
 - architecture
 title: Как устроен CPython
 topic: architecture

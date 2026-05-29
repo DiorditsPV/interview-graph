@@ -5,7 +5,6 @@ id: af-architecture-01
 kind: question
 subblock: airflow
 tags:
-- airflow
 - architecture
 title: Архитектура Airflow
 topic: architecture

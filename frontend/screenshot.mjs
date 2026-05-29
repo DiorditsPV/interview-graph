@@ -18,7 +18,9 @@ if (process.env.CLICK) {
   await page.locator(".hud__score .scorebtn").nth(3).click();
 }
 await page.waitForTimeout(700);
-const clip = process.env.CLIP
+const clip = process.env.CX
+  ? { x: +process.env.CX, y: 55, width: +(process.env.CW || 700), height: 920 }
+  : process.env.CLIP
   ? { x: 100, y: 55, width: 720, height: 920 }
   : undefined;
 await page.screenshot({ path: OUT, fullPage: false, clip });

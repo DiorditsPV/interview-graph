@@ -5,9 +5,7 @@ id: af-orchestration-06
 kind: question
 subblock: airflow
 tags:
-- airflow
-- executor
-- celery
+- orchestration
 title: Executor'ы Airflow
 topic: orchestration
 weight: 16

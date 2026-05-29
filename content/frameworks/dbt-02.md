@@ -5,9 +5,8 @@ id: dbt-02
 kind: question
 subblock: dbt
 tags:
-- dbt
-- incremental
-- tests
+- data-modeling
+- quality
 title: Incremental-модели и тесты
 topic: transformations
 weight: 6

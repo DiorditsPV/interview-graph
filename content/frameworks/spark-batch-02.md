@@ -25,9 +25,7 @@ starterCode: '# PySpark: join большой таблицы продаж с ма
   '
 subblock: pyspark
 tags:
-- spark
-- skew
-- join
+- optimization
 title: Оптимизация skew-join
 topic: distributed-batch
 weight: 13

@@ -3,10 +3,8 @@ block: databases
 difficulty: base
 id: olap-ch-arch-01
 kind: question
-subblock: engines
+subblock: dbms
 tags:
-- clickhouse
-- olap
 - architecture
 title: Архитектура ClickHouse
 topic: architecture

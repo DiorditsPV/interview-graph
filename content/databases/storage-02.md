@@ -3,11 +3,9 @@ block: databases
 difficulty: base
 id: storage-02
 kind: question
-subblock: engines
+subblock: formats
 tags:
-- parquet
-- columnar
-- file-format
+- file-formats
 title: Устройство Apache Parquet
 topic: architecture
 weight: 5

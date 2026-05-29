@@ -5,9 +5,7 @@ id: af-orchestration-02
 kind: question
 subblock: airflow
 tags:
-- airflow
-- backfill
-- scheduling
+- orchestration
 title: Backfill и catchup
 topic: orchestration
 weight: 16

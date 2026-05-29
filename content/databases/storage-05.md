@@ -3,10 +3,9 @@ block: databases
 difficulty: base
 id: storage-05
 kind: question
-subblock: engines
+subblock: storage
 tags:
-- s3
-- object-storage
+- storage
 - consistency
 title: Объектная модель S3
 topic: architecture

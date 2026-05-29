@@ -5,9 +5,8 @@ id: dbt-architecture-01
 kind: question
 subblock: dbt
 tags:
-- dbt
 - architecture
-- elt
+- data-modeling
 title: Как устроен dbt
 topic: architecture
 weight: 6

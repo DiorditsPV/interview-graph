@@ -5,9 +5,7 @@ id: streaming-01
 kind: question
 subblock: streaming
 tags:
-- kafka
-- flink
-- exactly-once
+- consistency
 title: 'Exactly-once: Kafka → Flink'
 topic: streaming
 weight: 6

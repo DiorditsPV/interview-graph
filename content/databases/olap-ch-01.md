@@ -3,10 +3,9 @@ block: databases
 difficulty: middle
 id: olap-ch-01
 kind: question
-subblock: engines
+subblock: dbms
 tags:
-- clickhouse
-- mergetree
+- architecture
 title: 'ClickHouse: MergeTree и ORDER BY'
 topic: olap-columnar
 weight: 5

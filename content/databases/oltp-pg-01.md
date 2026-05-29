@@ -3,11 +3,9 @@ block: databases
 difficulty: middle
 id: oltp-pg-01
 kind: question
-subblock: engines
+subblock: dbms
 tags:
-- postgresql
-- index
-- explain
+- optimization
 title: 'PostgreSQL: индексы и EXPLAIN'
 topic: oltp-relational
 weight: 5

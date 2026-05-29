@@ -4,8 +4,6 @@ difficulty: junior
 id: py-lang-01
 kind: question
 tags:
-- python
-- generators
 - memory
 title: Генераторы vs списки
 topic: language

@@ -5,8 +5,6 @@ id: spark-batch-09
 kind: question
 subblock: pyspark
 tags:
-- spark
-- aqe
 - optimization
 title: Adaptive Query Execution (AQE)
 topic: distributed-batch

@@ -5,9 +5,7 @@ id: spark-batch-06
 kind: question
 subblock: pyspark
 tags:
-- spark
-- structured-streaming
-- watermark
+- streaming
 title: Spark Structured Streaming
 topic: stream-processing
 weight: 13

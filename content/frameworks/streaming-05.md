@@ -5,9 +5,7 @@ id: streaming-05
 kind: question
 subblock: streaming
 tags:
-- kafka
-- offset
-- commit
+- streaming
 title: Управление офсетами Kafka
 topic: streaming
 weight: 6

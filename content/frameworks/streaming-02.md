@@ -5,9 +5,8 @@ id: streaming-02
 kind: question
 subblock: streaming
 tags:
-- kafka
-- partitions
-- offset
+- partitioning
+- streaming
 title: Архитектура Kafka
 topic: architecture
 weight: 6

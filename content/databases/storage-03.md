@@ -3,11 +3,10 @@ block: databases
 difficulty: base
 id: storage-03
 kind: question
-subblock: engines
+subblock: storage
 tags:
-- hdfs
-- namenode
-- replication
+- architecture
+- storage
 title: Архитектура HDFS
 topic: architecture
 weight: 5

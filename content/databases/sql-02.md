@@ -18,8 +18,6 @@ starterCode: '-- Таблица sales(region, sku, qty, dt). Нужен топ-3
 subblock: sql
 tags:
 - sql
-- window-functions
-- top-n
 title: Топ-3 SKU по регионам
 topic: analytical-sql
 weight: 10

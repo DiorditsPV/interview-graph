@@ -4,8 +4,6 @@ difficulty: middle
 id: py-lang-02
 kind: question
 tags:
-- python
-- gil
 - concurrency
 title: GIL и конкурентность
 topic: language

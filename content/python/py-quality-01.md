@@ -4,9 +4,7 @@ difficulty: junior
 id: py-quality-01
 kind: question
 tags:
-- pydantic
-- testing
-- data-quality
+- quality
 title: Валидация данных (pydantic)
 topic: validation-quality
 weight: 7

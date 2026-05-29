@@ -5,10 +5,7 @@ id: spark-batch-08
 kind: question
 subblock: pyspark
 tags:
-- spark
-- cache
-- persist
-- storage-level
+- memory
 title: cache/persist и уровни хранения
 topic: distributed-batch
 weight: 13

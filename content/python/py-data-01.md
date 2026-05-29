@@ -4,9 +4,7 @@ difficulty: middle
 id: py-data-01
 kind: question
 tags:
-- pandas
-- numpy
-- vectorization
+- optimization
 title: Векторизация в pandas
 topic: data-libs
 weight: 8

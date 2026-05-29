@@ -6,7 +6,6 @@ kind: question
 subblock: sql
 tags:
 - sql
-- query-execution
 - architecture
 title: Как выполняется SQL-запрос
 topic: architecture
