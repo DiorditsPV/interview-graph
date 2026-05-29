@@ -1,0 +1,79 @@
+Здесь — реестр вопросов интервью и идеи для новых.
+
+Легенда: [x] — вопрос уже сгенерирован (в скобках id ноды), [ ] — ещё нет.
+Названия сведены с заголовками (title) самих вопросов.
+Уровень base = архитектурно-обзорные вопросы (идут перед junior).
+
+Airflow (frameworks/airflow):
+- [x] Архитектура Airflow — base (af-architecture-01)
+- [x] DAG и идемпотентность — junior (af-orchestration-01)
+- [x] Операторы и свой оператор — junior (af-orchestration-04)
+- [x] Connections, Hooks и секреты — junior (af-orchestration-09)
+- [x] Backfill и catchup — middle (af-orchestration-02)
+- [x] XCom в Airflow — middle (af-orchestration-05)
+- [x] Executor'ы Airflow — middle (af-orchestration-06)
+- [x] Trigger rules и ветвление — middle (af-orchestration-08)
+- [x] KubernetesExecutor vs CeleryExecutor — senior (af-orchestration-03)
+- [x] Sensors и deferrable-операторы — senior (af-orchestration-07)
+
+PySpark (frameworks/pyspark):
+- [x] Архитектура PySpark — base (spark-batch-04)
+- [x] RDD vs DataFrame vs Dataset — junior (spark-batch-07)
+- [x] Shuffle в Spark — middle (spark-batch-01)
+- [x] repartition vs coalesce — middle (spark-batch-05)
+- [x] Spark Structured Streaming — middle (spark-batch-06)
+- [x] cache/persist и уровни хранения — middle (spark-batch-08)
+- [x] Оптимизация skew-join [задача] — senior (spark-batch-02)
+- [x] Dynamic allocation в Spark — senior (spark-batch-03)
+- [x] Adaptive Query Execution (AQE) — senior (spark-batch-09)
+
+dbt (frameworks/dbt):
+- [x] Как устроен dbt — base (dbt-architecture-01)
+- [x] Модели и материализации dbt — junior (dbt-01)
+- [x] Incremental-модели и тесты — middle (dbt-02)
+- [x] dbt на масштабе: lineage и SCD — senior (dbt-03)
+
+Kafka / Streaming (frameworks/streaming):
+- [x] Архитектура Kafka — base (streaming-02)
+- [x] Exactly-once: Kafka → Flink — middle (streaming-01)
+- [x] Consumer groups и rebalancing — middle (streaming-04)
+- [x] Управление офсетами Kafka — middle (streaming-05)
+- [x] Producer-тюнинг и партиционирование — middle (streaming-06)
+- [x] Гарантии доставки Kafka — senior (streaming-03)
+
+SQL (databases/sql):
+- [x] Как выполняется SQL-запрос — base (sql-architecture-01)
+- [x] Оконные функции: ROW_NUMBER / RANK — junior (sql-01)
+- [x] Топ-3 SKU по регионам [задача] — middle (sql-02)
+
+Движки и хранение — OLAP/OLTP, Trino, HDFS/S3, parquet (databases/engines):
+- [x] Архитектура ClickHouse — base (olap-ch-arch-01)
+- [x] Архитектура PostgreSQL — base (oltp-pg-arch-01)
+- [x] Архитектура Trino — base (query-trino-arch-01)
+- [x] Устройство Apache Parquet — base (storage-02)
+- [x] Архитектура HDFS — base (storage-03)
+- [x] Объектная модель S3 — base (storage-05)
+- [x] ClickHouse: MergeTree и ORDER BY — middle (olap-ch-01)
+- [x] PostgreSQL: индексы и EXPLAIN — middle (oltp-pg-01)
+- [x] Партиционирование parquet — middle (storage-01)
+- [x] Размер блока и small files в HDFS — middle (storage-04)
+- [x] S3 как хранилище data lake — middle (storage-06)
+- [x] Trino: pushdown и federation — senior (query-trino-01)
+- [x] HDFS против S3 для data lake — senior (storage-07)
+
+Python (python/python):
+- [x] Как устроен CPython — base (py-architecture-01)
+- [x] Генераторы vs списки — junior (py-lang-01)
+- [x] Валидация данных (pydantic) — junior (py-quality-01)
+- [x] Векторизация в pandas — middle (py-data-01)
+- [x] GIL и конкурентность — middle (py-lang-02)
+
+Платформа (platform/platform):
+- [x] Контейнеризация и оркестрация — base (plat-architecture-01)
+- [x] CI для Airflow DAG — junior (plat-ci-01)
+- [x] Метрики прогноза спроса — middle (domain-01)
+- [x] Lineage и data quality — middle (monitoring-01)
+- [x] Multi-stage Docker build — middle (plat-docker-01)
+
+Идеи (ещё не сгенерированы):
+- [ ] (добавляйте сюда новые идеи; после генерации помечайте [x] с id)

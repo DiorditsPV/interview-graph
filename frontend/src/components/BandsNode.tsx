@@ -1,0 +1,36 @@
+import { Fragment, memo } from "react";
+import { DIFF_COLOR, hexA, type Difficulty } from "../types";
+import type { Band } from "../layout";
+
+export interface BandsNodeData {
+  bands: Band[];
+  width: number;
+  labelW: number;
+  height: number;
+  [key: string]: unknown;
+}
+
+// Левая ось сложности + горизонтальные разделители полос (junior→senior сверху вниз).
+function BandsNodeImpl({ data }: { data: BandsNodeData }) {
+  const { bands, width, labelW, height } = data;
+  return (
+    <div className="bands" style={{ width: labelW + width, height }}>
+      {bands.map((b) => {
+        const color = DIFF_COLOR[b.difficulty as Difficulty];
+        return (
+          <Fragment key={b.difficulty}>
+            <div className="bands__divider" style={{ top: b.y, left: labelW, width }} />
+            <div
+              className="bands__label"
+              style={{ top: b.y, height: b.height, width: labelW, color, background: hexA(color, 0.05) }}
+            >
+              <span>{b.label}</span>
+            </div>
+          </Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
+export const BandsNode = memo(BandsNodeImpl);

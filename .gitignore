@@ -1,0 +1,20 @@
+# python
+backend/.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# sqlite
+*.db
+
+# node / vite
+frontend/node_modules/
+frontend/dist/
+
+# os / editor
+.DS_Store
+
+# deploy: локальная пара ключей раннера (НЕ коммитить)
+/.deploy/

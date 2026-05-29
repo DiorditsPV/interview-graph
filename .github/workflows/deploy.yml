@@ -1,0 +1,67 @@
+name: Deploy
+
+# Разворачивает новую версию при вливании в main (merge из любой ветки = push в main).
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+# Не запускать два деплоя одновременно (но и не отменять уже идущий).
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Rsync sources to server (staging)
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+        run: |
+          PORT="${SSH_PORT:-22}"
+          rsync -az --delete \
+            --exclude '.git' \
+            --exclude 'frontend/node_modules' \
+            --exclude 'backend/.venv' \
+            --exclude '__pycache__' \
+            --exclude '*.db' \
+            --exclude '.deploy' \
+            -e "ssh -i ~/.ssh/deploy_key -p ${PORT}" \
+            ./ "${SSH_USER}@${SSH_HOST}:~/interview-src/"
+
+      - name: Bootstrap & restart on server
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+        run: |
+          PORT="${SSH_PORT:-22}"
+          ssh -i ~/.ssh/deploy_key -p "${PORT}" "${SSH_USER}@${SSH_HOST}" \
+            'sudo bash ~/interview-src/deploy/bootstrap.sh ~/interview-src'
