@@ -18,3 +18,4 @@ frontend/dist/
 
 # deploy: локальная пара ключей раннера (НЕ коммитить)
 /.deploy/
+.claude/*.lock
