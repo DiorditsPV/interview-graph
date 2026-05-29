@@ -9,7 +9,7 @@
 
 ## Идеи
 - [x] interview-tracks (feature/interview-tracks) — выбор направления интервью (треки-профили над block/subblock)
-- [ ] session-resume: загрузка прошлой сессии кандидата обратно на доску (восстановить оценки) — backend `/api/sessions/{id}` уже есть; фронт: выбор сессии + проставить scores.
+- [x] session-resume (feature/session-resume) — загрузка прошлой сессии кандидата на доску (восстановление оценок)
 - [ ] node-notes: текстовая заметка интервьюера на ноду, сохраняется с оценкой и попадает в отчёт — backend (поле note в scores уже есть в db), фронт drawer + report.ts.
 - [ ] interview-timer: таймер на вопрос и на сессию в HUD — фронт only (App.tsx/HUD, localStorage).
 - [ ] question-search: строка поиска по тексту вопросов → подсветка/фильтр нод — фронт (App.tsx, filter panel, dimmed-механизм).
