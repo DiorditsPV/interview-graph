@@ -1,4 +1,4 @@
-import type { GraphResponse, Session } from "./types";
+import type { GraphResponse, Session, Track } from "./types";
 
 // В dev /api проксируется Vite на :8000; в прод тот же origin (раздаёт FastAPI).
 const BASE = "/api";
@@ -11,6 +11,7 @@ async function json<T>(res: Response): Promise<T> {
 export const api = {
   graph: () => fetch(`${BASE}/graph`).then(json<GraphResponse>),
   weights: () => fetch(`${BASE}/weights`).then(json<Record<string, number>>),
+  tracks: () => fetch(`${BASE}/tracks`).then(json<Track[]>),
   createSession: (candidate: string) =>
     fetch(`${BASE}/sessions`, {
       method: "POST",
