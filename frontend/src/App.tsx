@@ -13,6 +13,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "./api";
 import { BandsNode } from "./components/BandsNode";
 import { BlockGroupNode } from "./components/BlockGroupNode";
+import { CompareModal } from "./components/CompareModal";
 import { DetailDrawer } from "./components/DetailDrawer";
 import { GuidesNode } from "./components/GuidesNode";
 import { QuestionNode } from "./components/QuestionNode";
@@ -156,6 +157,7 @@ export default function App() {
   const [fullscreen, setFullscreen] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [candidate, setCandidate] = useState("");
+  const [compareOpen, setCompareOpen] = useState(false);
   const [activeBlocks, setActiveBlocks] = useState<Record<string, boolean>>(ALL_BLOCKS);
   const [activeDiffs, setActiveDiffs] = useState<Record<string, boolean>>(ALL_DIFFS);
   const [activeTags, setActiveTags] = useState<Record<string, boolean>>({});
@@ -400,6 +402,13 @@ export default function App() {
             📥 Скачать
           </button>
           <button
+            className="iconbtn cmpbtn"
+            onClick={() => setCompareOpen(true)}
+            title="Сравнить кандидатов по блокам"
+          >
+            📊 Сравнить
+          </button>
+          <button
             className="iconbtn themebtn"
             onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
             title="Переключить тему (светлая/тёмная)"
@@ -579,6 +588,7 @@ export default function App() {
           }}
         />
       </div>
+      {compareOpen && <CompareModal onClose={() => setCompareOpen(false)} />}
     </div>
   );
 }
