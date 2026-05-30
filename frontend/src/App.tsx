@@ -48,6 +48,12 @@ const nodeTypes = {
 };
 const NO_EDGES: Edge[] = [];
 
+// M:SS из миллисекунд (для таймеров вопроса/сессии).
+function mmss(ms: number): string {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
 // Настройки отображения холста (фон + направляющие), сохраняются в localStorage.
 // База — без сетки; точки — единственный альтернативный вариант (переключается иконкой).
 type BgVariant = "off" | "dots";
@@ -156,6 +162,12 @@ export default function App() {
   const [fullscreen, setFullscreen] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [candidate, setCandidate] = useState("");
+  const [now, setNow] = useState(() => Date.now());
+  const [sessionStart, setSessionStart] = useState<number | null>(() => {
+    const v = localStorage.getItem("timerStart");
+    return v ? Number(v) : null;
+  });
+  const [questionStart, setQuestionStart] = useState<number>(() => Date.now());
   const [activeBlocks, setActiveBlocks] = useState<Record<string, boolean>>(ALL_BLOCKS);
   const [activeDiffs, setActiveDiffs] = useState<Record<string, boolean>>(ALL_DIFFS);
   const [activeTags, setActiveTags] = useState<Record<string, boolean>>({});
@@ -178,6 +190,23 @@ export default function App() {
   useEffect(() => localStorage.setItem("bgVariant", bgVariant), [bgVariant]);
   useEffect(() => localStorage.setItem("guidesH", guidesH ? "1" : "0"), [guidesH]);
   useEffect(() => localStorage.setItem("guidesV", guidesV ? "1" : "0"), [guidesV]);
+
+  // Таймеры: сброс «времени на вопрос» при смене текущего; старт «времени сессии» при первом выборе.
+  useEffect(() => {
+    if (!currentId) return;
+    setQuestionStart(Date.now());
+    setSessionStart((s) => {
+      if (s != null) return s;
+      const t = Date.now();
+      localStorage.setItem("timerStart", String(t));
+      return t;
+    });
+  }, [currentId]);
+  useEffect(() => {
+    if (!currentId && sessionStart == null) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [currentId, sessionStart]);
 
   const instance = useRef<ReactFlowInstance<Node, Edge> | null>(null);
   const nodeMap = useMemo(() => Object.fromEntries(graph.map((n) => [n.id, n])), [graph]);
@@ -315,6 +344,9 @@ export default function App() {
     const s = await api.createSession(candidate.trim());
     setSession(s);
     setScores({});
+    const t = Date.now();
+    setSessionStart(t);
+    localStorage.setItem("timerStart", String(t));
   }, [candidate]);
 
   const toggleBlock = (b: Block) => setActiveBlocks((s) => ({ ...s, [b]: !s[b] }));
@@ -537,6 +569,10 @@ export default function App() {
                     </span>
                     <span className="hud__title" title={currentNode.question}>
                       {currentNode.title || currentNode.question}
+                    </span>
+                    <span className="hud__timer" title="Время на вопрос · вся сессия">
+                      ⏱ {mmss(now - questionStart)}
+                      {sessionStart != null && ` · ${mmss(now - sessionStart)}`}
                     </span>
                     <span className="hud__score">
                       {[1, 2, 3, 4, 5].map((i) => (
