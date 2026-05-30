@@ -118,6 +118,27 @@ const after = await page.evaluate(() => document.documentElement.dataset.theme);
 if (after === before) fail(`theme toggle did not change theme (${before} → ${after})`);
 console.log(`OK: theme toggles (${before} → ${after})`);
 
+// 9. Экран «Все вопросы» (bank-browser): открыть, список всего банка, поиск, раскрытие, закрытие.
+await page.locator(".session .iconbtn", { hasText: "Все вопросы" }).click();
+await page.waitForSelector(".bankbrowser", { timeout: 5000 });
+const bankRows = await page.locator(".bankrow").count();
+if (bankRows < nodeCount) fail(`bank shows fewer rows (${bankRows}) than canvas nodes (${nodeCount})`);
+console.log(`OK: bank screen lists ${bankRows} questions`);
+await page.locator(".bankbrowser__search").fill("ROW_NUMBER");
+await page.waitForTimeout(250);
+const bankFiltered = await page.locator(".bankrow").count();
+if (bankFiltered < 1 || bankFiltered >= bankRows) fail(`bank search did not narrow rows (${bankRows} → ${bankFiltered})`);
+console.log(`OK: bank search narrows ${bankRows} → ${bankFiltered}`);
+await page.locator(".bankrow__head").first().click();
+await page.waitForSelector(".bankrow--open .bankrow__body", { timeout: 3000 });
+const bodyLen = (await page.locator(".bankrow--open .bankrow__body").first().innerText()).length;
+if (bodyLen < 30) fail(`expanded bank row body too short (${bodyLen})`);
+console.log("OK: bank row expands with question/answer/criteria");
+await page.keyboard.press("Escape");
+await page.waitForTimeout(200);
+if ((await page.locator(".bankbrowser").count()) !== 0) fail("bank screen did not close on Esc");
+console.log("OK: bank screen closes on Esc");
+
 if (errors.length) fail(`console/page errors:\n${errors.join("\n")}`);
 
 console.log("\nALL SMOKE CHECKS PASSED ✓");

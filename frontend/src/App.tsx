@@ -12,6 +12,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "./api";
 import { BandsNode } from "./components/BandsNode";
+import { BankBrowser } from "./components/BankBrowser";
 import { BlockGroupNode } from "./components/BlockGroupNode";
 import { DetailDrawer } from "./components/DetailDrawer";
 import { GuidesNode } from "./components/GuidesNode";
@@ -154,6 +155,7 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
+  const [showBank, setShowBank] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [candidate, setCandidate] = useState("");
   const [activeBlocks, setActiveBlocks] = useState<Record<string, boolean>>(ALL_BLOCKS);
@@ -392,6 +394,14 @@ export default function App() {
             </>
           )}
           <button
+            className="iconbtn"
+            onClick={() => setShowBank(true)}
+            disabled={graph.length === 0}
+            title="Открыть экран со всеми вопросами банка"
+          >
+            📋 Все вопросы
+          </button>
+          <button
             className="iconbtn dlbtn"
             onClick={() => downloadReport(session?.candidate ?? candidate, graph, scores)}
             disabled={scored === 0}
@@ -579,6 +589,8 @@ export default function App() {
           }}
         />
       </div>
+
+      {showBank && <BankBrowser nodes={graph} onClose={() => setShowBank(false)} />}
     </div>
   );
 }
