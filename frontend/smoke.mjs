@@ -222,6 +222,15 @@ const scoredCount = await page.locator(".qnode--scored").count();
 if (scoredCount < 1) fail("resume did not restore scores onto the board");
 console.log(`OK: session resume restores scores (${scoredCount} scored)`);
 
+// 12. Экспорт банка вопросов: кнопка отдаёт interview_bank_*.html (всегда активна, без reload).
+const [dlBank] = await Promise.all([
+  page.waitForEvent("download"),
+  page.locator(".bankbtn").click(),
+]);
+const bankFn = dlBank.suggestedFilename();
+if (!bankFn.includes("bank") || !bankFn.endsWith(".html")) fail(`bank export wrong file: ${bankFn}`);
+console.log(`OK: question bank export (${bankFn})`);
+
 if (errors.length) fail(`console/page errors:\n${errors.join("\n")}`);
 
 console.log("\nALL SMOKE CHECKS PASSED ✓");

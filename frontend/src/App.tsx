@@ -18,7 +18,7 @@ import { DetailDrawer } from "./components/DetailDrawer";
 import { GuidesNode } from "./components/GuidesNode";
 import { QuestionNode } from "./components/QuestionNode";
 import { SubHeadNode } from "./components/SubHeadNode";
-import { downloadReport } from "./report";
+import { downloadBank, downloadReport } from "./report";
 import {
   BLOCK_ORDER,
   CARD_H,
@@ -576,6 +576,14 @@ export default function App() {
             title="Сравнить кандидатов по блокам"
           >
             📊 Сравнить
+          </button>
+          <button
+            className="iconbtn bankbtn"
+            onClick={() => downloadBank(graph)}
+            disabled={graph.length === 0}
+            title="Скачать весь банк вопросов (HTML)"
+          >
+            🗂 Банк
           </button>
           <button
             className="iconbtn themebtn"
