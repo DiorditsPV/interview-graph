@@ -118,6 +118,30 @@ const after = await page.evaluate(() => document.documentElement.dataset.theme);
 if (after === before) fail(`theme toggle did not change theme (${before} → ${after})`);
 console.log(`OK: theme toggles (${before} → ${after})`);
 
+// 9. UX-полировка: HUD-прогресс+топик, чип переполнения тегов, свёртка панели тегов.
+//    (HUD текущего вопроса уже активен с шага 6 — KubernetesExecutor.)
+await page.waitForSelector(".hud__progress", { timeout: 3000 });
+const hudProg = await page.locator(".hud__progress").innerText();
+if (!hudProg.includes("/")) fail(`HUD progress missing fraction: "${hudProg}"`);
+if (hudProg.replace(/[^·]/g, "").length < 1) fail(`HUD progress missing topic separator: "${hudProg}"`);
+console.log(`OK: HUD progress + topic (${hudProg})`);
+
+const moreChips = await page.locator(".tagchip--more").count();
+if (moreChips < 1) fail("no tag-overflow chip (+N) rendered on any card");
+console.log(`OK: card tag overflow chip (+N) on ${moreChips} cards`);
+
+const tagsBefore = await page.locator(".fp__tag").count();
+if (tagsBefore < 1) fail("expected tag chips in filter panel");
+await page.locator(".fp__collapse").click();
+await page.waitForTimeout(150);
+const tagsCollapsed = await page.locator(".fp__tag").count();
+if (tagsCollapsed !== 0) fail(`tag panel did not collapse (still ${tagsCollapsed})`);
+await page.locator(".fp__collapse").click(); // развернуть обратно
+await page.waitForTimeout(150);
+const tagsAgain = await page.locator(".fp__tag").count();
+if (tagsAgain !== tagsBefore) fail(`tag panel did not restore (${tagsAgain} vs ${tagsBefore})`);
+console.log(`OK: tag panel collapse toggle (${tagsBefore} ⇄ 0)`);
+
 if (errors.length) fail(`console/page errors:\n${errors.join("\n")}`);
 
 console.log("\nALL SMOKE CHECKS PASSED ✓");
