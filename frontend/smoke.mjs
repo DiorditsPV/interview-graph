@@ -118,6 +118,22 @@ const after = await page.evaluate(() => document.documentElement.dataset.theme);
 if (after === before) fail(`theme toggle did not change theme (${before} → ${after})`);
 console.log(`OK: theme toggles (${before} → ${after})`);
 
+// 9. Загрузка вопросов: открыть модалку, загрузить НЕвалидный .md → показана ошибка (файл не пишется).
+await page.locator(".uploadbtn").click();
+await page.waitForSelector(".upload-modal", { timeout: 3000 });
+const badMd = "---\nid: smoke-bad-01\nblock: NOPE\ntopic: x\n---\n## Вопрос\nq\n";
+await page.setInputFiles(".upload-modal input[type=file]", {
+  name: "smoke-bad.md",
+  mimeType: "text/markdown",
+  buffer: Buffer.from(badMd),
+});
+await page.waitForSelector(".upload-result__err", { timeout: 3000 });
+const upErr = await page.locator(".upload-result__err").innerText();
+if (!upErr.toLowerCase().includes("ошибк")) fail(`upload error not shown: "${upErr}"`);
+console.log("OK: upload rejects invalid file with error");
+await page.keyboard.press("Escape");
+await page.waitForSelector(".upload-modal", { state: "detached", timeout: 3000 });
+
 if (errors.length) fail(`console/page errors:\n${errors.join("\n")}`);
 
 console.log("\nALL SMOKE CHECKS PASSED ✓");
