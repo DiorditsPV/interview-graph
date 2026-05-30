@@ -118,6 +118,21 @@ const after = await page.evaluate(() => document.documentElement.dataset.theme);
 if (after === before) fail(`theme toggle did not change theme (${before} → ${after})`);
 console.log(`OK: theme toggles (${before} → ${after})`);
 
+// 9. Скрыть вопрос: кнопка в drawer гасит карточку; тумблер «Скрытые» возвращает (+ пометка).
+// (Drawer открыт с шага 6 — KubernetesExecutor.)
+const dimBeforeHide = await page.locator(".qnode--dimmed").count();
+await page.locator(".drawer__hide").click();
+await page.waitForTimeout(250);
+const dimAfterHide = await page.locator(".qnode--dimmed").count();
+if (dimAfterHide <= dimBeforeHide) fail(`hide did not dim node (${dimBeforeHide}→${dimAfterHide})`);
+await page.locator(".tb__toggle", { hasText: "Скрытые" }).click();
+await page.waitForTimeout(250);
+const dimShown = await page.locator(".qnode--dimmed").count();
+if (dimShown >= dimAfterHide) fail(`show-hidden did not un-dim (${dimAfterHide}→${dimShown})`);
+const hiddenMark = await page.locator(".qnode--hidden").count();
+if (hiddenMark < 1) fail("no .qnode--hidden marker after show-hidden");
+console.log(`OK: hide dims (${dimBeforeHide}→${dimAfterHide}), show-hidden un-dims+marks (${dimShown} dimmed, ${hiddenMark} marked)`);
+
 if (errors.length) fail(`console/page errors:\n${errors.join("\n")}`);
 
 console.log("\nALL SMOKE CHECKS PASSED ✓");
