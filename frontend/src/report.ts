@@ -22,7 +22,12 @@ function pad(n: number): string {
   return String(n).padStart(2, "0");
 }
 
-export function buildReportHtml(candidate: string, nodes: QNode[], scores: Record<string, number>): string {
+export function buildReportHtml(
+  candidate: string,
+  nodes: QNode[],
+  scores: Record<string, number>,
+  notes?: Record<string, string>,
+): string {
   const now = new Date();
   const dateStr = `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
 
@@ -64,10 +69,12 @@ export function buildReportHtml(candidate: string, nodes: QNode[], scores: Recor
             ? `<div class="tags">${n.tags.map((t) => `<span class="tag">${esc(t)}</span>`).join("")}</div>`
             : "";
           const kind = n.kind === "task" ? `<span class="kind">задача</span>` : "";
+          const nText = notes?.[n.id]?.trim();
+          const noteHtml = nText ? `<div class="qnote">📝 ${esc(nText)}</div>` : "";
           return `<tr>
   <td class="c-diff"><span class="diff" style="color:${DIFF_COLOR[n.difficulty]}">${esc(n.difficulty)}</span></td>
   <td class="c-q">${sub}<span class="qt">${esc(n.title || n.question)}</span> ${kind}
-    <div class="topic">${esc(n.topic)}</div>${tags}</td>
+    <div class="topic">${esc(n.topic)}</div>${tags}${noteHtml}</td>
   <td class="c-score"><span class="dots">${dots(s)}</span> <b style="color:${scoreColor(s)}">${s}/5</b></td>
 </tr>`;
         })
@@ -126,6 +133,7 @@ export function buildReportHtml(candidate: string, nodes: QNode[], scores: Recor
   .qt { font-weight: 600; }
   .kind { font-size: 10px; color: #92400e; background: #fef3c7; padding: 1px 6px; border-radius: 4px; }
   .topic { font-size: 11px; color: #9ca3af; margin-top: 2px; }
+  .qnote { font-size: 12px; color: #374151; background: #fffbeb; border-left: 2px solid #f59e0b; padding: 3px 7px; margin-top: 5px; border-radius: 3px; white-space: pre-wrap; }
   .tags { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 3px; }
   .tag { font-size: 9px; color: #4338ca; background: #eef2ff; padding: 1px 5px; border-radius: 4px; }
   .dots { letter-spacing: 1px; font-size: 12px; }
@@ -150,8 +158,13 @@ export function buildReportHtml(candidate: string, nodes: QNode[], scores: Recor
 </body></html>`;
 }
 
-export function downloadReport(candidate: string, nodes: QNode[], scores: Record<string, number>): void {
-  const html = buildReportHtml(candidate, nodes, scores);
+export function downloadReport(
+  candidate: string,
+  nodes: QNode[],
+  scores: Record<string, number>,
+  notes?: Record<string, string>,
+): void {
+  const html = buildReportHtml(candidate, nodes, scores, notes);
   const blob = new Blob([html], { type: "text/html;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const now = new Date();
