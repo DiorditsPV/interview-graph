@@ -48,6 +48,12 @@ const nodeTypes = {
 };
 const NO_EDGES: Edge[] = [];
 
+// Совпадение ноды с поисковым запросом (подстрока в title/question/topic/tags).
+function matchesQuery(n: QNode, q: string): boolean {
+  if (!q) return true;
+  return `${n.title ?? ""} ${n.question} ${n.topic} ${n.tags.join(" ")}`.toLowerCase().includes(q);
+}
+
 // Настройки отображения холста (фон + направляющие), сохраняются в localStorage.
 // База — без сетки; точки — единственный альтернативный вариант (переключается иконкой).
 type BgVariant = "off" | "dots";
@@ -62,6 +68,7 @@ function buildNodes(
   activeDiffs: Record<string, boolean>,
   activeTags: Record<string, boolean>,
   activeKinds: Record<string, boolean>,
+  query: string,
   guidesH: boolean,
   guidesV: boolean,
 ): Node[] {
@@ -123,7 +130,8 @@ function buildNodes(
     const pos = p.positions[n.id];
     if (!pos) continue;
     const tagOk = !anyTag || n.tags.some((t) => activeTags[t]);
-    const dimmed = !activeBlocks[n.block] || !activeDiffs[n.difficulty] || !activeKinds[n.kind] || !tagOk;
+    const dimmed =
+      !activeBlocks[n.block] || !activeDiffs[n.difficulty] || !activeKinds[n.kind] || !tagOk || !matchesQuery(n, query);
     nodes.push({
       id: n.id,
       type: "question",
@@ -160,6 +168,7 @@ export default function App() {
   const [activeDiffs, setActiveDiffs] = useState<Record<string, boolean>>(ALL_DIFFS);
   const [activeTags, setActiveTags] = useState<Record<string, boolean>>({});
   const [activeKinds, setActiveKinds] = useState<Record<string, boolean>>(ALL_KINDS);
+  const [query, setQuery] = useState("");
   const [theme, setTheme] = useState<"light" | "dark">(
     () =>
       (localStorage.getItem("theme") as "light" | "dark") ||
@@ -200,9 +209,9 @@ export default function App() {
   const rfNodes = useMemo(
     () =>
       placement
-        ? buildNodes(graph, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, guidesH, guidesV)
+        ? buildNodes(graph, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, query.toLowerCase().trim(), guidesH, guidesV)
         : [],
-    [graph, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, guidesH, guidesV],
+    [graph, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, query, guidesH, guidesV],
   );
 
   const centerOn = useCallback(
@@ -456,6 +465,12 @@ export default function App() {
 
               <Panel position="top-right">
                 <div className="filterpanel">
+                  <input
+                    className="fp__search"
+                    placeholder="Поиск по вопросам…"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                  />
                   <div className="fp__group">
                     <div className="fp__title">Направления</div>
                     {BLOCK_ORDER.map((b) => (
