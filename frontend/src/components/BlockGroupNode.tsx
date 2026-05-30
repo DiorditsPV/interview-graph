@@ -19,7 +19,7 @@ function BlockGroupNodeImpl({ data }: { data: BlockGroupNodeData }) {
   return (
     <div
       className="bgroup"
-      style={{ width, height, background: hexA(color, 0.05), border: `1px solid ${hexA(color, 0.2)}` }}
+      style={{ width, height, background: hexA(color, 0.1), border: `1px solid ${hexA(color, 0.2)}` }}
     >
       <div
         className="bgroup__header"

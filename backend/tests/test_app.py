@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 
 from app.importer import load_content
 from app.models import Node
-from app.sampler import build_interview, load_weights
+from app.sampler import build_interview, load_tracks, load_weights, node_in_track
 
 CONTENT = Path(__file__).resolve().parent.parent.parent / "content"
 
@@ -190,3 +190,226 @@ def test_api_interview():
     r = _client().post("/api/interview", json={"count": 8, "seed": 1})
     assert r.status_code == 200
     assert len(r.json()["order"]) <= 8
+
+
+# --- tracks ---
+def test_load_tracks():
+    tracks = load_tracks(CONTENT)
+    ids = {t["id"] for t in tracks}
+    assert {"data-engineer", "backend", "analyst"} <= ids
+    for t in tracks:
+        assert t.get("id") and "label" in t and isinstance(t["include"], list)
+
+
+def test_node_in_track_matcher():
+    nmap = {n.id: n for n in load_content(CONTENT)[0]}
+    inc = ["python", "databases/sql", "frameworks/airflow"]
+    assert node_in_track(nmap["py-lang-01"], inc)          # python (block)
+    assert node_in_track(nmap["sql-01"], inc)              # databases/sql
+    assert node_in_track(nmap["af-orchestration-01"], inc)  # frameworks/airflow
+    assert not node_in_track(nmap["spark-batch-01"], inc)   # frameworks/pyspark — нет
+    assert node_in_track(nmap["sql-01"], [])               # пустой include = все
+
+
+def test_api_tracks_endpoint():
+    r = _client().get("/api/tracks")
+    assert r.status_code == 200
+    assert {"data-engineer", "backend", "analyst"} <= {t["id"] for t in r.json()}
+
+
+def test_interview_track_scoped():
+    nmap = {n.id: n for n in load_content(CONTENT)[0]}
+    inc = ["databases/sql", "databases/dbms", "python", "platform"]
+    order = _client().post("/api/interview", json={"count": 50, "track": "analyst", "seed": 1}).json()["order"]
+    assert order
+    for nid in order:
+        assert node_in_track(nmap[nid], inc), f"{nid} вне трека analyst"
+
+
+def test_api_list_sessions_for_resume():
+    c = _client()
+    sid = c.post("/api/sessions", json={"candidate": "Resume"}).json()["id"]
+    c.post(f"/api/sessions/{sid}/score", json={"nodeId": "sql-01", "score": 5})
+    sessions = c.get("/api/sessions").json()
+    assert any(x["id"] == sid and x["candidate"] == "Resume" for x in sessions)
+    # деталь сессии содержит восстановимые оценки
+    detail = c.get(f"/api/sessions/{sid}").json()
+    assert detail["scores"]["sql-01"]["score"] == 5
+
+
+def test_api_score_note_persists():
+    c = _client()
+    sid = c.post("/api/sessions", json={"candidate": "Notes"}).json()["id"]
+    c.post(f"/api/sessions/{sid}/score", json={"nodeId": "sql-01", "score": 4, "note": "хороший ответ"})
+    detail = c.get(f"/api/sessions/{sid}").json()
+    assert detail["scores"]["sql-01"]["note"] == "хороший ответ"
+
+
+def test_api_compare():
+    c = _client()
+    a = c.post("/api/sessions", json={"candidate": "Cmp-A"}).json()
+    b = c.post("/api/sessions", json={"candidate": "Cmp-B"}).json()
+    c.post(f"/api/sessions/{a['id']}/score", json={"nodeId": "sql-01", "score": 4})
+    c.post(f"/api/sessions/{a['id']}/score", json={"nodeId": "sql-02", "score": 2})
+    c.post(f"/api/sessions/{b['id']}/score", json={"nodeId": "sql-01", "score": 5})
+
+    r = c.get(f"/api/sessions/compare?ids={a['id']},{b['id']}")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["blocks"], "blocks should be non-empty"
+    out = {s["id"]: s for s in data["sessions"]}
+    assert set(out) == {a["id"], b["id"]}
+    # sql-01/sql-02 → блок databases; среднее A = (4+2)/2 = 3.0
+    assert out[a["id"]]["overall"]["avg"] == 3.0
+    assert out[a["id"]]["overall"]["scored"] == 2
+    assert out[a["id"]]["byBlock"]["databases"]["avg"] == 3.0
+    assert out[b["id"]]["byBlock"]["databases"]["avg"] == 5.0
+    # блок без оценок → avg=null, scored=0
+    empty_block = next(bl for bl in data["blocks"] if bl != "databases")
+    assert out[b["id"]]["byBlock"][empty_block]["avg"] is None
+    assert out[b["id"]]["byBlock"][empty_block]["scored"] == 0
+
+
+def test_api_compare_bad_ids():
+    c = _client()
+    assert c.get("/api/sessions/compare?ids=").status_code == 400
+    assert c.get("/api/sessions/compare?ids=abc").status_code == 400
+
+
+def _delete_node(node_id: str):
+    """Убрать тестовую ноду из БД (источник правды теперь БД, а не файлы content/)."""
+    from app.main import db
+    from app.tenancy import DEFAULT_TENANT
+    db.delete_node(DEFAULT_TENANT, node_id)
+
+
+def test_api_import_valid_with_id():
+    c = _client()
+    md = (
+        "---\nid: zzz-upload-test-01\nblock: databases\ntopic: Загрузка\n---\n"
+        "## Вопрос\nТестовый вопрос?\n## Ответ\nОтвет.\n"
+    )
+    try:
+        r = c.post("/api/import", json={"filename": "whatever.md", "content": md})
+        assert r.status_code == 200
+        data = r.json()
+        assert data["errors"] == []
+        assert any(a["id"] == "zzz-upload-test-01" for a in data["added"])
+        # Источник правды — БД: загруженная нода видна в /api/graph (не пишется на диск).
+        ids = {n["id"] for n in c.get("/api/graph").json()["nodes"]}
+        assert "zzz-upload-test-01" in ids
+        assert not (CONTENT / "databases" / "zzz-upload-test-01.md").exists()
+    finally:
+        _delete_node("zzz-upload-test-01")
+
+
+def test_api_import_idless_md_takes_stem():
+    c = _client()
+    md = "---\nblock: python\ntopic: Стем\n---\n## Вопрос\nОткуда id?\n"
+    try:
+        r = c.post("/api/import", json={"filename": "zzz-stem-01.md", "content": md})
+        data = r.json()
+        assert data["added"], f"nothing added: {data}"
+        assert data["added"][0]["id"] == "zzz-stem-01"  # id из имени файла, не из temp-stem
+    finally:
+        _delete_node("zzz-stem-01")
+
+
+def test_api_import_duplicate_rejected():
+    """Повторная загрузка той же id отклоняется (нода уже в банке)."""
+    c = _client()
+    md = "---\nid: zzz-dup-01\nblock: python\ntopic: Дубль\n---\n## Вопрос\nq?\n"
+    try:
+        first = c.post("/api/import", json={"filename": "a.md", "content": md}).json()
+        assert any(a["id"] == "zzz-dup-01" for a in first["added"])
+        second = c.post("/api/import", json={"filename": "a.md", "content": md}).json()
+        assert second["added"] == []
+        assert second["errors"]
+    finally:
+        _delete_node("zzz-dup-01")
+
+
+def test_api_import_invalid_not_written():
+    c = _client()
+    bad = "---\nid: zzz-bad-01\nblock: NOPE\ntopic: x\n---\n## Вопрос\nq\n"
+    r = c.post("/api/import", json={"filename": "bad.md", "content": bad})
+    data = r.json()
+    assert data["added"] == []
+    assert data["errors"]
+    assert c.get("/api/graph").status_code == 200
+    assert "zzz-bad-01" not in {n["id"] for n in c.get("/api/graph").json()["nodes"]}
+
+
+def test_api_import_duplicate_id():
+    c = _client()
+    dup = "---\nid: sql-01\nblock: databases\ntopic: dup\n---\n## Вопрос\nq\n"
+    r = c.post("/api/import", json={"filename": "dup.md", "content": dup})
+    data = r.json()
+    assert data["added"] == []
+    assert any("duplicate" in e["error"] for e in data["errors"])
+    # существующий sql-01 не перезаписан (всё ещё на месте)
+    assert (CONTENT / "databases" / "sql-01.md").exists()
+
+
+# --- DB как источник правды для банка вопросов (content-store-db) ---
+def test_graph_served_from_db_seed():
+    """Сид из content/*.md наполняет БД; /api/graph отдаёт ноды из БД."""
+    nodes_on_disk, _ = load_content(CONTENT)
+    api_ids = {n["id"] for n in _client().get("/api/graph").json()["nodes"]}
+    disk_ids = {n.id for n in nodes_on_disk}
+    # Все засеяные с диска ноды присутствуют в БД-выдаче (плюс могут быть user-ноды от других тестов).
+    assert disk_ids <= api_ids
+    assert len(api_ids) >= len(disk_ids)
+
+
+def test_seed_is_idempotent():
+    """Повторный сид в непустую БД ничего не вставляет (не плодит дубли)."""
+    from app.main import db
+    from app.tenancy import DEFAULT_TENANT
+    before = db.count_nodes(DEFAULT_TENANT)
+    nodes, _ = load_content(CONTENT)
+    inserted = db.seed_nodes(DEFAULT_TENANT, [n.model_dump() for n in nodes])
+    assert inserted == 0
+    assert db.count_nodes(DEFAULT_TENANT) == before
+
+
+def test_node_crud_and_hidden():
+    """DAL: upsert → get → hide → delete для одного тенанта."""
+    from app.main import db
+    from app.tenancy import DEFAULT_TENANT as T
+    node = {"id": "zzz-crud-01", "block": "python", "topic": "CRUD",
+            "question": "q?", "answer": "a", "tags": ["t1"], "rubric": ["r1"]}
+    try:
+        saved = db.upsert_node(T, node)
+        assert saved["id"] == "zzz-crud-01" and saved["tags"] == ["t1"]
+        assert db.get_node(T, "zzz-crud-01")["source"] == "user"
+        hidden = db.set_node_hidden(T, "zzz-crud-01", True)
+        assert hidden["hidden"] is True
+        assert any(n["id"] == "zzz-crud-01" for n in db.list_nodes(T, include_hidden=True))
+        assert not any(n["id"] == "zzz-crud-01" for n in db.list_nodes(T, include_hidden=False))
+    finally:
+        assert db.delete_node(T, "zzz-crud-01")
+        assert db.get_node(T, "zzz-crud-01") is None
+
+
+def test_tenant_isolation():
+    """Ноды одного тенанта не видны другому (фундамент мультитенантности)."""
+    from app.main import db
+    db.ensure_tenant("other")
+    node = {"id": "shared-id-01", "block": "python", "topic": "Iso", "question": "q?"}
+    try:
+        db.upsert_node("other", node)
+        # тот же id в дефолтном тенанте отсутствует — изоляция по (tenant_id, id)
+        assert db.get_node("default", "shared-id-01") is None
+        assert db.get_node("other", "shared-id-01") is not None
+        other_ids = {n["id"] for n in db.list_nodes("other")}
+        default_ids = {n["id"] for n in db.list_nodes("default")}
+        assert "shared-id-01" in other_ids
+        assert "shared-id-01" not in default_ids
+    finally:
+        db.delete_node("other", "shared-id-01")
+
+
+def test_api_import_bad_extension():
+    r = _client().post("/api/import", json={"filename": "x.txt", "content": "hi"})
+    assert r.status_code == 400

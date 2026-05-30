@@ -11,7 +11,9 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
+import tempfile
 from pathlib import Path
 from typing import List, Optional
 
@@ -23,9 +25,13 @@ from pydantic import BaseModel, Field
 
 from .db import Database
 from .hub import SessionHub
-from .importer import load_content
-from .models import GraphResponse
-from .sampler import build_interview, load_weights
+from .importer import parse_file
+from .models import GraphResponse, Node
+from .sampler import build_interview, load_tracks, load_weights
+from .seed import seed_tenant_if_empty
+from .tenancy import resolve_tenant
+
+log = logging.getLogger("interview")
 
 BASE_DIR = Path(__file__).resolve().parent.parent          # backend/
 PROJECT_DIR = BASE_DIR.parent                              # interview/
@@ -46,6 +52,14 @@ app.add_middleware(
 db = Database(DB_PATH)
 hub = SessionHub()
 
+# Сид банка вопросов в БД при первом старте (пустая таблица nodes у тенанта default).
+# Источник правды — БД; content/*.md — стартовый набор. Идемпотентно при рестарте/деплое.
+_seeded, _seed_errors = seed_tenant_if_empty(db, resolve_tenant(), CONTENT_DIR)
+if _seeded:
+    log.info("seeded %d nodes from %s", _seeded, CONTENT_DIR)
+if _seed_errors:
+    log.warning("content import errors during seed: %s", _seed_errors)
+
 
 # ---------- request models ----------
 class SessionCreate(BaseModel):
@@ -62,14 +76,34 @@ class ScoreIn(BaseModel):
 class InterviewRequest(BaseModel):
     count: int = Field(default=20, ge=1, le=200)
     difficulties: Optional[List[str]] = None
+    track: Optional[str] = None
     seed: Optional[int] = None
 
 
+class ImportFile(BaseModel):
+    filename: str = Field(min_length=1)
+    content: str
+
+
 # ---------- graph & content ----------
+# Поля, которые понимает models.Node (остальные — tenant_id/source/hidden/таймстемпы —
+# живут только в БД-слое; Node их не принимает из-за extra="forbid").
+_NODE_FIELDS = set(Node.model_fields)
+
+
+def _db_nodes(request: Request = None) -> List[Node]:
+    """Ноды банка из БД (источник правды) как объекты Node для текущего тенанта."""
+    tenant = resolve_tenant(request)
+    return [
+        Node.model_validate({k: v for k, v in row.items() if k in _NODE_FIELDS})
+        for row in db.list_nodes(tenant)
+    ]
+
+
 @app.get("/api/graph", response_model=GraphResponse)
-def get_graph() -> GraphResponse:
-    nodes, errors = load_content(CONTENT_DIR)
-    return GraphResponse(nodes=nodes, errors=errors)
+def get_graph(request: Request) -> GraphResponse:
+    # Вопросы читаются из БД (а не с диска) — рантайм-правки переживают деплой.
+    return GraphResponse(nodes=_db_nodes(request), errors=[])
 
 
 @app.get("/api/weights")
@@ -77,14 +111,63 @@ def get_weights() -> dict:
     return load_weights(CONTENT_DIR)
 
 
+@app.get("/api/tracks")
+def get_tracks() -> list:
+    return load_tracks(CONTENT_DIR)
+
+
+@app.post("/api/import")
+def import_file(body: ImportFile, request: Request) -> dict:
+    """Загрузить .md/.json: распарсить тем же импортёром, валидные новые ноды сохранить в БД.
+
+    Пишем в БД (source='user'), а не на диск content/ — иначе деплой (rsync --delete)
+    затёр бы загруженные вопросы. БД переживает деплой (INTERVIEW_DB_PATH).
+    """
+    name = Path(body.filename).name
+    ext = Path(name).suffix.lower()
+    if ext not in {".md", ".json"}:
+        raise HTTPException(status_code=400, detail="only .md or .json files are supported")
+
+    # Парсим во временной директории, сохраняя ОРИГИНАЛЬНОЕ имя: id-less md берёт id из stem.
+    from .importer import _fmt_error  # локально — внутренний хелпер форматирования ошибок
+
+    tenant = resolve_tenant(request)
+    added: List[dict] = []
+    errors: List[dict] = []
+    with tempfile.TemporaryDirectory() as td:
+        tmp = Path(td) / name
+        tmp.write_text(body.content, encoding="utf-8")
+        try:
+            nodes = parse_file(tmp)
+        except Exception as exc:  # noqa: BLE001 — любую ошибку парсинга показываем пользователю
+            return {"added": [], "errors": [{"file": name, "error": _fmt_error(exc)}]}
+
+    for node in nodes:
+        if db.get_node(tenant, node.id) is not None:
+            errors.append({"file": name, "error": f"duplicate id '{node.id}' (already in bank)"})
+            continue
+        saved = db.upsert_node(tenant, node.model_dump(), source="user")
+        added.append({
+            "id": saved["id"],
+            "block": saved["block"],
+            "title": saved.get("title") or "",
+        })
+    return {"added": added, "errors": errors}
+
+
 @app.post("/api/interview")
-def make_interview(req: InterviewRequest) -> dict:
-    nodes, _ = load_content(CONTENT_DIR)
+def make_interview(req: InterviewRequest, request: Request) -> dict:
+    nodes = _db_nodes(request)
+    track_include = None
+    if req.track:
+        match = next((t for t in load_tracks(CONTENT_DIR) if t["id"] == req.track), None)
+        track_include = match["include"] if match else None
     order = build_interview(
         nodes,
         count=req.count,
         difficulties=req.difficulties,
         block_weights=load_weights(CONTENT_DIR),
+        track_include=track_include,
         seed=req.seed,
     )
     return {"order": order}
@@ -99,6 +182,50 @@ def create_session(body: SessionCreate) -> dict:
 @app.get("/api/sessions")
 def list_sessions() -> list:
     return db.list_sessions()
+
+
+BLOCK_ORDER = ["frameworks", "databases", "python", "platform"]
+
+
+def _agg(vals: List[int]) -> dict:
+    return {"avg": round(sum(vals) / len(vals), 2) if vals else None, "scored": len(vals)}
+
+
+# ВАЖНО: объявлено ДО "/api/sessions/{session_id}" — иначе FastAPI попытается распарсить
+# "compare" как session_id: int и вернёт 422 (роут станет недоступен).
+@app.get("/api/sessions/compare")
+def compare_sessions(ids: str, request: Request) -> dict:
+    try:
+        id_list = [int(x) for x in ids.split(",") if x.strip()]
+    except ValueError:
+        raise HTTPException(status_code=400, detail="ids must be comma-separated integers")
+    if not id_list:
+        raise HTTPException(status_code=400, detail="ids is required")
+
+    node_block = {n.id: n.block for n in _db_nodes(request)}
+    present = [b for b in BLOCK_ORDER if b in set(node_block.values())]
+
+    sessions_out = []
+    for sid in id_list:
+        sess = db.get_session(sid)
+        if sess is None:
+            continue
+        by_block: dict = {b: [] for b in present}
+        all_scores: List[int] = []
+        for node_id, sc in sess["scores"].items():
+            blk = node_block.get(node_id)
+            if blk is None:
+                continue
+            by_block.setdefault(blk, []).append(sc["score"])
+            all_scores.append(sc["score"])
+        sessions_out.append({
+            "id": sess["id"],
+            "candidate": sess["candidate"],
+            "created_at": sess["created_at"],
+            "overall": _agg(all_scores),
+            "byBlock": {b: _agg(by_block.get(b, [])) for b in present},
+        })
+    return {"blocks": present, "sessions": sessions_out}
 
 
 @app.get("/api/sessions/{session_id}")
