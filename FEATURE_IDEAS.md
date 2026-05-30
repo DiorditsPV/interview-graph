@@ -8,6 +8,8 @@
 Формат: `- [ ] <slug>: <краткое описание> — <подсказка по слоям/объёму>`.
 
 ## Идеи
+- [ ] Набор фич для работы с вопросами. Проработать легковесный подход для добавления, удаления, редактирования и скрытия вопросов. Полный набор фич можешь определить сам через агента.
+- [x] topbar-redeclutter (feature/topbar-redeclutter, от integration/all-ideas) — шапка разгружена в ДВА ряда (ряд 1 = флоу: заголовок/направление/сессия/прогресс/Скачать; ряд 2 = служебное: панель отображения/Загрузить/Сравнить/Банк/?/тема), заголовок больше не переносится. Дизайнер-консультация; реф image.png. Полный integration-smoke зелёный.
 - [x] interview-tracks (feature/interview-tracks) — выбор направления интервью (треки-профили над block/subblock)
 - [x] session-resume (feature/session-resume) — загрузка прошлой сессии кандидата на доску (восстановление оценок)
 - [x] node-notes (feature/node-notes) — заметка интервьюера на вопрос (drawer textarea, персист с оценкой, в отчёте)
@@ -23,7 +25,8 @@
 
 ## Сгенерировано автоматически (из out-of-scope ux-live-polish)
 - [x] agenda-sidebar (feature/agenda-sidebar) — сайдбар-агенда (.interview): список вопросов из placement.order по блокам, ✓ на оценённых, клик → текущий + центрирование, тоггл в шапке
-- [ ] minimap-progress: кодировать прогресс в минимапе React Flow (оценённые — серым, текущий — акцентом) через nodeColor — фронт (App.tsx MiniMap props + buildNodes data).
-- [ ] filter-aware-nav: «Дальше →»/стрелки навигируют по видимым (не-dimmed) нодам, а не по всей сетке — фронт (App.tsx nextQuestion/keyboard используют visibleIds).
+- [x] minimap-progress (feature/minimap-progress) — минимапа кодирует прогресс: текущий красным, оценённые серым (+ фикс: v12-минимапе добавлены размеры нод, иначе была пустой)
+- [x] filter-aware-nav (feature/filter-aware-nav) — «Дальше»/стрелки навигируют только по видимым (не-dimmed) нодам через visibleIds
+- [x] draft-autosave (feature/draft-autosave) — автосохранение оценок без сессии в localStorage + восстановление при перезагрузке; чистится при старте именованной сессии
 
 <!-- feature-build переносит реализованные идеи сюда: - [x] <slug> (feature/<slug>) -->
