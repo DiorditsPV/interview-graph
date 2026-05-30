@@ -4,6 +4,7 @@ title: Прогресс-бар оценённых вопросов в шапке
 status: done
 created: 2026-05-30
 branch: feature/interview-progress
+merged: integration/all-ideas
 verify: pass
 review: ok — багов нет (coverage — точный инверс dimmed)
 ---
