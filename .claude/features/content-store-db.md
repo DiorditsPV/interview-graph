@@ -1,11 +1,12 @@
 ---
 slug: content-store-db
 title: Вопросы/таксономия в БД (single-tenant сейчас, tenant-ready инфраструктура)
-status: designed        # designed -> building -> done
+status: done            # designed -> building -> done
 created: 2026-05-30
 branch: feature/content-store-db
-verify: —
-review: —
+verify: pytest 34 passed; frontend build OK; smoke all checks pass (download-filename = known browser artifact); deploy-survival scenario proven (uploaded node survives restart, content/ untouched)
+review: code-review high — 1 finding (dead _NODE_COLUMNS const) fixed; FK ordering/JSON round-trip/Node extra=forbid filtering verified clean
+scope_note: реализованы nodes + tenant-инфраструктура (tenants/tenancy.py/seed.py); tracks/weights пока остаются read-only конфиг-файлами (per-tenant таксономия — следующий шаг)
 ---
 
 ## Проблема / цель
