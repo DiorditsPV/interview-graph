@@ -118,6 +118,15 @@ const after = await page.evaluate(() => document.documentElement.dataset.theme);
 if (after === before) fail(`theme toggle did not change theme (${before} → ${after})`);
 console.log(`OK: theme toggles (${before} → ${after})`);
 
+// 9. Экспорт банка вопросов: кнопка отдаёт interview_bank_*.html.
+const [dlBank] = await Promise.all([
+  page.waitForEvent("download"),
+  page.locator(".bankbtn").click(),
+]);
+const bankFn = dlBank.suggestedFilename();
+if (!bankFn.includes("bank") || !bankFn.endsWith(".html")) fail(`bank export wrong file: ${bankFn}`);
+console.log(`OK: question bank export (${bankFn})`);
+
 if (errors.length) fail(`console/page errors:\n${errors.join("\n")}`);
 
 console.log("\nALL SMOKE CHECKS PASSED ✓");
