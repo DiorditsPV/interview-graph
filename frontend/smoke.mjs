@@ -118,6 +118,15 @@ const after = await page.evaluate(() => document.documentElement.dataset.theme);
 if (after === before) fail(`theme toggle did not change theme (${before} → ${after})`);
 console.log(`OK: theme toggles (${before} → ${after})`);
 
+// 9. Таймер: HUD показывает M:SS и инкрементируется (есть текущий вопрос с прошлых шагов).
+await page.waitForSelector(".hud__timer", { timeout: 3000 });
+const tmr1 = (await page.locator(".hud__timer").innerText()).trim();
+if (!/\d+:\d{2}/.test(tmr1)) fail(`timer format wrong: "${tmr1}"`);
+await page.waitForTimeout(1300);
+const tmr2 = (await page.locator(".hud__timer").innerText()).trim();
+if (tmr2 === tmr1) fail(`timer not ticking (${tmr1} == ${tmr2})`);
+console.log(`OK: HUD timer ticks (${tmr1} → ${tmr2})`);
+
 if (errors.length) fail(`console/page errors:\n${errors.join("\n")}`);
 
 console.log("\nALL SMOKE CHECKS PASSED ✓");
