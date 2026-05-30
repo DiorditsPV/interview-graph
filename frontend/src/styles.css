@@ -278,3 +278,33 @@ button:disabled:hover { background: var(--surface); }
 }
 .hud__score { display: flex; gap: 2px; }
 .hud__score .scorebtn { font-size: 18px; }
+
+/* ---- сравнение кандидатов ---- */
+.cmp-modal {
+  position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+}
+.cmp-modal__card {
+  background: var(--surface); color: var(--text); border: 1px solid var(--border);
+  border-radius: 12px; box-shadow: 0 8px 32px var(--shadow-strong);
+  width: min(640px, 92vw); max-height: 86vh; overflow-y: auto; padding: 16px 18px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.cmp-modal__head { display: flex; align-items: center; justify-content: space-between; }
+.cmp-modal__close { padding: 2px 8px; line-height: 1; }
+.cmp-modal__empty { color: var(--text-muted); margin: 8px 0; }
+.cmp-modal__list { display: flex; flex-direction: column; gap: 4px; max-height: 240px; overflow-y: auto; }
+.cmp-modal__item {
+  display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 6px;
+  cursor: pointer; font-size: 14px;
+}
+.cmp-modal__item:hover { background: var(--hover); }
+.cmp-modal__date { margin-left: auto; font-size: 12px; color: var(--text-faint); }
+.cmp-modal__run { align-self: flex-start; }
+.cmp-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.cmp-table th, .cmp-table td {
+  border: 1px solid var(--border); padding: 6px 10px; text-align: center;
+}
+.cmp-table th:first-child, .cmp-table td:first-child { text-align: left; color: var(--text-muted); }
+.cmp-table th { background: var(--hover); color: var(--heading); }
+.cmp-table__total td { font-weight: 700; border-top: 2px solid var(--border-strong); }
