@@ -156,6 +156,7 @@ export default function App() {
   const [fullscreen, setFullscreen] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [candidate, setCandidate] = useState("");
+  const [notes, setNotes] = useState<Record<string, string>>({});
   const [activeBlocks, setActiveBlocks] = useState<Record<string, boolean>>(ALL_BLOCKS);
   const [activeDiffs, setActiveDiffs] = useState<Record<string, boolean>>(ALL_DIFFS);
   const [activeTags, setActiveTags] = useState<Record<string, boolean>>({});
@@ -218,9 +219,20 @@ export default function App() {
   const applyScore = useCallback(
     (nodeId: string, score: number) => {
       setScores((s) => ({ ...s, [nodeId]: score }));
-      if (session) api.setScore(session.id, nodeId, score).catch(() => void 0);
+      if (session) api.setScore(session.id, nodeId, score, notes[nodeId]).catch(() => void 0);
     },
-    [session],
+    [session, notes],
+  );
+
+  // Заметка интервьюера на ноду: персистится вместе с оценкой (схема scores: score+note).
+  const setNote = useCallback(
+    (nodeId: string, text: string) => {
+      setNotes((s) => ({ ...s, [nodeId]: text }));
+      if (session && scores[nodeId] != null) {
+        api.setScore(session.id, nodeId, scores[nodeId], text).catch(() => void 0);
+      }
+    },
+    [session, scores],
   );
 
   const onNodeClick = useCallback((_: unknown, node: Node) => {
@@ -393,7 +405,7 @@ export default function App() {
           )}
           <button
             className="iconbtn dlbtn"
-            onClick={() => downloadReport(session?.candidate ?? candidate, graph, scores)}
+            onClick={() => downloadReport(session?.candidate ?? candidate, graph, scores, notes)}
             disabled={scored === 0}
             title={scored === 0 ? "Сначала выставьте оценки" : "Скачать результаты (HTML)"}
           >
@@ -570,8 +582,10 @@ export default function App() {
         <DetailDrawer
           node={selectedNode}
           score={selectedId ? scores[selectedId] : undefined}
+          note={selectedId ? notes[selectedId] : undefined}
           fullscreen={fullscreen}
           onScore={applyScore}
+          onNote={setNote}
           onToggleFullscreen={() => setFullscreen((f) => !f)}
           onClose={() => {
             setSelectedId(null);
