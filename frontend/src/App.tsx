@@ -62,6 +62,7 @@ function buildNodes(
   activeDiffs: Record<string, boolean>,
   activeTags: Record<string, boolean>,
   activeKinds: Record<string, boolean>,
+  unscoredOnly: boolean,
   guidesH: boolean,
   guidesV: boolean,
 ): Node[] {
@@ -123,7 +124,12 @@ function buildNodes(
     const pos = p.positions[n.id];
     if (!pos) continue;
     const tagOk = !anyTag || n.tags.some((t) => activeTags[t]);
-    const dimmed = !activeBlocks[n.block] || !activeDiffs[n.difficulty] || !activeKinds[n.kind] || !tagOk;
+    const dimmed =
+      !activeBlocks[n.block] ||
+      !activeDiffs[n.difficulty] ||
+      !activeKinds[n.kind] ||
+      !tagOk ||
+      (unscoredOnly && scores[n.id] != null);
     nodes.push({
       id: n.id,
       type: "question",
@@ -160,6 +166,7 @@ export default function App() {
   const [activeDiffs, setActiveDiffs] = useState<Record<string, boolean>>(ALL_DIFFS);
   const [activeTags, setActiveTags] = useState<Record<string, boolean>>({});
   const [activeKinds, setActiveKinds] = useState<Record<string, boolean>>(ALL_KINDS);
+  const [unscoredOnly, setUnscoredOnly] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">(
     () =>
       (localStorage.getItem("theme") as "light" | "dark") ||
@@ -200,9 +207,9 @@ export default function App() {
   const rfNodes = useMemo(
     () =>
       placement
-        ? buildNodes(graph, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, guidesH, guidesV)
+        ? buildNodes(graph, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, unscoredOnly, guidesH, guidesV)
         : [],
-    [graph, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, guidesH, guidesV],
+    [graph, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, unscoredOnly, guidesH, guidesV],
   );
 
   const centerOn = useCallback(
@@ -506,6 +513,20 @@ export default function App() {
                         {KIND_LABEL[k]}
                       </button>
                     ))}
+                  </div>
+                  <div className="fp__group">
+                    <div className="fp__title">Прогресс</div>
+                    <button
+                      className={`fp__chip ${unscoredOnly ? "" : "fp__chip--off"}`}
+                      style={{
+                        borderColor: "#16a34a",
+                        color: unscoredOnly ? "#fff" : "#16a34a",
+                        background: unscoredOnly ? "#16a34a" : "transparent",
+                      }}
+                      onClick={() => setUnscoredOnly((v) => !v)}
+                    >
+                      Только неоценённые
+                    </button>
                   </div>
                   <div className="fp__group fp__group--tags">
                     <div className="fp__title">
