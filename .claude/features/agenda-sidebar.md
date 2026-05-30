@@ -4,6 +4,7 @@ title: Сайдбар-агенда (список вопросов с перех�
 status: done
 created: 2026-05-30
 branch: feature/agenda-sidebar
+merged: integration/all-ideas
 verify: pass
 review: ok — багов нет (стили самодостаточны, без зависимости от --accent другой ветки)
 ---

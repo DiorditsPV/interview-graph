@@ -216,6 +216,7 @@ export default function App() {
   );
   const [guidesH, setGuidesH] = useState<boolean>(() => localStorage.getItem("guidesH") === "1");
   const [guidesV, setGuidesV] = useState<boolean>(() => localStorage.getItem("guidesV") === "1");
+  const [agendaOpen, setAgendaOpen] = useState<boolean>(() => localStorage.getItem("agendaOpen") === "1");
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -225,6 +226,7 @@ export default function App() {
   useEffect(() => localStorage.setItem("guidesH", guidesH ? "1" : "0"), [guidesH]);
   useEffect(() => localStorage.setItem("guidesV", guidesV ? "1" : "0"), [guidesV]);
   useEffect(() => localStorage.setItem("track", activeTrack), [activeTrack]);
+  useEffect(() => localStorage.setItem("agendaOpen", agendaOpen ? "1" : "0"), [agendaOpen]);
 
   // Таймеры: сброс «времени на вопрос» при смене текущего; старт «времени сессии» при первом выборе.
   useEffect(() => {
@@ -275,6 +277,23 @@ export default function App() {
     }
     return s;
   }, [graph, activeBlocks, activeDiffs, activeKinds, activeTags, trackInclude]);
+
+  // Строки агенды в порядке клавиатурной навигации, с заголовком при смене блока.
+  const agendaRows = useMemo(() => {
+    if (!placement) return [] as ({ kind: "head"; block: Block } | { kind: "item"; node: QNode })[];
+    const rows: ({ kind: "head"; block: Block } | { kind: "item"; node: QNode })[] = [];
+    let last: Block | null = null;
+    for (const id of placement.order.flat()) {
+      const n = nodeMap[id];
+      if (!n) continue;
+      if (n.block !== last) {
+        rows.push({ kind: "head", block: n.block });
+        last = n.block;
+      }
+      rows.push({ kind: "item", node: n });
+    }
+    return rows;
+  }, [placement, nodeMap]);
 
   const loadGraph = useCallback(
     () =>
@@ -546,6 +565,13 @@ export default function App() {
           >
             ☰ Гор.
           </button>
+          <button
+            className={`tb__toggle ${agendaOpen ? "tb__toggle--on" : ""}`}
+            onClick={() => setAgendaOpen((v) => !v)}
+            title="Сайдбар-агенда: список вопросов с переходом"
+          >
+            ☰ Агенда
+          </button>
         </div>
 
         <div className="session">
@@ -647,6 +673,33 @@ export default function App() {
       )}
 
       <div className="main">
+        {agendaOpen && placement && (
+          <aside className="interview">
+            <h4>Агенда · {agendaRows.filter((r) => r.kind === "item").length}</h4>
+            {agendaRows.map((r, i) =>
+              r.kind === "head" ? (
+                <div key={`h-${r.block}-${i}`} className="iv-block" style={{ color: BLOCK_COLOR[r.block] }}>
+                  {BLOCK_LABEL[r.block]}
+                </div>
+              ) : (
+                <button
+                  key={r.node.id}
+                  className={[
+                    "ivbtn",
+                    r.node.id === currentId ? "ivbtn--current" : "",
+                    scores[r.node.id] != null ? "ivbtn--scored" : "",
+                  ].join(" ")}
+                  style={{ borderLeftColor: BLOCK_COLOR[r.node.block] }}
+                  onClick={() => moveCurrent(r.node.id)}
+                  title={r.node.question}
+                >
+                  {scores[r.node.id] != null && <span className="ivbtn__check">✓</span>}
+                  {r.node.title || r.node.topic}
+                </button>
+              ),
+            )}
+          </aside>
+        )}
         <div className="canvas">
           {rfNodes.length === 0 ? (
             <div className="loading">Загрузка графа…</div>
