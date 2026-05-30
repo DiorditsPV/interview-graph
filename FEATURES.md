@@ -7,6 +7,7 @@
 | `feature/agenda-sidebar` | agenda-sidebar | Сайдбар-агенда (список вопросов с переходом) | done | pass | ok — багов нет (стили самодостаточны, без зависимости от --accent другой ветки) | 2026-05-30 | .claude/features/agenda-sidebar.md |
 | `feature/bank-export` | bank-export | Экспорт всего банка вопросов в HTML | done | pass | ok — поле starterCode (не starter_code) поймано build-гейтом и исправлено | 2026-05-30 | .claude/features/bank-export.md |
 | `feature/candidate-compare` | candidate-compare | Сравнение кандидатов по блокам | done | pass | ok — багов нет (route-order проверен живым запросом, не 422) | 2026-05-30 | .claude/features/candidate-compare.md |
+| `feature/draft-autosave` | draft-autosave | Автосохранение черновика оценок (без сессии) | done | pass | ok — багов нет (readDraftScores try/catch+валидация; персист на [scores]; startSession чистит) | 2026-05-30 | .claude/features/draft-autosave.md |
 | `feature/filter-aware-nav` | filter-aware-nav | Фильтро-осознанная навигация (Дальше/стрелки по видимым) | done | pass | ok — багов нет (visibleIds = предикат dimmed; deps выверены; пустой набор → no-op) | 2026-05-30 | .claude/features/filter-aware-nav.md |
 | `feature/interview-progress` | interview-progress | Прогресс-бар оценённых вопросов в шапке | done | pass | ok — багов нет (coverage — точный инверс dimmed) | 2026-05-30 | .claude/features/interview-progress.md |
 | `feature/interview-timer` | interview-timer | Таймеры вопроса и сессии в HUD | done | pass | ok — багов нет | 2026-05-30 | .claude/features/interview-timer.md |
