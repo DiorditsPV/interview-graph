@@ -4,6 +4,7 @@ title: Загрузка вопросов (.md/.json) через UI
 status: done
 created: 2026-05-30
 branch: feature/md-upload
+merged: integration/all-ideas
 verify: pass
 review: ok — temp-stem ловушка (id-less md) поймана advisor'ом и закрыта тестом; запись безопасна (block=Literal, id санитизирован)
 ---

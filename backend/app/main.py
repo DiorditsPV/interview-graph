@@ -10,6 +10,8 @@
 from __future__ import annotations
 
 import os
+import re
+import tempfile
 from pathlib import Path
 from typing import List, Optional
 
@@ -19,7 +21,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .db import Database
-from .importer import load_content
+from .importer import load_content, parse_file
 from .models import GraphResponse
 from .sampler import build_interview, load_tracks, load_weights
 
@@ -61,6 +63,11 @@ class InterviewRequest(BaseModel):
     seed: Optional[int] = None
 
 
+class ImportFile(BaseModel):
+    filename: str = Field(min_length=1)
+    content: str
+
+
 # ---------- graph & content ----------
 @app.get("/api/graph", response_model=GraphResponse)
 def get_graph() -> GraphResponse:
@@ -76,6 +83,51 @@ def get_weights() -> dict:
 @app.get("/api/tracks")
 def get_tracks() -> list:
     return load_tracks(CONTENT_DIR)
+
+
+@app.post("/api/import")
+def import_file(body: ImportFile) -> dict:
+    """Загрузить .md/.json: распарсить тем же импортёром, валидные новые ноды сохранить в content/<block>/."""
+    name = Path(body.filename).name
+    ext = Path(name).suffix.lower()
+    if ext not in {".md", ".json"}:
+        raise HTTPException(status_code=400, detail="only .md or .json files are supported")
+
+    # Парсим во временной директории, сохраняя ОРИГИНАЛЬНОЕ имя: id-less md берёт id из stem.
+    from .importer import _fmt_error  # локально — внутренний хелпер форматирования ошибок
+
+    added: List[dict] = []
+    errors: List[dict] = []
+    with tempfile.TemporaryDirectory() as td:
+        tmp = Path(td) / name
+        tmp.write_text(body.content, encoding="utf-8")
+        try:
+            nodes = parse_file(tmp)
+        except Exception as exc:  # noqa: BLE001 — любую ошибку парсинга показываем пользователю
+            return {"added": [], "errors": [{"file": name, "error": _fmt_error(exc)}]}
+
+    existing = {n.id for n in load_content(CONTENT_DIR)[0]}
+    for node in nodes:
+        if node.id in existing:
+            errors.append({"file": name, "error": f"duplicate id '{node.id}' (already in content)"})
+            continue
+        safe_id = re.sub(r"[^A-Za-z0-9_-]+", "_", node.id)
+        dest_dir = CONTENT_DIR / node.block
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest = dest_dir / f"{safe_id}{ext}"
+        if ext == ".md":
+            dest.write_text(body.content, encoding="utf-8")
+        else:
+            import json as _json
+            dest.write_text(_json.dumps(node.model_dump(), ensure_ascii=False, indent=2), encoding="utf-8")
+        existing.add(node.id)
+        added.append({
+            "id": node.id,
+            "block": node.block,
+            "title": node.title or "",
+            "path": str(dest.relative_to(CONTENT_DIR)),
+        })
+    return {"added": added, "errors": errors}
 
 
 @app.post("/api/interview")

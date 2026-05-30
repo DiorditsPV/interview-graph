@@ -44,6 +44,18 @@ export interface GraphResponse {
   errors: ImportErr[];
 }
 
+// Результат загрузки файла вопросов (POST /api/import).
+export interface ImportAdded {
+  id: string;
+  block: Block;
+  title: string;
+  path: string;
+}
+export interface ImportResult {
+  added: ImportAdded[];
+  errors: ImportErr[];
+}
+
 export interface Session {
   id: number;
   candidate: string;

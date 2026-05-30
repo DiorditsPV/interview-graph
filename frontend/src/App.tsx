@@ -19,6 +19,7 @@ import { GuidesNode } from "./components/GuidesNode";
 import { QuestionNode } from "./components/QuestionNode";
 import { ShortcutsHelp } from "./components/ShortcutsHelp";
 import { SubHeadNode } from "./components/SubHeadNode";
+import { UploadModal } from "./components/UploadModal";
 import { downloadBank, downloadReport } from "./report";
 import {
   BLOCK_ORDER,
@@ -193,6 +194,7 @@ export default function App() {
   const [questionStart, setQuestionStart] = useState<number>(() => Date.now());
   const [compareOpen, setCompareOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [uploadOpen, setUploadOpen] = useState(false);
   const [activeBlocks, setActiveBlocks] = useState<Record<string, boolean>>(ALL_BLOCKS);
   const [activeDiffs, setActiveDiffs] = useState<Record<string, boolean>>(ALL_DIFFS);
   const [activeTags, setActiveTags] = useState<Record<string, boolean>>({});
@@ -273,16 +275,22 @@ export default function App() {
     return s;
   }, [graph, activeBlocks, activeDiffs, activeKinds, activeTags, trackInclude]);
 
+  const loadGraph = useCallback(
+    () =>
+      api
+        .graph()
+        .then((g) => {
+          setGraph(g.nodes);
+          setErrors(g.errors);
+          setPlacement(swimlaneLayout(g.nodes));
+        })
+        .catch((err) => setErrors([{ file: "API", error: String(err) }])),
+    [],
+  );
+
   useEffect(() => {
-    api
-      .graph()
-      .then((g) => {
-        setGraph(g.nodes);
-        setErrors(g.errors);
-        setPlacement(swimlaneLayout(g.nodes));
-      })
-      .catch((err) => setErrors([{ file: "API", error: String(err) }]));
-  }, []);
+    loadGraph();
+  }, [loadGraph]);
 
   useEffect(() => {
     api.tracks().then(setTracks).catch(() => setTracks([]));
@@ -571,6 +579,13 @@ export default function App() {
             </>
           )}
           <button
+            className="iconbtn uploadbtn"
+            onClick={() => setUploadOpen(true)}
+            title="Загрузить вопросы (.md/.json)"
+          >
+            ⬆ Загрузить
+          </button>
+          <button
             className="iconbtn dlbtn"
             onClick={() => downloadReport(session?.candidate ?? candidate, graph, scores, trackLabel, notes)}
             disabled={scored === 0}
@@ -808,6 +823,9 @@ export default function App() {
       </div>
       {compareOpen && <CompareModal onClose={() => setCompareOpen(false)} />}
       {helpOpen && <ShortcutsHelp onClose={() => setHelpOpen(false)} />}
+      {uploadOpen && (
+        <UploadModal onClose={() => setUploadOpen(false)} onImported={loadGraph} />
+      )}
     </div>
   );
 }
