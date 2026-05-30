@@ -96,3 +96,11 @@ def test_api_interview():
     r = _client().post("/api/interview", json={"count": 8, "seed": 1})
     assert r.status_code == 200
     assert len(r.json()["order"]) <= 8
+
+
+def test_api_score_note_persists():
+    c = _client()
+    sid = c.post("/api/sessions", json={"candidate": "Notes"}).json()["id"]
+    c.post(f"/api/sessions/{sid}/score", json={"nodeId": "sql-01", "score": 4, "note": "хороший ответ"})
+    detail = c.get(f"/api/sessions/{sid}").json()
+    assert detail["scores"]["sql-01"]["note"] == "хороший ответ"

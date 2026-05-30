@@ -118,6 +118,23 @@ const after = await page.evaluate(() => document.documentElement.dataset.theme);
 if (after === before) fail(`theme toggle did not change theme (${before} → ${after})`);
 console.log(`OK: theme toggles (${before} → ${after})`);
 
+// 9. Заметка на ноду: ввод в drawer переживает закрытие/повторное открытие.
+// Открываем/закрываем drawer текущего вопроса клавиатурой (Enter/Esc) — без клика по карточке
+// (drawer может перекрывать доску).
+await page.keyboard.press("Escape"); // закрыть открытый drawer (current сохраняется)
+await page.waitForTimeout(150);
+await page.keyboard.press("Enter"); // открыть drawer текущего вопроса
+await page.waitForSelector(".drawer__note", { timeout: 3000 });
+const noteText = "smoke-note-проверка";
+await page.locator(".drawer__note").fill(noteText);
+await page.keyboard.press("Escape");
+await page.waitForTimeout(150);
+await page.keyboard.press("Enter"); // повторно открыть тот же вопрос
+await page.waitForSelector(".drawer__note", { timeout: 3000 });
+const restored = await page.locator(".drawer__note").inputValue();
+if (restored !== noteText) fail(`note not retained across reopen: "${restored}"`);
+console.log("OK: node note retained across reopen");
+
 if (errors.length) fail(`console/page errors:\n${errors.join("\n")}`);
 
 console.log("\nALL SMOKE CHECKS PASSED ✓");
