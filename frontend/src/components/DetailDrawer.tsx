@@ -9,12 +9,13 @@ interface Props {
   score?: number;
   fullscreen: boolean;
   onScore: (nodeId: string, score: number) => void;
+  onDelete: (nodeId: string) => void;
   onToggleFullscreen: () => void;
   onClose: () => void;
 }
 
 // Немодальный drawer: полный текст вопроса/ответа. Закрывается с клавиатуры (Esc).
-export function DetailDrawer({ node, score, fullscreen, onScore, onToggleFullscreen, onClose }: Props) {
+export function DetailDrawer({ node, score, fullscreen, onScore, onDelete, onToggleFullscreen, onClose }: Props) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -42,6 +43,17 @@ export function DetailDrawer({ node, score, fullscreen, onScore, onToggleFullscr
           {node.kind === "task" ? "🛠 задача" : "❓ вопрос"} · {node.difficulty}
         </span>
         <div className="drawer__actions">
+          <button
+            className="drawer__delete"
+            onClick={() => {
+              if (window.confirm(`Удалить вопрос «${node.title || node.id}» из банка безвозвратно?`)) {
+                onDelete(node.id);
+              }
+            }}
+            title="Удалить вопрос из банка (необратимо)"
+          >
+            🗑 Удалить
+          </button>
           <button onClick={onToggleFullscreen} title="Развернуть/свернуть">
             {fullscreen ? "⤢ свернуть" : "⤢ на весь экран"}
           </button>

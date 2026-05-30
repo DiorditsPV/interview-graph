@@ -186,16 +186,44 @@ export default function App() {
     [graph],
   );
 
+  const reloadGraph = useCallback(
+    () =>
+      api
+        .graph()
+        .then((g) => {
+          setGraph(g.nodes);
+          setErrors(g.errors);
+          setPlacement(swimlaneLayout(g.nodes));
+        })
+        .catch((err) => setErrors([{ file: "API", error: String(err) }])),
+    [],
+  );
+
   useEffect(() => {
-    api
-      .graph()
-      .then((g) => {
-        setGraph(g.nodes);
-        setErrors(g.errors);
-        setPlacement(swimlaneLayout(g.nodes));
-      })
-      .catch((err) => setErrors([{ file: "API", error: String(err) }]));
-  }, []);
+    reloadGraph();
+  }, [reloadGraph]);
+
+  // Удаление вопроса из банка: DELETE → перезагрузить граф → снять выбор/текущий и осиротевшую оценку.
+  const deleteNode = useCallback(
+    async (id: string) => {
+      try {
+        await api.deleteNode(id);
+      } catch {
+        alert("Не удалось удалить вопрос");
+        return;
+      }
+      await reloadGraph();
+      setSelectedId((s) => (s === id ? null : s));
+      setCurrentId((c) => (c === id ? null : c));
+      setScores((prev) => {
+        if (!(id in prev)) return prev;
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+    },
+    [reloadGraph],
+  );
 
   const rfNodes = useMemo(
     () =>
@@ -572,6 +600,7 @@ export default function App() {
           score={selectedId ? scores[selectedId] : undefined}
           fullscreen={fullscreen}
           onScore={applyScore}
+          onDelete={deleteNode}
           onToggleFullscreen={() => setFullscreen((f) => !f)}
           onClose={() => {
             setSelectedId(null);

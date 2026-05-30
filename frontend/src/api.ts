@@ -25,4 +25,8 @@ export const api = {
     }).then(json<Session>),
   getSession: (sessionId: number) =>
     fetch(`${BASE}/sessions/${sessionId}`).then(json<Session>),
+  deleteNode: (id: string) =>
+    fetch(`${BASE}/nodes/${encodeURIComponent(id)}`, { method: "DELETE" }).then(
+      json<{ deleted: string; file: string; fileRemoved: boolean }>,
+    ),
 };
