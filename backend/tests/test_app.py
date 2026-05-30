@@ -137,6 +137,37 @@ def test_api_session_events_404():
         assert r.status_code == 404
 
 
+def test_api_score_note_synced_over_sse():
+    # Заметка (note) синхронизируется наравне с баллом: бэкенд хранит её и отдаёт в снимке,
+    # который рассылается подписчикам (интервьюер + HR). UI заметок нет — это backend-only.
+    import asyncio
+
+    from starlette.requests import Request
+
+    from app.main import session_events
+
+    c = _client()
+    sid = c.post("/api/sessions", json={"candidate": "Заметкин"}).json()["id"]
+    note = "путается в оконных функциях, но базу знает"
+    c.post(f"/api/sessions/{sid}/score", json={"nodeId": "sql-01", "score": 4, "note": note})
+
+    async def first_frame() -> str:
+        async def receive():
+            return {"type": "http.request"}
+
+        req = Request({"type": "http", "method": "GET", "headers": []}, receive)
+        resp = await session_events(sid, req)
+        agen = resp.body_iterator
+        try:
+            return await agen.__anext__()
+        finally:
+            await agen.aclose()
+
+    data = json.loads(asyncio.run(first_frame()).split("data: ", 1)[1].strip())
+    assert data["scores"]["sql-01"]["score"] == 4
+    assert data["scores"]["sql-01"]["note"] == note
+
+
 def test_session_hub_publish():
     import asyncio
 
