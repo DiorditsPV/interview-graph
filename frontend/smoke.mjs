@@ -118,6 +118,18 @@ const after = await page.evaluate(() => document.documentElement.dataset.theme);
 if (after === before) fail(`theme toggle did not change theme (${before} → ${after})`);
 console.log(`OK: theme toggles (${before} → ${after})`);
 
+// 9. «Только неоценённые»: оценённая на шаге 4 нода гаснет при включении тумблера.
+const unscoredBtn = page.locator(".fp__chip", { hasText: "Только неоценённые" });
+await unscoredBtn.click();
+await page.waitForTimeout(250);
+const dimUnscored = await page.locator(".qnode--dimmed").count();
+if (dimUnscored < 1) fail("unscored-only did not dim scored nodes");
+await unscoredBtn.click();
+await page.waitForTimeout(250);
+const dimAfter = await page.locator(".qnode--dimmed").count();
+if (dimAfter >= dimUnscored) fail(`toggling off did not clear dim (${dimUnscored} → ${dimAfter})`);
+console.log(`OK: «только неоценённые» dims ${dimUnscored}, clears to ${dimAfter}`);
+
 if (errors.length) fail(`console/page errors:\n${errors.join("\n")}`);
 
 console.log("\nALL SMOKE CHECKS PASSED ✓");
