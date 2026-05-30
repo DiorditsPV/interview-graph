@@ -96,3 +96,64 @@ def test_api_interview():
     r = _client().post("/api/interview", json={"count": 8, "seed": 1})
     assert r.status_code == 200
     assert len(r.json()["order"]) <= 8
+
+
+def test_api_import_valid_with_id():
+    c = _client()
+    md = (
+        "---\nid: zzz-upload-test-01\nblock: databases\ntopic: Загрузка\n---\n"
+        "## Вопрос\nТестовый вопрос?\n## Ответ\nОтвет.\n"
+    )
+    created = []
+    try:
+        r = c.post("/api/import", json={"filename": "whatever.md", "content": md})
+        assert r.status_code == 200
+        data = r.json()
+        created = [a["path"] for a in data["added"]]
+        assert data["errors"] == []
+        assert any(a["id"] == "zzz-upload-test-01" for a in data["added"])
+        assert (CONTENT / "databases" / "zzz-upload-test-01.md").exists()
+    finally:
+        for p in created:
+            (CONTENT / p).unlink(missing_ok=True)
+
+
+def test_api_import_idless_md_takes_stem():
+    c = _client()
+    md = "---\nblock: python\ntopic: Стем\n---\n## Вопрос\nОткуда id?\n"
+    created = []
+    try:
+        r = c.post("/api/import", json={"filename": "zzz-stem-01.md", "content": md})
+        data = r.json()
+        created = [a["path"] for a in data["added"]]
+        assert data["added"], f"nothing added: {data}"
+        assert data["added"][0]["id"] == "zzz-stem-01"  # id из имени файла, не из temp-stem
+    finally:
+        for p in created:
+            (CONTENT / p).unlink(missing_ok=True)
+
+
+def test_api_import_invalid_not_written():
+    c = _client()
+    bad = "---\nid: zzz-bad-01\nblock: NOPE\ntopic: x\n---\n## Вопрос\nq\n"
+    r = c.post("/api/import", json={"filename": "bad.md", "content": bad})
+    data = r.json()
+    assert data["added"] == []
+    assert data["errors"]
+    assert not (CONTENT / "NOPE" / "zzz-bad-01.md").exists()
+
+
+def test_api_import_duplicate_id():
+    c = _client()
+    dup = "---\nid: sql-01\nblock: databases\ntopic: dup\n---\n## Вопрос\nq\n"
+    r = c.post("/api/import", json={"filename": "dup.md", "content": dup})
+    data = r.json()
+    assert data["added"] == []
+    assert any("duplicate" in e["error"] for e in data["errors"])
+    # существующий sql-01 не перезаписан (всё ещё на месте)
+    assert (CONTENT / "databases" / "sql-01.md").exists()
+
+
+def test_api_import_bad_extension():
+    r = _client().post("/api/import", json={"filename": "x.txt", "content": "hi"})
+    assert r.status_code == 400
