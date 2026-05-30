@@ -18,5 +18,6 @@
 | `feature/question-search` | question-search | Поиск по тексту вопросов | done | pass | ok — багов нет | 2026-05-30 | .claude/features/question-search.md |
 | `feature/session-resume` | session-resume | Загрузка прошлой сессии кандидата (resume) | done | pass | ok — багов нет; мелочь: стиль .loadsess дублирует .tb__select (не блокер) | 2026-05-30 | .claude/features/session-resume.md |
 | `feature/shortcuts-help` | shortcuts-help | Оверлей горячих клавиш (по «?») | done | pass | ok — найден и устранён баг двойного Escape-listener'а (capture-фаза + stopImmediatePropagation) | 2026-05-30 | .claude/features/shortcuts-help.md |
+| `feature/topbar-redeclutter` | topbar-redeclutter | Разгрузка шапки (два ряда) | done | pass | ok — багов нет; реструктуризация раскладки, все классы/селекторы сохранены, поведение не менялось | 2026-05-30 | .claude/features/topbar-redeclutter.md |
 | `feature/unscored-filter` | unscored-filter | Фильтр «только неоценённые» | done | pass | ok — багов нет | 2026-05-30 | .claude/features/unscored-filter.md |
 | `feature/ux-live-polish` | ux-live-polish | Пакет UX-полировки (читаемость/управляемость) | done | pass | ok — багов нет (фикс currentColor→--accent для кольца текущего вопроса) | 2026-05-30 | .claude/features/ux-live-polish.md |
