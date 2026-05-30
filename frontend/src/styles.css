@@ -189,6 +189,11 @@ button:disabled:hover { background: var(--surface); }
 .scorebtn:hover { background: none; }
 .scorebtn--on { color: #f59e0b; }
 .scoreval { margin-left: 8px; font-weight: 600; color: var(--text-muted); }
+.drawer__note {
+  width: 100%; margin-top: 8px; min-height: 56px; resize: vertical; box-sizing: border-box;
+  padding: 6px 8px; border: 1px solid var(--border-strong); border-radius: 6px;
+  background: var(--surface); color: var(--text); font: inherit; font-size: 13px;
+}
 
 .nextlist { list-style: none; margin: 0; padding: 0; }
 .nextlist li { margin: 6px 0; }

@@ -141,3 +141,11 @@ def test_api_list_sessions_for_resume():
     # деталь сессии содержит восстановимые оценки
     detail = c.get(f"/api/sessions/{sid}").json()
     assert detail["scores"]["sql-01"]["score"] == 5
+
+
+def test_api_score_note_persists():
+    c = _client()
+    sid = c.post("/api/sessions", json={"candidate": "Notes"}).json()["id"]
+    c.post(f"/api/sessions/{sid}/score", json={"nodeId": "sql-01", "score": 4, "note": "хороший ответ"})
+    detail = c.get(f"/api/sessions/{sid}").json()
+    assert detail["scores"]["sql-01"]["note"] == "хороший ответ"

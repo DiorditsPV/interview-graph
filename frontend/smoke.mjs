@@ -129,7 +129,25 @@ const after = await page.evaluate(() => document.documentElement.dataset.theme);
 if (after === before) fail(`theme toggle did not change theme (${before} → ${after})`);
 console.log(`OK: theme toggles (${before} → ${after})`);
 
-// 9. Resume: создать сессию+оценку через API → reload → выбрать в .loadsess → оценки восстановлены.
+// 9. Заметка на ноду: ввод в drawer переживает закрытие/повторное открытие.
+// (ДО resume-проверки: она делает reload и сбрасывает current/drawer.)
+// Открываем/закрываем drawer текущего вопроса клавиатурой (Enter/Esc) — без клика по карточке.
+await page.keyboard.press("Escape"); // закрыть открытый drawer (current сохраняется)
+await page.waitForTimeout(150);
+await page.keyboard.press("Enter"); // открыть drawer текущего вопроса
+await page.waitForSelector(".drawer__note", { timeout: 3000 });
+const noteText = "smoke-note-проверка";
+await page.locator(".drawer__note").fill(noteText);
+await page.keyboard.press("Escape");
+await page.waitForTimeout(150);
+await page.keyboard.press("Enter"); // повторно открыть тот же вопрос
+await page.waitForSelector(".drawer__note", { timeout: 3000 });
+const restored = await page.locator(".drawer__note").inputValue();
+if (restored !== noteText) fail(`note not retained across reopen: "${restored}"`);
+console.log("OK: node note retained across reopen");
+
+// 10. Resume: создать сессию+оценку через API → reload → выбрать в .loadsess → оценки восстановлены.
+// (Делает page.reload() — должна идти ПОСЛЕ проверок, опирающихся на накопленное состояние.)
 const sid = (await (await page.request.post(URL + "api/sessions", { data: { candidate: "SmokeResume" } })).json()).id;
 await page.request.post(`${URL}api/sessions/${sid}/score`, { data: { nodeId: "sql-01", score: 5 } });
 await page.reload({ waitUntil: "networkidle" });
