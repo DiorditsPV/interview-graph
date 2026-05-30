@@ -26,7 +26,7 @@ from pydantic import BaseModel, Field
 from .db import Database
 from .hub import SessionHub
 from .importer import parse_file
-from .models import GraphResponse, Node
+from .models import Block, Difficulty, GraphResponse, Kind, Node
 from .sampler import build_interview, load_tracks, load_weights
 from .seed import seed_tenant_if_empty
 from .tenancy import resolve_tenant
@@ -83,6 +83,28 @@ class InterviewRequest(BaseModel):
 class ImportFile(BaseModel):
     filename: str = Field(min_length=1)
     content: str
+
+
+class NodeCreate(BaseModel):
+    """Создание вопроса из UI: id генерится сервером, остальное валидируется."""
+
+    block: Block
+    topic: str = Field(min_length=1)
+    difficulty: Difficulty = "middle"
+    kind: Kind = "question"
+    title: Optional[str] = None
+    question: str = Field(min_length=1)
+    answer: str = ""
+    tags: List[str] = Field(default_factory=list)
+
+
+class NodeUpdate(BaseModel):
+    """Структурная правка вопроса — только переданные поля (None = не менять)."""
+
+    title: Optional[str] = None
+    difficulty: Optional[Difficulty] = None
+    question: Optional[str] = None
+    answer: Optional[str] = None
 
 
 # ---------- graph & content ----------
@@ -153,6 +175,66 @@ def import_file(body: ImportFile, request: Request) -> dict:
             "title": saved.get("title") or "",
         })
     return {"added": added, "errors": errors}
+
+
+# ---------- node CRUD (банк вопросов в БД) ----------
+# Источник правды для вопросов — БД (см. db.py/seed.py). CRUD пишет в БД через DAL,
+# а НЕ в content/*.md: иначе рантайм-правки затёр бы деплой (rsync --delete content/).
+import re  # noqa: E402 — локальный хелпер slug для генерации id новых нод
+
+
+def _slugify(s: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", s.strip().lower()).strip("-")
+    return slug or "q"
+
+
+def _unique_node_id(tenant: str, base: str) -> str:
+    """Сгенерировать свободный id вида `<base>-NN`, уникальный среди нод тенанта."""
+    taken = {n["id"] for n in db.list_nodes(tenant)}
+    n = 1
+    while f"{base}-{n:02d}" in taken:
+        n += 1
+    return f"{base}-{n:02d}"
+
+
+@app.post("/api/nodes")
+def add_node(body: NodeCreate, request: Request) -> dict:
+    """Создать новый вопрос в банке (БД, source='user'). id генерится из topic/title."""
+    tenant = resolve_tenant(request)
+    base = _slugify(body.topic or body.title or body.block)
+    node_id = _unique_node_id(tenant, base)
+    # Валидация через Node (extra=forbid, Literal-проверки) до записи.
+    node = Node.model_validate({**body.model_dump(), "id": node_id})
+    saved = db.upsert_node(tenant, node.model_dump(by_alias=True), source="user")
+    return {"id": saved["id"], "block": saved["block"], "title": saved.get("title") or ""}
+
+
+@app.put("/api/nodes/{node_id}")
+def edit_node(node_id: str, body: NodeUpdate, request: Request) -> dict:
+    """Обновить структурные поля вопроса. 404 если нет, 422 если результат невалиден."""
+    tenant = resolve_tenant(request)
+    existing = db.get_node(tenant, node_id)
+    if existing is None:
+        raise HTTPException(status_code=404, detail=f"node '{node_id}' not found")
+    fields = body.model_dump(exclude_none=True)
+    merged = {**existing, **fields}
+    # existing несёт БД-поля (source/hidden/timestamps), которых нет в Node (extra=forbid):
+    # валидируем только подмножество полей Node, а в БД пишем полный merged (db читает по .get).
+    try:
+        Node.model_validate({k: v for k, v in merged.items() if k in _NODE_FIELDS})
+    except Exception as exc:  # noqa: BLE001 — pydantic ValidationError → 422
+        raise HTTPException(status_code=422, detail=str(exc))
+    saved = db.upsert_node(tenant, merged, source=existing.get("source", "user"))
+    return {"updated": saved["id"]}
+
+
+@app.delete("/api/nodes/{node_id}")
+def remove_node(node_id: str, request: Request) -> dict:
+    """Безвозвратно удалить вопрос из банка (БД). 404, если нет."""
+    tenant = resolve_tenant(request)
+    if not db.delete_node(tenant, node_id):
+        raise HTTPException(status_code=404, detail=f"node '{node_id}' not found")
+    return {"deleted": node_id}
 
 
 @app.post("/api/interview")

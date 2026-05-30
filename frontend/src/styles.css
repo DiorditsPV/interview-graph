@@ -50,11 +50,16 @@ body {
 
 .app { display: flex; flex-direction: column; height: 100vh; }
 
-/* ---- topbar ---- */
+/* ---- topbar (topbar-redeclutter: два ряда — поток интервью + служебное) ---- */
 .topbar {
-  display: flex; align-items: center; gap: 12px;
-  padding: 10px 16px; background: var(--surface); border-bottom: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 8px 16px; background: var(--surface); border-bottom: 1px solid var(--border);
 }
+.topbar__row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+/* ряд 2 — визуально тише: отделён сверху, мельче */
+.topbar__row--utility { padding-top: 6px; border-top: 1px solid var(--border); }
+.topbar__row--utility .iconbtn,
+.topbar__row--utility .tb__toggle { font-size: 13px; }
 .topbar strong { color: var(--heading); }
 .topbar .muted { color: var(--text-faint); font-size: 13px; }
 .progress { display: flex; align-items: center; gap: 8px; }
@@ -480,3 +485,33 @@ kbd {
   text-transform: uppercase; letter-spacing: .03em;
 }
 .bankrow__body section:first-child h4 { margin-top: 8px; }
+
+/* ---- question-management: правка/удаление/скрытие/добавление вопроса ---- */
+.qnode--hidden { border-style: dashed; opacity: 0.6; }
+.drawer__hide { color: var(--text-muted); }
+.drawer__delete { color: #b91c1c; border-color: #fca5a5; }
+.drawer__delete:hover { background: #fef2f2; border-color: #ef4444; }
+
+.drawer__field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-muted); margin-bottom: 10px; }
+.drawer__field input, .drawer__field select, .drawer__field textarea {
+  padding: 6px 8px; border: 1px solid var(--border-strong); border-radius: 6px;
+  background: var(--surface); color: var(--text); font-size: 14px; font-family: inherit;
+}
+.drawer__field textarea { resize: vertical; line-height: 1.5; }
+.drawer__editform { display: flex; flex-direction: column; }
+.drawer__editbtns, .addform__btns { display: flex; gap: 8px; margin-top: 4px; }
+.btn--primary { background: #2563eb; color: #fff; border-color: #2563eb; }
+.btn--primary:hover { background: #1d4ed8; }
+.btn--primary:disabled { opacity: .5; }
+
+.modal {
+  position: fixed; inset: 0; background: rgba(0, 0, 0, 0.4); z-index: 50;
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.modal__card {
+  background: var(--surface); color: var(--text); border-radius: 12px; padding: 18px 20px;
+  width: 520px; max-width: 95vw; max-height: 90vh; overflow-y: auto; box-shadow: 0 12px 40px var(--shadow-strong);
+}
+.modal__card h3 { margin: 0 0 14px; color: var(--heading); }
+.addform__row { display: flex; gap: 12px; }
+.addform__row .drawer__field { flex: 1; }
