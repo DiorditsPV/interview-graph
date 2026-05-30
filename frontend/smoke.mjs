@@ -118,6 +118,23 @@ const after = await page.evaluate(() => document.documentElement.dataset.theme);
 if (after === before) fail(`theme toggle did not change theme (${before} → ${after})`);
 console.log(`OK: theme toggles (${before} → ${after})`);
 
+// 10. Сравнение кандидатов: старт сессии → оценка текущего вопроса через HUD (персист) → модалка-агрегат.
+await page.locator(".session input").fill("Cmp Bot");
+await page.locator(".session button", { hasText: "Начать сессию" }).click();
+await page.waitForSelector(".session__active", { timeout: 3000 });
+// Оцениваем текущий вопрос через HUD (fixed-оверлей, всегда в кадре — не зависит от позиции холста).
+await page.waitForSelector(".hud__score .scorebtn", { timeout: 3000 });
+await page.locator(".hud__score .scorebtn").nth(2).click(); // 3/5 → персист в сессию
+await page.waitForTimeout(400);
+await page.locator(".cmpbtn").click();
+await page.waitForSelector(".cmp-modal", { timeout: 3000 });
+await page.locator(".cmp-modal__item input[type=checkbox]").first().check();
+await page.locator(".cmp-modal__run").click();
+await page.waitForSelector(".cmp-table", { timeout: 3000 });
+const cmpText = await page.locator(".cmp-table").innerText();
+if (!cmpText.includes("Cmp Bot")) fail(`compare table missing candidate: "${cmpText}"`);
+console.log("OK: candidate compare table renders (Cmp Bot)");
+
 if (errors.length) fail(`console/page errors:\n${errors.join("\n")}`);
 
 console.log("\nALL SMOKE CHECKS PASSED ✓");
