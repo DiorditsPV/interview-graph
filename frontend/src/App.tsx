@@ -10,7 +10,7 @@ import {
   type ReactFlowInstance,
 } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api } from "./api";
+import { api, type NodeCreate, type NodeUpdate } from "./api";
 import { BandsNode } from "./components/BandsNode";
 import { BlockGroupNode } from "./components/BlockGroupNode";
 import { DetailDrawer } from "./components/DetailDrawer";
@@ -159,6 +159,7 @@ const KINDS = ["question", "task"] as const;
 const KIND_LABEL: Record<string, string> = { question: "вопрос", task: "задача" };
 const KIND_COLOR: Record<string, string> = { question: "#2563eb", task: "#9333ea" };
 const ALL_KINDS: Record<string, boolean> = { question: true, task: true };
+const EMPTY_ADD = { block: "databases", topic: "", difficulty: "middle", kind: "question", title: "", question: "", answer: "", tags: "" };
 
 export default function App() {
   const [graph, setGraph] = useState<QNode[]>([]);
@@ -250,6 +251,47 @@ export default function App() {
     },
     [reloadGraph],
   );
+
+  // Правка вопроса в банке: PUT структурных полей → перезагрузить граф.
+  const updateNode = useCallback(
+    async (id: string, fields: NodeUpdate) => {
+      try {
+        await api.updateNode(id, fields);
+      } catch {
+        alert("Не удалось сохранить изменения");
+        return;
+      }
+      await reloadGraph();
+    },
+    [reloadGraph],
+  );
+
+  // Добавление вопроса формой (шапка).
+  const [addOpen, setAddOpen] = useState(false);
+  const [addDraft, setAddDraft] = useState(EMPTY_ADD);
+  const createNode = useCallback(async () => {
+    const payload: NodeCreate = {
+      block: addDraft.block as Block,
+      topic: addDraft.topic.trim(),
+      difficulty: addDraft.difficulty as Difficulty,
+      kind: addDraft.kind as "question" | "task",
+      title: addDraft.title.trim() || undefined,
+      question: addDraft.question,
+      answer: addDraft.answer,
+      tags: addDraft.tags.split(",").map((t) => t.trim()).filter(Boolean),
+    };
+    let res: { id: string; file: string };
+    try {
+      res = await api.createNode(payload);
+    } catch {
+      alert("Не удалось создать вопрос");
+      return;
+    }
+    await reloadGraph();
+    setAddOpen(false);
+    setAddDraft(EMPTY_ADD);
+    setSelectedId(res.id);
+  }, [addDraft, reloadGraph]);
 
   const rfNodes = useMemo(
     () =>
@@ -453,6 +495,13 @@ export default function App() {
             </>
           )}
           <button
+            className="iconbtn addbtn"
+            onClick={() => setAddOpen(true)}
+            title="Добавить вопрос в банк"
+          >
+            ＋ Вопрос
+          </button>
+          <button
             className="iconbtn dlbtn"
             onClick={() => downloadReport(session?.candidate ?? candidate, graph, scores)}
             disabled={scored === 0}
@@ -636,6 +685,7 @@ export default function App() {
           onToggleHide={toggleHide}
           onScore={applyScore}
           onDelete={deleteNode}
+          onUpdate={updateNode}
           onToggleFullscreen={() => setFullscreen((f) => !f)}
           onClose={() => {
             setSelectedId(null);
@@ -643,6 +693,71 @@ export default function App() {
           }}
         />
       </div>
+
+      {addOpen && (
+        <div className="modal" onClick={() => setAddOpen(false)}>
+          <div className="modal__card addform" onClick={(e) => e.stopPropagation()}>
+            <h3>Новый вопрос</h3>
+            <div className="addform__row">
+              <label className="drawer__field">
+                Блок
+                <select value={addDraft.block} onChange={(e) => setAddDraft({ ...addDraft, block: e.target.value })}>
+                  {BLOCK_ORDER.map((b) => (
+                    <option key={b} value={b}>{BLOCK_LABEL[b as Block]}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="drawer__field">
+                Тема
+                <input
+                  value={addDraft.topic}
+                  onChange={(e) => setAddDraft({ ...addDraft, topic: e.target.value })}
+                  placeholder="например, sql"
+                />
+              </label>
+            </div>
+            <div className="addform__row">
+              <label className="drawer__field">
+                Сложность
+                <select value={addDraft.difficulty} onChange={(e) => setAddDraft({ ...addDraft, difficulty: e.target.value })}>
+                  {DIFFS.map((d) => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="drawer__field">
+                Тип
+                <select value={addDraft.kind} onChange={(e) => setAddDraft({ ...addDraft, kind: e.target.value })}>
+                  <option value="question">вопрос</option>
+                  <option value="task">задача</option>
+                </select>
+              </label>
+            </div>
+            <label className="drawer__field">
+              Заголовок
+              <input value={addDraft.title} onChange={(e) => setAddDraft({ ...addDraft, title: e.target.value })} />
+            </label>
+            <label className="drawer__field">
+              {addDraft.kind === "task" ? "Задача" : "Вопрос"}
+              <textarea rows={3} value={addDraft.question} onChange={(e) => setAddDraft({ ...addDraft, question: e.target.value })} />
+            </label>
+            <label className="drawer__field">
+              {addDraft.kind === "task" ? "Эталон / решение" : "Ответ"}
+              <textarea rows={5} value={addDraft.answer} onChange={(e) => setAddDraft({ ...addDraft, answer: e.target.value })} />
+            </label>
+            <label className="drawer__field">
+              Теги (через запятую)
+              <input value={addDraft.tags} onChange={(e) => setAddDraft({ ...addDraft, tags: e.target.value })} />
+            </label>
+            <div className="addform__btns">
+              <button className="btn--primary" onClick={createNode} disabled={!addDraft.topic.trim() || !addDraft.question.trim()}>
+                Создать
+              </button>
+              <button onClick={() => setAddOpen(false)}>Отмена</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

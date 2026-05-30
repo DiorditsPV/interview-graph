@@ -1,4 +1,22 @@
-import type { GraphResponse, Session } from "./types";
+import type { Block, Difficulty, GraphResponse, Session } from "./types";
+
+export interface NodeUpdate {
+  title?: string;
+  difficulty?: Difficulty;
+  question?: string;
+  answer?: string;
+}
+
+export interface NodeCreate {
+  block: Block;
+  topic: string;
+  difficulty: Difficulty;
+  kind: "question" | "task";
+  title?: string;
+  question: string;
+  answer: string;
+  tags: string[];
+}
 
 // В dev /api проксируется Vite на :8000; в прод тот же origin (раздаёт FastAPI).
 const BASE = "/api";
@@ -29,4 +47,16 @@ export const api = {
     fetch(`${BASE}/nodes/${encodeURIComponent(id)}`, { method: "DELETE" }).then(
       json<{ deleted: string; file: string; fileRemoved: boolean }>,
     ),
+  updateNode: (id: string, fields: NodeUpdate) =>
+    fetch(`${BASE}/nodes/${encodeURIComponent(id)}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(fields),
+    }).then(json<{ updated: string; file: string }>),
+  createNode: (data: NodeCreate) =>
+    fetch(`${BASE}/nodes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }).then(json<{ id: string; file: string }>),
 };

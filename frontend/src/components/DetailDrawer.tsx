@@ -1,8 +1,9 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Markdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import remarkGfm from "remark-gfm";
-import { BLOCK_COLOR, BLOCK_LABEL, type QNode } from "../types";
+import { BLOCK_COLOR, BLOCK_LABEL, type Difficulty, type QNode } from "../types";
+import type { NodeUpdate } from "../api";
 
 interface Props {
   node: QNode | null;
@@ -12,22 +13,50 @@ interface Props {
   onToggleHide: (nodeId: string) => void;
   onScore: (nodeId: string, score: number) => void;
   onDelete: (nodeId: string) => void;
+  onUpdate: (nodeId: string, fields: NodeUpdate) => void;
   onToggleFullscreen: () => void;
   onClose: () => void;
 }
 
+const DIFF_OPTS: Difficulty[] = ["base", "junior", "middle", "senior"];
+
 // Немодальный drawer: полный текст вопроса/ответа. Закрывается с клавиатуры (Esc).
-export function DetailDrawer({ node, score, fullscreen, hidden, onToggleHide, onScore, onDelete, onToggleFullscreen, onClose }: Props) {
+export function DetailDrawer({ node, score, fullscreen, hidden, onToggleHide, onScore, onDelete, onUpdate, onToggleFullscreen, onClose }: Props) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<{ title: string; difficulty: Difficulty; question: string; answer: string }>(
+    { title: "", difficulty: "middle", question: "", answer: "" },
+  );
+
+  // Сброс режима правки при переключении на другой вопрос.
+  useEffect(() => setEditing(false), [node?.id]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        if (editing) setEditing(false);
+        else onClose();
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [onClose, editing]);
 
   if (!node) return null;
   const color = BLOCK_COLOR[node.block];
+
+  const startEdit = () => {
+    setDraft({ title: node.title ?? "", difficulty: node.difficulty, question: node.question, answer: node.answer });
+    setEditing(true);
+  };
+  const saveEdit = () => {
+    onUpdate(node.id, {
+      title: draft.title.trim() || undefined,
+      difficulty: draft.difficulty,
+      question: draft.question,
+      answer: draft.answer,
+    });
+    setEditing(false);
+  };
 
   return (
     <aside
@@ -63,6 +92,11 @@ export function DetailDrawer({ node, score, fullscreen, hidden, onToggleHide, on
           >
             🗑 Удалить
           </button>
+          {!editing && (
+            <button className="drawer__edit" onClick={startEdit} title="Редактировать вопрос (в банке)">
+              ✏ Редактировать
+            </button>
+          )}
           <button onClick={onToggleFullscreen} title="Развернуть/свернуть">
             {fullscreen ? "⤢ свернуть" : "⤢ на весь экран"}
           </button>
@@ -73,6 +107,40 @@ export function DetailDrawer({ node, score, fullscreen, hidden, onToggleHide, on
       </header>
 
       <div className="drawer__body">
+        {editing ? (
+          <div className="drawer__editform">
+            <label className="drawer__field">
+              Заголовок
+              <input value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
+            </label>
+            <label className="drawer__field">
+              Сложность
+              <select
+                value={draft.difficulty}
+                onChange={(e) => setDraft({ ...draft, difficulty: e.target.value as Difficulty })}
+              >
+                {DIFF_OPTS.map((d) => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+            </label>
+            <label className="drawer__field">
+              {node.kind === "task" ? "Задача" : "Вопрос"}
+              <textarea rows={4} value={draft.question} onChange={(e) => setDraft({ ...draft, question: e.target.value })} />
+            </label>
+            <label className="drawer__field">
+              {node.kind === "task" ? "Эталон / решение" : "Ответ"}
+              <textarea rows={8} value={draft.answer} onChange={(e) => setDraft({ ...draft, answer: e.target.value })} />
+            </label>
+            <div className="drawer__editbtns">
+              <button className="btn--primary" onClick={saveEdit} disabled={!draft.question.trim()}>
+                💾 Сохранить
+              </button>
+              <button onClick={() => setEditing(false)}>Отмена</button>
+            </div>
+          </div>
+        ) : (
+        <>
         {node.title && <h1 className="drawer__title">{node.title}</h1>}
 
         {node.tags.length > 0 && (
@@ -141,6 +209,8 @@ export function DetailDrawer({ node, score, fullscreen, hidden, onToggleHide, on
             {score != null && <span className="scoreval">{score}/5</span>}
           </div>
         </section>
+        </>
+        )}
       </div>
     </aside>
   );
