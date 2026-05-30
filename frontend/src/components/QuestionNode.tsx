@@ -7,13 +7,14 @@ export interface QuestionNodeData {
   score?: number;
   current?: boolean;
   dimmed?: boolean;
+  hidden?: boolean;
   [key: string]: unknown;
 }
 
 // Компактная карточка: короткий заголовок (title) вместо полного текста вопроса —
 // полный текст/код живёт в drawer. Теги показываем чипами.
 function QuestionNodeImpl({ data, selected }: NodeProps) {
-  const { node, score, current, dimmed } = data as QuestionNodeData;
+  const { node, score, current, dimmed, hidden } = data as QuestionNodeData;
   const color = BLOCK_COLOR[node.block];
   const isTask = node.kind === "task";
   const heading = node.title || node.question;
@@ -26,12 +27,16 @@ function QuestionNodeImpl({ data, selected }: NodeProps) {
         current ? "qnode--current" : "",
         score != null ? "qnode--scored" : "",
         dimmed ? "qnode--dimmed" : "",
+        hidden ? "qnode--hidden" : "",
       ].join(" ")}
       style={{ borderTopColor: color }}
       title={node.question}
     >
       <div className="qnode__head">
-        <span className="qnode__kind">{isTask ? "🛠 задача" : "❓ вопрос"}</span>
+        <span className="qnode__kind">
+          {hidden ? "🙈 " : ""}
+          {isTask ? "🛠 задача" : "❓ вопрос"}
+        </span>
         <span className="qnode__diff" data-diff={node.difficulty}>
           {node.difficulty}
         </span>

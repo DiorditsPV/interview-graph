@@ -8,6 +8,8 @@ interface Props {
   node: QNode | null;
   score?: number;
   fullscreen: boolean;
+  hidden: boolean;
+  onToggleHide: (nodeId: string) => void;
   onScore: (nodeId: string, score: number) => void;
   onDelete: (nodeId: string) => void;
   onToggleFullscreen: () => void;
@@ -15,7 +17,7 @@ interface Props {
 }
 
 // Немодальный drawer: полный текст вопроса/ответа. Закрывается с клавиатуры (Esc).
-export function DetailDrawer({ node, score, fullscreen, onScore, onDelete, onToggleFullscreen, onClose }: Props) {
+export function DetailDrawer({ node, score, fullscreen, hidden, onToggleHide, onScore, onDelete, onToggleFullscreen, onClose }: Props) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -43,6 +45,13 @@ export function DetailDrawer({ node, score, fullscreen, onScore, onDelete, onTog
           {node.kind === "task" ? "🛠 задача" : "❓ вопрос"} · {node.difficulty}
         </span>
         <div className="drawer__actions">
+          <button
+            className="drawer__hide"
+            onClick={() => onToggleHide(node.id)}
+            title={hidden ? "Вернуть на доску" : "Скрыть с доски (локально, обратимо)"}
+          >
+            {hidden ? "↩ Вернуть" : "🙈 Скрыть"}
+          </button>
           <button
             className="drawer__delete"
             onClick={() => {

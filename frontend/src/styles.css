@@ -124,6 +124,8 @@ button:disabled:hover { background: var(--surface); }
   z-index: 5;
 }
 .qnode--dimmed { opacity: 0.15; }
+.qnode--hidden { border-style: dashed; opacity: 0.6; }
+.drawer__hide { color: var(--text-muted); }
 
 /* handles нужны только для привязки рёбер — скрываем визуально */
 .react-flow__handle { opacity: 0 !important; pointer-events: none !important; }
