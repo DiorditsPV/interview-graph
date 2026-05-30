@@ -103,10 +103,21 @@ button:disabled:hover { background: var(--surface); }
 .interview h4 { margin: 6px 4px; }
 .interview ol { margin: 0; padding: 0 0 0 4px; list-style: none; }
 .interview li { margin: 4px 0; }
-.ivbtn {
-  width: 100%; text-align: left; border-left: 4px solid; font-size: 12px;
-  padding: 6px 8px; line-height: 1.3;
+.interview h4 { font-size: 13px; color: var(--text-muted); }
+.iv-block {
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em;
+  margin: 10px 4px 4px;
 }
+.ivbtn {
+  display: block; width: 100%; text-align: left; border-left: 4px solid; font-size: 12px;
+  padding: 6px 8px; line-height: 1.3; margin: 3px 0; border-radius: 4px;
+  background: var(--surface); color: var(--text); cursor: pointer;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ivbtn:hover { background: var(--hover); }
+.ivbtn--current { box-shadow: 0 0 0 2px #2563eb; font-weight: 600; }
+.ivbtn--scored { color: var(--text-muted); }
+.ivbtn__check { color: #16a34a; font-weight: 700; margin-right: 4px; }
 
 /* ---- custom node ---- */
 .qnode {
