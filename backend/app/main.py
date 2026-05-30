@@ -16,12 +16,12 @@ from typing import List, Optional
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
-from .content_ops import NodeNotFound, delete_node
+from .content_ops import NodeNotFound, create_node, delete_node, update_node
 from .db import Database
 from .importer import load_content
-from .models import GraphResponse
+from .models import Block, Difficulty, GraphResponse, Kind
 from .sampler import build_interview, load_weights
 
 BASE_DIR = Path(__file__).resolve().parent.parent          # backend/
@@ -61,6 +61,26 @@ class InterviewRequest(BaseModel):
     seed: Optional[int] = None
 
 
+class NodeUpdate(BaseModel):
+    """Структурная правка вопроса — только переданные поля (None = не менять)."""
+
+    title: Optional[str] = None
+    difficulty: Optional[Difficulty] = None
+    question: Optional[str] = None
+    answer: Optional[str] = None
+
+
+class NodeCreate(BaseModel):
+    block: Block
+    topic: str = Field(min_length=1)
+    difficulty: Difficulty = "middle"
+    kind: Kind = "question"
+    title: Optional[str] = None
+    question: str = Field(min_length=1)
+    answer: str = ""
+    tags: List[str] = Field(default_factory=list)
+
+
 # ---------- graph & content ----------
 @app.get("/api/graph", response_model=GraphResponse)
 def get_graph() -> GraphResponse:
@@ -84,6 +104,27 @@ def make_interview(req: InterviewRequest) -> dict:
         seed=req.seed,
     )
     return {"order": order}
+
+
+@app.post("/api/nodes")
+def add_node(body: NodeCreate) -> dict:
+    """Создать новый вопрос (пишет content/{block}/{id}.md, id уникален по банку)."""
+    try:
+        return create_node(CONTENT_DIR, body.model_dump())
+    except (ValidationError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@app.put("/api/nodes/{node_id}")
+def edit_node(node_id: str, body: NodeUpdate) -> dict:
+    """Обновить структурные поля вопроса. 404 если нет, 422 если результат невалиден."""
+    fields = body.model_dump(exclude_none=True)
+    try:
+        return update_node(CONTENT_DIR, node_id, fields)
+    except NodeNotFound:
+        raise HTTPException(status_code=404, detail=f"node '{node_id}' not found")
+    except (ValidationError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
 
 
 @app.delete("/api/nodes/{node_id}")
