@@ -118,6 +118,18 @@ const after = await page.evaluate(() => document.documentElement.dataset.theme);
 if (after === before) fail(`theme toggle did not change theme (${before} → ${after})`);
 console.log(`OK: theme toggles (${before} → ${after})`);
 
+// 9. Поиск по вопросам: запрос гасит несовпавшие ноды; очистка убирает гашение.
+const search = page.locator(".fp__search");
+await search.fill("MergeTree");
+await page.waitForTimeout(300);
+const dimSearch = await page.locator(".qnode--dimmed").count();
+if (dimSearch < 1) fail("search did not dim non-matching nodes");
+await search.fill("");
+await page.waitForTimeout(300);
+const dimCleared = await page.locator(".qnode--dimmed").count();
+if (dimCleared >= dimSearch) fail(`clearing search did not remove dim (${dimSearch} → ${dimCleared})`);
+console.log(`OK: question search dims ${dimSearch}, clears to ${dimCleared}`);
+
 if (errors.length) fail(`console/page errors:\n${errors.join("\n")}`);
 
 console.log("\nALL SMOKE CHECKS PASSED ✓");
