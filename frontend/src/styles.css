@@ -290,3 +290,58 @@ button:disabled:hover { background: var(--surface); }
 }
 .hud__score { display: flex; gap: 2px; }
 .hud__score .scorebtn { font-size: 18px; }
+
+/* Экран «Все вопросы» (bank-browser): полноэкранный оверлей просмотра банка. */
+.bankbrowser {
+  position: fixed; inset: 0; z-index: 50; background: var(--bg);
+  display: flex; flex-direction: column;
+}
+.bankbrowser__bar {
+  display: flex; align-items: center; gap: 12px; padding: 10px 16px;
+  background: var(--surface); border-bottom: 1px solid var(--border); border-top: 4px solid #2563eb;
+}
+.bankbrowser__bar strong { font-size: 15px; color: var(--heading); }
+.bankbrowser__count { font-size: 12px; color: var(--text-muted); }
+.bankbrowser__search {
+  flex: 1 1 auto; max-width: 420px; padding: 6px 10px;
+  border: 1px solid var(--border-strong); border-radius: 6px; font-size: 14px;
+  background: var(--bg); color: var(--text);
+}
+.bankbrowser__close { margin-left: auto; }
+.bankbrowser__filters {
+  display: flex; flex-wrap: wrap; gap: 10px 18px; padding: 10px 16px;
+  border-bottom: 1px solid var(--border); background: var(--surface);
+}
+.bankbrowser__chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.bankbrowser__body { flex: 1 1 auto; overflow-y: auto; padding: 16px 22px; }
+.bankbrowser__empty { color: var(--text-muted); font-size: 14px; }
+
+.bankblock { margin-bottom: 22px; }
+.bankblock__head {
+  font-size: 16px; color: var(--heading); margin: 0 0 8px;
+  padding-left: 10px; border-left: 4px solid var(--border-strong);
+}
+.bankblock__n { font-size: 12px; color: var(--text-muted); font-weight: 400; }
+.banksub { margin: 0 0 12px 10px; }
+.banksub__head {
+  font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .03em;
+  margin: 10px 0 6px;
+}
+.bankrow { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 6px; background: var(--surface); }
+.bankrow--open { border-color: var(--border-strong); }
+.bankrow__head {
+  display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+  padding: 8px 12px; border: none; background: none; cursor: pointer; color: var(--text);
+}
+.bankrow__head:hover { background: var(--hover); }
+.bankrow__diff { color: #fff; font-size: 11px; padding: 1px 7px; border-radius: 4px; text-transform: lowercase; }
+.bankrow__kind { font-size: 11px; color: var(--text-muted); }
+.bankrow__title { font-size: 14px; font-weight: 500; flex: 1 1 auto; }
+.bankrow__tags { display: flex; gap: 4px; flex-wrap: wrap; }
+.bankrow__caret { color: var(--text-faint); font-size: 12px; }
+.bankrow__body { padding: 4px 16px 14px; border-top: 1px dashed var(--border); }
+.bankrow__body h4 {
+  font-size: 12px; margin: 12px 0 4px; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: .03em;
+}
+.bankrow__body section:first-child h4 { margin-top: 8px; }
