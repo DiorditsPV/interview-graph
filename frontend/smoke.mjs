@@ -156,6 +156,19 @@ const tmr2 = (await page.locator(".hud__timer").first().innerText()).trim();
 if (tmr2 === tmr1) fail(`timer not ticking (${tmr1} == ${tmr2})`);
 console.log(`OK: HUD timer ticks (${tmr1} → ${tmr2})`);
 
+// 9c. Поиск по вопросам: запрос гасит несовпавшие ноды; очистка убирает гашение.
+// (После клавиатурных проверок: фокус уходит в input — дальше body-клавиатура не нужна, только resume.)
+const search = page.locator(".fp__search");
+await search.fill("MergeTree");
+await page.waitForTimeout(300);
+const dimSearch = await page.locator(".qnode--dimmed").count();
+if (dimSearch < 1) fail("search did not dim non-matching nodes");
+await search.fill("");
+await page.waitForTimeout(300);
+const dimCleared = await page.locator(".qnode--dimmed").count();
+if (dimCleared >= dimSearch) fail(`clearing search did not remove dim (${dimSearch} → ${dimCleared})`);
+console.log(`OK: question search dims ${dimSearch}, clears to ${dimCleared}`);
+
 // 10. Resume: создать сессию+оценку через API → reload → выбрать в .loadsess → оценки восстановлены.
 // (Делает page.reload() — должна идти ПОСЛЕ проверок, опирающихся на накопленное состояние.)
 const sid = (await (await page.request.post(URL + "api/sessions", { data: { candidate: "SmokeResume" } })).json()).id;

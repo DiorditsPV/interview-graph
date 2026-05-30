@@ -57,6 +57,12 @@ function mmss(ms: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
+// Совпадение ноды с поисковым запросом (подстрока в title/question/topic/tags).
+function matchesQuery(n: QNode, q: string): boolean {
+  if (!q) return true;
+  return `${n.title ?? ""} ${n.question} ${n.topic} ${n.tags.join(" ")}`.toLowerCase().includes(q);
+}
+
 // Настройки отображения холста (фон + направляющие), сохраняются в localStorage.
 // База — без сетки; точки — единственный альтернативный вариант (переключается иконкой).
 type BgVariant = "off" | "dots";
@@ -72,6 +78,7 @@ function buildNodes(
   activeTags: Record<string, boolean>,
   activeKinds: Record<string, boolean>,
   trackInclude: string[],
+  query: string,
   guidesH: boolean,
   guidesV: boolean,
 ): Node[] {
@@ -138,7 +145,8 @@ function buildNodes(
       !activeDiffs[n.difficulty] ||
       !activeKinds[n.kind] ||
       !tagOk ||
-      !nodeInTrack(n, trackInclude);
+      !nodeInTrack(n, trackInclude) ||
+      !matchesQuery(n, query);
     nodes.push({
       id: n.id,
       type: "question",
@@ -187,6 +195,7 @@ export default function App() {
   const [activeTrack, setActiveTrack] = useState<string>(
     () => localStorage.getItem("track") || "data-engineer",
   );
+  const [query, setQuery] = useState("");
   const [theme, setTheme] = useState<"light" | "dark">(
     () =>
       (localStorage.getItem("theme") as "light" | "dark") ||
@@ -279,9 +288,9 @@ export default function App() {
   const rfNodes = useMemo(
     () =>
       placement
-        ? buildNodes(graph, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, trackInclude, guidesH, guidesV)
+        ? buildNodes(graph, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, trackInclude, query.toLowerCase().trim(), guidesH, guidesV)
         : [],
-    [graph, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, trackInclude, guidesH, guidesV],
+    [graph, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, trackInclude, query, guidesH, guidesV],
   );
 
   const centerOn = useCallback(
@@ -590,6 +599,12 @@ export default function App() {
 
               <Panel position="top-right">
                 <div className="filterpanel">
+                  <input
+                    className="fp__search"
+                    placeholder="Поиск по вопросам…"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                  />
                   <div className="fp__group">
                     <div className="fp__title">Направления</div>
                     {BLOCK_ORDER.map((b) => (
