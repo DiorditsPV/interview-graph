@@ -4,6 +4,7 @@ title: Фильтр «только неоценённые»
 status: done
 created: 2026-05-30
 branch: feature/unscored-filter
+merged: integration/all-ideas
 verify: pass
 review: ok — багов нет
 ---

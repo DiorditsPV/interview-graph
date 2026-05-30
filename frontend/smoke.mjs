@@ -183,6 +183,19 @@ const scoredCount = await page.locator(".qnode--scored").count();
 if (scoredCount < 1) fail("resume did not restore scores onto the board");
 console.log(`OK: session resume restores scores (${scoredCount} scored)`);
 
+// 11. «Только неоценённые»: восстановленная resume-оценка гаснет при включении тумблера.
+// (dimUnscoredAfter — не dimAfter: тот уже объявлен в track-проверке выше.)
+const unscoredBtn = page.locator(".fp__chip", { hasText: "Только неоценённые" });
+await unscoredBtn.click();
+await page.waitForTimeout(250);
+const dimUnscored = await page.locator(".qnode--dimmed").count();
+if (dimUnscored < 1) fail("unscored-only did not dim scored nodes");
+await unscoredBtn.click();
+await page.waitForTimeout(250);
+const dimUnscoredAfter = await page.locator(".qnode--dimmed").count();
+if (dimUnscoredAfter >= dimUnscored) fail(`toggling off did not clear dim (${dimUnscored} → ${dimUnscoredAfter})`);
+console.log(`OK: «только неоценённые» dims ${dimUnscored}, clears to ${dimUnscoredAfter}`);
+
 if (errors.length) fail(`console/page errors:\n${errors.join("\n")}`);
 
 console.log("\nALL SMOKE CHECKS PASSED ✓");

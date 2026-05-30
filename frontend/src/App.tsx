@@ -79,6 +79,7 @@ function buildNodes(
   activeKinds: Record<string, boolean>,
   trackInclude: string[],
   query: string,
+  unscoredOnly: boolean,
   guidesH: boolean,
   guidesV: boolean,
 ): Node[] {
@@ -146,7 +147,8 @@ function buildNodes(
       !activeKinds[n.kind] ||
       !tagOk ||
       !nodeInTrack(n, trackInclude) ||
-      !matchesQuery(n, query);
+      !matchesQuery(n, query) ||
+      (unscoredOnly && scores[n.id] != null);
     nodes.push({
       id: n.id,
       type: "question",
@@ -196,6 +198,7 @@ export default function App() {
     () => localStorage.getItem("track") || "data-engineer",
   );
   const [query, setQuery] = useState("");
+  const [unscoredOnly, setUnscoredOnly] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">(
     () =>
       (localStorage.getItem("theme") as "light" | "dark") ||
@@ -288,9 +291,9 @@ export default function App() {
   const rfNodes = useMemo(
     () =>
       placement
-        ? buildNodes(graph, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, trackInclude, query.toLowerCase().trim(), guidesH, guidesV)
+        ? buildNodes(graph, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, trackInclude, query.toLowerCase().trim(), unscoredOnly, guidesH, guidesV)
         : [],
-    [graph, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, trackInclude, query, guidesH, guidesV],
+    [graph, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, trackInclude, query, unscoredOnly, guidesH, guidesV],
   );
 
   const centerOn = useCallback(
@@ -655,6 +658,20 @@ export default function App() {
                         {KIND_LABEL[k]}
                       </button>
                     ))}
+                  </div>
+                  <div className="fp__group">
+                    <div className="fp__title">Прогресс</div>
+                    <button
+                      className={`fp__chip ${unscoredOnly ? "" : "fp__chip--off"}`}
+                      style={{
+                        borderColor: "#16a34a",
+                        color: unscoredOnly ? "#fff" : "#16a34a",
+                        background: unscoredOnly ? "#16a34a" : "transparent",
+                      }}
+                      onClick={() => setUnscoredOnly((v) => !v)}
+                    >
+                      Только неоценённые
+                    </button>
                   </div>
                   <div className="fp__group fp__group--tags">
                     <div className="fp__title">
