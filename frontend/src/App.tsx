@@ -17,6 +17,7 @@ import { CompareModal } from "./components/CompareModal";
 import { DetailDrawer } from "./components/DetailDrawer";
 import { GuidesNode } from "./components/GuidesNode";
 import { QuestionNode } from "./components/QuestionNode";
+import { ShortcutsHelp } from "./components/ShortcutsHelp";
 import { SubHeadNode } from "./components/SubHeadNode";
 import { downloadBank, downloadReport } from "./report";
 import {
@@ -191,6 +192,7 @@ export default function App() {
   });
   const [questionStart, setQuestionStart] = useState<number>(() => Date.now());
   const [compareOpen, setCompareOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [activeBlocks, setActiveBlocks] = useState<Record<string, boolean>>(ALL_BLOCKS);
   const [activeDiffs, setActiveDiffs] = useState<Record<string, boolean>>(ALL_DIFFS);
   const [activeTags, setActiveTags] = useState<Record<string, boolean>>({});
@@ -363,6 +365,12 @@ export default function App() {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
+      // «?» открывает шпаргалку. Пока она открыта, ShortcutsHelp перехватывает клавиши в capture-фазе
+      // (stopImmediatePropagation), поэтому сюда они не доходят и захват клавиатуры обеспечен там.
+      if (e.key === "?") {
+        setHelpOpen(true);
+        return;
+      }
       if (!placement) return;
       if (e.key >= "1" && e.key <= "5") {
         if (currentId) applyScore(currentId, Number(e.key));
@@ -586,6 +594,13 @@ export default function App() {
             🗂 Банк
           </button>
           <button
+            className="iconbtn helpbtn"
+            onClick={() => setHelpOpen(true)}
+            title="Горячие клавиши (?)"
+          >
+            ?
+          </button>
+          <button
             className="iconbtn themebtn"
             onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
             title="Переключить тему (светлая/тёмная)"
@@ -792,6 +807,7 @@ export default function App() {
         />
       </div>
       {compareOpen && <CompareModal onClose={() => setCompareOpen(false)} />}
+      {helpOpen && <ShortcutsHelp onClose={() => setHelpOpen(false)} />}
     </div>
   );
 }

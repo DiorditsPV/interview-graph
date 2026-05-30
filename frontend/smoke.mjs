@@ -231,6 +231,16 @@ const bankFn = dlBank.suggestedFilename();
 if (!bankFn.includes("bank") || !bankFn.endsWith(".html")) fail(`bank export wrong file: ${bankFn}`);
 console.log(`OK: question bank export (${bankFn})`);
 
+// 13. Шпаргалка горячих клавиш: «?» открывает оверлей, Esc закрывает.
+// (После bank: фокус на кнопке, не в input — «?» доходит до обработчика.)
+await page.keyboard.press("?");
+await page.waitForSelector(".help-modal", { timeout: 3000 });
+const helpText = await page.locator(".help-modal").innerText();
+if (!helpText.includes("неоценённому")) fail(`help overlay missing shortcuts: "${helpText}"`);
+await page.keyboard.press("Escape");
+await page.waitForSelector(".help-modal", { state: "detached", timeout: 3000 });
+console.log("OK: shortcuts help overlay (? opens, Esc closes)");
+
 if (errors.length) fail(`console/page errors:\n${errors.join("\n")}`);
 
 console.log("\nALL SMOKE CHECKS PASSED ✓");
