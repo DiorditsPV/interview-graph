@@ -9,16 +9,20 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
 import os
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .db import Database
+from .hub import SessionHub
 from .importer import load_content
 from .models import GraphResponse
 from .sampler import build_interview, load_weights
@@ -40,6 +44,7 @@ app.add_middleware(
 )
 
 db = Database(DB_PATH)
+hub = SessionHub()
 
 
 # ---------- request models ----------
@@ -105,10 +110,48 @@ def get_session(session_id: int) -> dict:
 
 
 @app.post("/api/sessions/{session_id}/score")
-def set_score(session_id: int, body: ScoreIn) -> dict:
+async def set_score(session_id: int, body: ScoreIn) -> dict:
     if db.get_session(session_id) is None:
         raise HTTPException(status_code=404, detail="session not found")
-    return db.set_score(session_id, body.node_id, body.score, body.note)
+    session = db.set_score(session_id, body.node_id, body.score, body.note)
+    hub.publish(session_id, session)
+    return session
+
+
+def _sse(event: str, data: dict) -> str:
+    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
+@app.get("/api/sessions/{session_id}/events")
+async def session_events(session_id: int, request: Request) -> StreamingResponse:
+    """SSE-поток: снимок сессии при подключении + обновления после каждой оценки.
+
+    Позволяет интервьюеру и HR одновременно видеть изменения по одному кандидату.
+    """
+    session = db.get_session(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="session not found")
+    queue = hub.subscribe(session_id)
+
+    async def gen():
+        try:
+            yield _sse("snapshot", session)
+            while True:
+                try:
+                    payload = await asyncio.wait_for(queue.get(), timeout=15)
+                    yield _sse("update", payload)
+                except asyncio.TimeoutError:
+                    yield ": keepalive\n\n"
+                if await request.is_disconnected():
+                    break
+        finally:
+            hub.unsubscribe(session_id, queue)
+
+    return StreamingResponse(
+        gen(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @app.get("/api/health")

@@ -1,5 +1,6 @@
 """Тесты импортёра, sampler и API."""
 
+import json
 from pathlib import Path
 
 import pytest
@@ -90,6 +91,99 @@ def test_api_session_flow():
     c.post(f"/api/sessions/{sid}/score", json={"nodeId": "sql-01", "score": 2})
     session = c.get(f"/api/sessions/{sid}").json()
     assert session["scores"]["sql-01"]["score"] == 2
+
+
+def test_api_list_sessions():
+    c = _client()
+    c.post("/api/sessions", json={"candidate": "Сидоров"})
+    rows = c.get("/api/sessions").json()
+    assert isinstance(rows, list) and len(rows) >= 1
+    assert all({"id", "candidate", "created_at"} <= set(r) for r in rows)
+
+
+def test_api_session_events_snapshot():
+    # Бесконечный SSE-поток нельзя гонять через TestClient.iter_lines (зависает на close),
+    # поэтому тянем первый кадр напрямую из генератора StreamingResponse.
+    import asyncio
+
+    from starlette.requests import Request
+
+    from app.main import session_events
+
+    c = _client()
+    sid = c.post("/api/sessions", json={"candidate": "Петров"}).json()["id"]
+    c.post(f"/api/sessions/{sid}/score", json={"nodeId": "sql-01", "score": 3})
+
+    async def first_frame() -> str:
+        async def receive():
+            return {"type": "http.request"}
+
+        req = Request({"type": "http", "method": "GET", "headers": []}, receive)
+        resp = await session_events(sid, req)
+        agen = resp.body_iterator
+        try:
+            return await agen.__anext__()
+        finally:
+            await agen.aclose()
+
+    frame = asyncio.run(first_frame())
+    assert frame.startswith("event: snapshot")
+    data = json.loads(frame.split("data: ", 1)[1].strip())
+    assert data["scores"]["sql-01"]["score"] == 3
+
+
+def test_api_session_events_404():
+    with _client().stream("GET", "/api/sessions/999999/events") as r:
+        assert r.status_code == 404
+
+
+def test_api_score_note_synced_over_sse():
+    # Заметка (note) синхронизируется наравне с баллом: бэкенд хранит её и отдаёт в снимке,
+    # который рассылается подписчикам (интервьюер + HR). UI заметок нет — это backend-only.
+    import asyncio
+
+    from starlette.requests import Request
+
+    from app.main import session_events
+
+    c = _client()
+    sid = c.post("/api/sessions", json={"candidate": "Заметкин"}).json()["id"]
+    note = "путается в оконных функциях, но базу знает"
+    c.post(f"/api/sessions/{sid}/score", json={"nodeId": "sql-01", "score": 4, "note": note})
+
+    async def first_frame() -> str:
+        async def receive():
+            return {"type": "http.request"}
+
+        req = Request({"type": "http", "method": "GET", "headers": []}, receive)
+        resp = await session_events(sid, req)
+        agen = resp.body_iterator
+        try:
+            return await agen.__anext__()
+        finally:
+            await agen.aclose()
+
+    data = json.loads(asyncio.run(first_frame()).split("data: ", 1)[1].strip())
+    assert data["scores"]["sql-01"]["score"] == 4
+    assert data["scores"]["sql-01"]["note"] == note
+
+
+def test_session_hub_publish():
+    import asyncio
+
+    from app.hub import SessionHub
+
+    async def scenario():
+        hub = SessionHub()
+        q = hub.subscribe(7)
+        hub.publish(7, {"ok": 1})
+        got = await asyncio.wait_for(q.get(), timeout=1)
+        hub.unsubscribe(7, q)
+        # после отписки последнего подписчика сессия выкидывается из реестра
+        hub.publish(7, {"ok": 2})  # никому не уходит, без ошибок
+        return got
+
+    assert asyncio.run(scenario()) == {"ok": 1}
 
 
 def test_api_interview():

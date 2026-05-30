@@ -1,4 +1,4 @@
-import type { GraphResponse, Session } from "./types";
+import type { GraphResponse, Session, SessionMeta } from "./types";
 
 // В dev /api проксируется Vite на :8000; в прод тот же origin (раздаёт FastAPI).
 const BASE = "/api";
@@ -25,4 +25,6 @@ export const api = {
     }).then(json<Session>),
   getSession: (sessionId: number) =>
     fetch(`${BASE}/sessions/${sessionId}`).then(json<Session>),
+  listSessions: () => fetch(`${BASE}/sessions`).then(json<SessionMeta[]>),
+  eventsUrl: (sessionId: number) => `${BASE}/sessions/${sessionId}/events`,
 };

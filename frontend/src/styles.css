@@ -61,6 +61,18 @@ body {
   background: var(--surface); color: var(--text);
 }
 .session__active { font-size: 14px; color: var(--text-muted); }
+.session__pick {
+  padding: 6px 10px; border: 1px solid var(--border-strong); border-radius: 6px;
+  background: var(--surface); color: var(--text); font-size: 14px; cursor: pointer;
+}
+.livedot {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 700; letter-spacing: .04em;
+  color: var(--text-faint);
+}
+.livedot--on { color: #16a34a; }
+.livedot--on { animation: livepulse 1.6s ease-in-out infinite; }
+@keyframes livepulse { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
 button {
   padding: 6px 12px; border: 1px solid var(--border-strong); border-radius: 6px;
   background: var(--surface); color: var(--text); cursor: pointer; font-size: 14px;
