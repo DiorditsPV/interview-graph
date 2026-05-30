@@ -11,7 +11,7 @@
 - [x] interview-tracks (feature/interview-tracks) — выбор направления интервью (треки-профили над block/subblock)
 - [x] session-resume (feature/session-resume) — загрузка прошлой сессии кандидата на доску (восстановление оценок)
 - [x] node-notes (feature/node-notes) — заметка интервьюера на вопрос (drawer textarea, персист с оценкой, в отчёте)
-- [ ] interview-timer: таймер на вопрос и на сессию в HUD — фронт only (App.tsx/HUD, localStorage).
+- [x] interview-timer (feature/interview-timer) — таймеры вопроса и сессии в HUD (тик 1с, localStorage)
 - [ ] question-search: строка поиска по тексту вопросов → подсветка/фильтр нод — фронт (App.tsx, filter panel, dimmed-механизм).
 - [ ] unscored-filter: быстрый переключатель «только неоценённые» и «только задачи» — фронт (filter panel + buildNodes).
 - [ ] interview-progress: прогресс-бар пройдено/осталось по выбранному профилю в шапке — фронт (App.tsx topbar).
