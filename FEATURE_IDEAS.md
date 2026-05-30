@@ -23,7 +23,7 @@
 
 ## Сгенерировано автоматически (из out-of-scope ux-live-polish)
 - [x] agenda-sidebar (feature/agenda-sidebar) — сайдбар-агенда (.interview): список вопросов из placement.order по блокам, ✓ на оценённых, клик → текущий + центрирование, тоггл в шапке
-- [ ] minimap-progress: кодировать прогресс в минимапе React Flow (оценённые — серым, текущий — акцентом) через nodeColor — фронт (App.tsx MiniMap props + buildNodes data).
+- [x] minimap-progress (feature/minimap-progress) — минимапа кодирует прогресс: текущий красным, оценённые серым (+ фикс: v12-минимапе добавлены размеры нод, иначе была пустой)
 - [ ] filter-aware-nav: «Дальше →»/стрелки навигируют по видимым (не-dimmed) нодам, а не по всей сетке — фронт (App.tsx nextQuestion/keyboard используют visibleIds).
 
 <!-- feature-build переносит реализованные идеи сюда: - [x] <slug> (feature/<slug>) -->
