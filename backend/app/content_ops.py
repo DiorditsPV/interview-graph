@@ -151,6 +151,8 @@ def update_node(content_dir: Path, node_id: str, fields: Dict) -> Dict:
             path.write_text(json.dumps(raw, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
             return {"updated": node_id, "file": _rel(path, root)}
         except OSError:
+            # Только OSError: пробрасываем ValidationError цели (pydantic v2 ValidationError
+            # ⊂ ValueError — ловить ValueError нельзя, иначе валид-ошибка → 404 вместо 422).
             continue
 
     raise NodeNotFound(node_id)
