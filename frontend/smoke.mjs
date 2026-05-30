@@ -118,6 +118,15 @@ const after = await page.evaluate(() => document.documentElement.dataset.theme);
 if (after === before) fail(`theme toggle did not change theme (${before} → ${after})`);
 console.log(`OK: theme toggles (${before} → ${after})`);
 
+// 9. Прогресс-бар в шапке: присутствует, подпись с дробью, заполнение > 0 (оценка уже выставлена выше).
+await page.waitForSelector(".progress", { timeout: 3000 });
+const progLabel = await page.locator(".progress__label").innerText();
+if (!progLabel.includes("/")) fail(`progress label has no fraction: "${progLabel}"`);
+const fillW = await page.locator(".progress__fill").evaluate((el) => el.style.width);
+const fillPct = parseFloat(fillW);
+if (!(fillPct > 0)) fail(`progress fill not advanced after scoring: "${fillW}"`);
+console.log(`OK: progress bar (${progLabel}, fill ${fillW})`);
+
 if (errors.length) fail(`console/page errors:\n${errors.join("\n")}`);
 
 console.log("\nALL SMOKE CHECKS PASSED ✓");
