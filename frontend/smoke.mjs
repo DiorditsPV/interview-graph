@@ -129,6 +129,19 @@ const after = await page.evaluate(() => document.documentElement.dataset.theme);
 if (after === before) fail(`theme toggle did not change theme (${before} → ${after})`);
 console.log(`OK: theme toggles (${before} → ${after})`);
 
+// 9. Resume: создать сессию+оценку через API → reload → выбрать в .loadsess → оценки восстановлены.
+const sid = (await (await page.request.post(URL + "api/sessions", { data: { candidate: "SmokeResume" } })).json()).id;
+await page.request.post(`${URL}api/sessions/${sid}/score`, { data: { nodeId: "sql-01", score: 5 } });
+await page.reload({ waitUntil: "networkidle" });
+await page.waitForSelector(".loadsess", { timeout: 5000 });
+await page.locator(".loadsess").selectOption(String(sid));
+await page.waitForSelector(".session__active", { timeout: 3000 });
+const active = await page.locator(".session__active").innerText();
+if (!active.includes("SmokeResume")) fail(`resume did not load session: ${active}`);
+const scoredCount = await page.locator(".qnode--scored").count();
+if (scoredCount < 1) fail("resume did not restore scores onto the board");
+console.log(`OK: session resume restores scores (${scoredCount} scored)`);
+
 if (errors.length) fail(`console/page errors:\n${errors.join("\n")}`);
 
 console.log("\nALL SMOKE CHECKS PASSED ✓");

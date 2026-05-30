@@ -51,6 +51,13 @@ export interface Session {
   scores: Record<string, { node_id: string; score: number; note?: string; created_at: string }>;
 }
 
+// Краткая запись сессии для списка (без оценок) — из GET /api/sessions.
+export interface SessionSummary {
+  id: number;
+  candidate: string;
+  created_at: string;
+}
+
 export const BLOCK_LABEL: Record<Block, string> = {
   frameworks: "Фреймворки",
   databases: "Базы данных",

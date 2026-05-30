@@ -38,6 +38,7 @@ import {
   type ImportErr,
   type QNode,
   type Session,
+  type SessionSummary,
   type Track,
 } from "./types";
 
@@ -164,6 +165,7 @@ export default function App() {
   const [fullscreen, setFullscreen] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [candidate, setCandidate] = useState("");
+  const [pastSessions, setPastSessions] = useState<SessionSummary[]>([]);
   const [activeBlocks, setActiveBlocks] = useState<Record<string, boolean>>(ALL_BLOCKS);
   const [activeDiffs, setActiveDiffs] = useState<Record<string, boolean>>(ALL_DIFFS);
   const [activeTags, setActiveTags] = useState<Record<string, boolean>>({});
@@ -238,6 +240,10 @@ export default function App() {
 
   useEffect(() => {
     api.tracks().then(setTracks).catch(() => setTracks([]));
+  }, []);
+
+  useEffect(() => {
+    api.listSessions().then(setPastSessions).catch(() => setPastSessions([]));
   }, []);
 
   const rfNodes = useMemo(
@@ -359,7 +365,16 @@ export default function App() {
     const s = await api.createSession(candidate.trim());
     setSession(s);
     setScores({});
+    api.listSessions().then(setPastSessions).catch(() => void 0);
   }, [candidate]);
+
+  // Загрузить прошлую сессию: восстановить оценки на доске.
+  const loadSession = useCallback(async (id: number) => {
+    if (!id) return;
+    const s = await api.getSession(id);
+    setSession(s);
+    setScores(Object.fromEntries(Object.entries(s.scores).map(([nid, v]) => [nid, v.score])));
+  }, []);
 
   const toggleBlock = (b: Block) => setActiveBlocks((s) => ({ ...s, [b]: !s[b] }));
   const toggleDiff = (d: Difficulty) => setActiveDiffs((s) => ({ ...s, [d]: !s[d] }));
@@ -449,6 +464,21 @@ export default function App() {
                 onKeyDown={(e) => e.key === "Enter" && startSession()}
               />
               <button onClick={startSession}>Начать сессию</button>
+              {pastSessions.length > 0 && (
+                <select
+                  className="loadsess"
+                  value=""
+                  onChange={(e) => e.target.value && loadSession(Number(e.target.value))}
+                  title="Загрузить прошлую сессию (восстановить оценки)"
+                >
+                  <option value="">Загрузить сессию…</option>
+                  {pastSessions.map((ps) => (
+                    <option key={ps.id} value={ps.id}>
+                      {ps.candidate} · {ps.created_at.slice(0, 16).replace("T", " ")}
+                    </option>
+                  ))}
+                </select>
+              )}
             </>
           )}
           <button

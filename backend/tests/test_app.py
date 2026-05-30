@@ -130,3 +130,14 @@ def test_interview_track_scoped():
     assert order
     for nid in order:
         assert node_in_track(nmap[nid], inc), f"{nid} вне трека analyst"
+
+
+def test_api_list_sessions_for_resume():
+    c = _client()
+    sid = c.post("/api/sessions", json={"candidate": "Resume"}).json()["id"]
+    c.post(f"/api/sessions/{sid}/score", json={"nodeId": "sql-01", "score": 5})
+    sessions = c.get("/api/sessions").json()
+    assert any(x["id"] == sid and x["candidate"] == "Resume" for x in sessions)
+    # деталь сессии содержит восстановимые оценки
+    detail = c.get(f"/api/sessions/{sid}").json()
+    assert detail["scores"]["sql-01"]["score"] == 5

@@ -61,6 +61,10 @@ body {
   background: var(--surface); color: var(--text);
 }
 .session__active { font-size: 14px; color: var(--text-muted); }
+.loadsess {
+  padding: 6px 8px; border: 1px solid var(--border-strong); border-radius: 6px;
+  background: var(--surface); color: var(--text); font-size: 13px; cursor: pointer; max-width: 220px;
+}
 button {
   padding: 6px 12px; border: 1px solid var(--border-strong); border-radius: 6px;
   background: var(--surface); color: var(--text); cursor: pointer; font-size: 14px;
