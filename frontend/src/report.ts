@@ -22,7 +22,12 @@ function pad(n: number): string {
   return String(n).padStart(2, "0");
 }
 
-export function buildReportHtml(candidate: string, nodes: QNode[], scores: Record<string, number>): string {
+export function buildReportHtml(
+  candidate: string,
+  nodes: QNode[],
+  scores: Record<string, number>,
+  trackLabel?: string,
+): string {
   const now = new Date();
   const dateStr = `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
 
@@ -137,7 +142,9 @@ export function buildReportHtml(candidate: string, nodes: QNode[], scores: Recor
   <div class="sheet">
     <div class="head">
       <h1>Результаты интервью</h1>
-      <div class="sub">Кандидат: <b>${esc(candidate || "—")}</b> · ${dateStr}</div>
+      <div class="sub">Кандидат: <b>${esc(candidate || "—")}</b> · ${dateStr}${
+        trackLabel ? ` · направление: <b>${esc(trackLabel)}</b>` : ""
+      }</div>
     </div>
     <div class="summary">
       <div class="stat"><span class="lbl">Оценено</span><span class="num">${scored.length}<span style="font-size:15px;color:#9ca3af">/${nodes.length}</span></span></div>
@@ -150,8 +157,13 @@ export function buildReportHtml(candidate: string, nodes: QNode[], scores: Recor
 </body></html>`;
 }
 
-export function downloadReport(candidate: string, nodes: QNode[], scores: Record<string, number>): void {
-  const html = buildReportHtml(candidate, nodes, scores);
+export function downloadReport(
+  candidate: string,
+  nodes: QNode[],
+  scores: Record<string, number>,
+  trackLabel?: string,
+): void {
+  const html = buildReportHtml(candidate, nodes, scores, trackLabel);
   const blob = new Blob([html], { type: "text/html;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const now = new Date();

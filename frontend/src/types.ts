@@ -25,6 +25,20 @@ export interface ImportErr {
   error: string;
 }
 
+// Направление интервью (трек/роль) — профиль-охват над block/subblock.
+export interface Track {
+  id: string;
+  label: string;
+  include: string[];
+}
+
+// Нода входит в трек: include пуст ИЛИ совпал block / "block/subblock".
+export function nodeInTrack(n: QNode, include: string[]): boolean {
+  if (!include.length) return true;
+  if (include.includes(n.block)) return true;
+  return !!n.subblock && include.includes(`${n.block}/${n.subblock}`);
+}
+
 export interface GraphResponse {
   nodes: QNode[];
   errors: ImportErr[];

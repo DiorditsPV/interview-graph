@@ -32,11 +32,13 @@ import {
   BLOCK_COLOR,
   BLOCK_LABEL,
   DIFF_COLOR,
+  nodeInTrack,
   type Block,
   type Difficulty,
   type ImportErr,
   type QNode,
   type Session,
+  type Track,
 } from "./types";
 
 const nodeTypes = {
@@ -62,6 +64,7 @@ function buildNodes(
   activeDiffs: Record<string, boolean>,
   activeTags: Record<string, boolean>,
   activeKinds: Record<string, boolean>,
+  trackInclude: string[],
   guidesH: boolean,
   guidesV: boolean,
 ): Node[] {
@@ -123,7 +126,12 @@ function buildNodes(
     const pos = p.positions[n.id];
     if (!pos) continue;
     const tagOk = !anyTag || n.tags.some((t) => activeTags[t]);
-    const dimmed = !activeBlocks[n.block] || !activeDiffs[n.difficulty] || !activeKinds[n.kind] || !tagOk;
+    const dimmed =
+      !activeBlocks[n.block] ||
+      !activeDiffs[n.difficulty] ||
+      !activeKinds[n.kind] ||
+      !tagOk ||
+      !nodeInTrack(n, trackInclude);
     nodes.push({
       id: n.id,
       type: "question",
@@ -160,6 +168,10 @@ export default function App() {
   const [activeDiffs, setActiveDiffs] = useState<Record<string, boolean>>(ALL_DIFFS);
   const [activeTags, setActiveTags] = useState<Record<string, boolean>>({});
   const [activeKinds, setActiveKinds] = useState<Record<string, boolean>>(ALL_KINDS);
+  const [tracks, setTracks] = useState<Track[]>([]);
+  const [activeTrack, setActiveTrack] = useState<string>(
+    () => localStorage.getItem("track") || "data-engineer",
+  );
   const [theme, setTheme] = useState<"light" | "dark">(
     () =>
       (localStorage.getItem("theme") as "light" | "dark") ||
@@ -178,6 +190,7 @@ export default function App() {
   useEffect(() => localStorage.setItem("bgVariant", bgVariant), [bgVariant]);
   useEffect(() => localStorage.setItem("guidesH", guidesH ? "1" : "0"), [guidesH]);
   useEffect(() => localStorage.setItem("guidesV", guidesV ? "1" : "0"), [guidesV]);
+  useEffect(() => localStorage.setItem("track", activeTrack), [activeTrack]);
 
   const instance = useRef<ReactFlowInstance<Node, Edge> | null>(null);
   const nodeMap = useMemo(() => Object.fromEntries(graph.map((n) => [n.id, n])), [graph]);
@@ -185,6 +198,32 @@ export default function App() {
     () => Array.from(new Set(graph.flatMap((n) => n.tags))).sort(),
     [graph],
   );
+  const trackInclude = useMemo(
+    () => tracks.find((t) => t.id === activeTrack)?.include ?? [],
+    [tracks, activeTrack],
+  );
+  const trackLabel = useMemo(
+    () => tracks.find((t) => t.id === activeTrack)?.label,
+    [tracks, activeTrack],
+  );
+  // Видимый срез (трек + активные фильтры) — для навигации «Дальше».
+  const visibleIds = useMemo(() => {
+    const anyTag = Object.values(activeTags).some(Boolean);
+    const s = new Set<string>();
+    for (const n of graph) {
+      const tagOk = !anyTag || n.tags.some((t) => activeTags[t]);
+      if (
+        activeBlocks[n.block] &&
+        activeDiffs[n.difficulty] &&
+        activeKinds[n.kind] &&
+        tagOk &&
+        nodeInTrack(n, trackInclude)
+      ) {
+        s.add(n.id);
+      }
+    }
+    return s;
+  }, [graph, activeBlocks, activeDiffs, activeKinds, activeTags, trackInclude]);
 
   useEffect(() => {
     api
@@ -197,12 +236,16 @@ export default function App() {
       .catch((err) => setErrors([{ file: "API", error: String(err) }]));
   }, []);
 
+  useEffect(() => {
+    api.tracks().then(setTracks).catch(() => setTracks([]));
+  }, []);
+
   const rfNodes = useMemo(
     () =>
       placement
-        ? buildNodes(graph, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, guidesH, guidesV)
+        ? buildNodes(graph, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, trackInclude, guidesH, guidesV)
         : [],
-    [graph, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, guidesH, guidesV],
+    [graph, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, trackInclude, guidesH, guidesV],
   );
 
   const centerOn = useCallback(
@@ -240,7 +283,8 @@ export default function App() {
   // «Дальше»: следующий НЕОЦЕНЁННЫЙ вопрос по порядку сетки (с переносом по кругу).
   const nextQuestion = useCallback(() => {
     if (!placement) return;
-    const flat = placement.order.flat();
+    // только видимый срез (трек + фильтры)
+    const flat = placement.order.flat().filter((id) => visibleIds.has(id));
     if (!flat.length) return;
     const start = currentId ? flat.indexOf(currentId) : -1;
     for (let k = 1; k <= flat.length; k++) {
@@ -251,7 +295,7 @@ export default function App() {
       }
     }
     moveCurrent(flat[(start + 1 + flat.length) % flat.length]);
-  }, [placement, currentId, scores, moveCurrent]);
+  }, [placement, currentId, scores, moveCurrent, visibleIds]);
 
   // Клавиатура: 1-5 — оценка, Enter — открыть, стрелки — навигация, n — далее, Esc — снять текущий.
   useEffect(() => {
@@ -346,6 +390,22 @@ export default function App() {
         <strong>Интервью · граф вопросов</strong>
         <span className="muted">{graph.length} нод</span>
 
+        <div className="tb__field">
+          <span className="tb__lbl">Направление</span>
+          <select
+            className="tb__select"
+            value={activeTrack}
+            onChange={(e) => setActiveTrack(e.target.value)}
+            title="Направление интервью — фокусирует доску на релевантных вопросах"
+          >
+            {tracks.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <div className="toolbar" role="group" aria-label="Отображение холста">
           <button
             className={`tb__toggle ${bgVariant === "dots" ? "tb__toggle--on" : ""}`}
@@ -393,7 +453,7 @@ export default function App() {
           )}
           <button
             className="iconbtn dlbtn"
-            onClick={() => downloadReport(session?.candidate ?? candidate, graph, scores)}
+            onClick={() => downloadReport(session?.candidate ?? candidate, graph, scores, trackLabel)}
             disabled={scored === 0}
             title={scored === 0 ? "Сначала выставьте оценки" : "Скачать результаты (HTML)"}
           >
