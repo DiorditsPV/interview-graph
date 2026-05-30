@@ -14,7 +14,7 @@
 - [x] interview-timer (feature/interview-timer) — таймеры вопроса и сессии в HUD (тик 1с, localStorage)
 - [x] question-search (feature/question-search) — поиск по тексту вопросов, гасит несовпавшие карточки
 - [x] unscored-filter (feature/unscored-filter) — тумблер «только неоценённые» (задачи уже есть в фильтре Тип)
-- [ ] interview-progress: прогресс-бар пройдено/осталось по выбранному профилю в шапке — фронт (App.tsx topbar).
+- [x] interview-progress (feature/interview-progress) — прогресс-бар оценено/всего по текущему набору фильтров в шапке
 - [ ] candidate-compare: сравнение нескольких сессий рядом (средние по блокам) — backend агрегаты + фронт-панель/HTML.
 - [ ] bank-export: экспорт всего банка вопросов (а не только результатов) в HTML/печать — расширить report.ts.
 - [ ] shortcuts-help: оверлей со списком горячих клавиш (по `?`) — фронт only (компонент + App.tsx).
