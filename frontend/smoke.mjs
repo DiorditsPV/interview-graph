@@ -118,6 +118,19 @@ const after = await page.evaluate(() => document.documentElement.dataset.theme);
 if (after === before) fail(`theme toggle did not change theme (${before} → ${after})`);
 console.log(`OK: theme toggles (${before} → ${after})`);
 
+// 9. Сайдбар-агенда: тоггл показывает список вопросов; клик по пункту делает ноду текущей (HUD).
+await page.locator(".tb__toggle", { hasText: "Агенда" }).click();
+await page.waitForSelector(".interview", { timeout: 3000 });
+const ivCount = await page.locator(".interview .ivbtn").count();
+if (ivCount < 5) fail(`agenda has too few items: ${ivCount}`);
+const firstLabel = (await page.locator(".interview .ivbtn").first().innerText()).trim();
+await page.locator(".interview .ivbtn").first().click();
+await page.waitForSelector(".hud", { timeout: 3000 });
+const agHud = await page.locator(".hud__title").innerText();
+if (!agHud || agHud.length < 2) fail(`agenda click did not set current question: "${agHud}"`);
+console.log(`OK: agenda sidebar (${ivCount} items, click → HUD "${agHud.slice(0, 30)}")`);
+void firstLabel;
+
 if (errors.length) fail(`console/page errors:\n${errors.join("\n")}`);
 
 console.log("\nALL SMOKE CHECKS PASSED ✓");
