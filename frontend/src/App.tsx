@@ -62,6 +62,8 @@ function buildNodes(
   activeDiffs: Record<string, boolean>,
   activeTags: Record<string, boolean>,
   activeKinds: Record<string, boolean>,
+  hiddenIds: Set<string>,
+  showHidden: boolean,
   guidesH: boolean,
   guidesV: boolean,
 ): Node[] {
@@ -123,12 +125,14 @@ function buildNodes(
     const pos = p.positions[n.id];
     if (!pos) continue;
     const tagOk = !anyTag || n.tags.some((t) => activeTags[t]);
-    const dimmed = !activeBlocks[n.block] || !activeDiffs[n.difficulty] || !activeKinds[n.kind] || !tagOk;
+    const hidden = hiddenIds.has(n.id);
+    // dimmed = фильтры + скрытое (пока не показываем скрытые). Держать предикат рядом.
+    const dimmed = !activeBlocks[n.block] || !activeDiffs[n.difficulty] || !activeKinds[n.kind] || !tagOk || (hidden && !showHidden);
     nodes.push({
       id: n.id,
       type: "question",
       position: pos,
-      data: { node: n, score: scores[n.id], current: n.id === currentId, dimmed },
+      data: { node: n, score: scores[n.id], current: n.id === currentId, dimmed, hidden: hidden && showHidden },
       selected: n.id === selectedId,
       draggable: false,
       selectable: !dimmed,
@@ -137,6 +141,16 @@ function buildNodes(
     });
   }
   return nodes;
+}
+
+// Скрытые вопросы (локальный вид интервьюера) — Set id в localStorage. Читаем безопасно.
+function readHiddenIds(): Set<string> {
+  try {
+    const raw = JSON.parse(localStorage.getItem("hiddenIds") || "[]");
+    return new Set(Array.isArray(raw) ? raw.filter((x) => typeof x === "string") : []);
+  } catch {
+    return new Set();
+  }
 }
 
 const ALL_BLOCKS: Record<string, boolean> = Object.fromEntries(BLOCK_ORDER.map((b) => [b, true]));
@@ -170,6 +184,8 @@ export default function App() {
   );
   const [guidesH, setGuidesH] = useState<boolean>(() => localStorage.getItem("guidesH") === "1");
   const [guidesV, setGuidesV] = useState<boolean>(() => localStorage.getItem("guidesV") === "1");
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(readHiddenIds);
+  const [showHidden, setShowHidden] = useState(false);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -178,6 +194,16 @@ export default function App() {
   useEffect(() => localStorage.setItem("bgVariant", bgVariant), [bgVariant]);
   useEffect(() => localStorage.setItem("guidesH", guidesH ? "1" : "0"), [guidesH]);
   useEffect(() => localStorage.setItem("guidesV", guidesV ? "1" : "0"), [guidesV]);
+  useEffect(() => localStorage.setItem("hiddenIds", JSON.stringify([...hiddenIds])), [hiddenIds]);
+
+  const toggleHide = useCallback((id: string) => {
+    setHiddenIds((s) => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
 
   const instance = useRef<ReactFlowInstance<Node, Edge> | null>(null);
   const nodeMap = useMemo(() => Object.fromEntries(graph.map((n) => [n.id, n])), [graph]);
@@ -200,9 +226,9 @@ export default function App() {
   const rfNodes = useMemo(
     () =>
       placement
-        ? buildNodes(graph, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, guidesH, guidesV)
+        ? buildNodes(graph, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, hiddenIds, showHidden, guidesH, guidesV)
         : [],
-    [graph, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, guidesH, guidesV],
+    [graph, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, hiddenIds, showHidden, guidesH, guidesV],
   );
 
   const centerOn = useCallback(
@@ -372,6 +398,13 @@ export default function App() {
             title="Горизонтальные направляющие (уровни Base/Junior/Middle/Senior)"
           >
             ☰ Гор.
+          </button>
+          <button
+            className={`tb__toggle ${showHidden ? "tb__toggle--on" : ""}`}
+            onClick={() => setShowHidden((v) => !v)}
+            title={`Скрытые вопросы (${hiddenIds.size}) — показать/спрятать`}
+          >
+            🙈 Скрытые{hiddenIds.size ? ` (${hiddenIds.size})` : ""}
           </button>
         </div>
 
@@ -571,6 +604,8 @@ export default function App() {
           node={selectedNode}
           score={selectedId ? scores[selectedId] : undefined}
           fullscreen={fullscreen}
+          hidden={selectedId ? hiddenIds.has(selectedId) : false}
+          onToggleHide={toggleHide}
           onScore={applyScore}
           onToggleFullscreen={() => setFullscreen((f) => !f)}
           onClose={() => {
