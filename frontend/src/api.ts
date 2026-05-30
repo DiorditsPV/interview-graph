@@ -1,4 +1,4 @@
-import type { GraphResponse, Session } from "./types";
+import type { GraphResponse, ImportResult, Session } from "./types";
 
 // В dev /api проксируется Vite на :8000; в прод тот же origin (раздаёт FastAPI).
 const BASE = "/api";
@@ -25,4 +25,10 @@ export const api = {
     }).then(json<Session>),
   getSession: (sessionId: number) =>
     fetch(`${BASE}/sessions/${sessionId}`).then(json<Session>),
+  importFile: (filename: string, content: string) =>
+    fetch(`${BASE}/import`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filename, content }),
+    }).then(json<ImportResult>),
 };
