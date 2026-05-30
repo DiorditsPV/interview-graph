@@ -337,6 +337,20 @@ export default function App() {
   }, [graph, scores]);
 
   const anyTagActive = Object.values(activeTags).some(Boolean);
+  // Прогресс по ТЕКУЩЕМУ отфильтрованному набору. Условие "проходит фильтры" держать в
+  // синхроне с предикатом `dimmed` в buildNodes (block/diff/kind/tag).
+  const coverage = useMemo(() => {
+    let total = 0;
+    let done = 0;
+    for (const n of graph) {
+      const tagOk = !anyTagActive || n.tags.some((t) => activeTags[t]);
+      if (activeBlocks[n.block] && activeDiffs[n.difficulty] && activeKinds[n.kind] && tagOk) {
+        total++;
+        if (scores[n.id] != null) done++;
+      }
+    }
+    return { done, total, pct: total ? Math.round((done / total) * 100) : 0 };
+  }, [graph, scores, activeBlocks, activeDiffs, activeKinds, activeTags, anyTagActive]);
   const currentNode = currentId ? nodeMap[currentId] : null;
   const selectedNode = selectedId ? nodeMap[selectedId] : null;
 
@@ -345,6 +359,15 @@ export default function App() {
       <header className="topbar">
         <strong>Интервью · граф вопросов</strong>
         <span className="muted">{graph.length} нод</span>
+
+        <div className="progress" title="Оценено по текущему набору фильтров">
+          <div className="progress__track">
+            <div className="progress__fill" style={{ width: `${coverage.pct}%` }} />
+          </div>
+          <span className="progress__label">
+            оценено {coverage.done} / {coverage.total} ({coverage.pct}%)
+          </span>
+        </div>
 
         <div className="toolbar" role="group" aria-label="Отображение холста">
           <button
