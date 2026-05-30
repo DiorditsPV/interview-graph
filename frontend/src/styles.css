@@ -278,3 +278,28 @@ button:disabled:hover { background: var(--surface); }
 }
 .hud__score { display: flex; gap: 2px; }
 .hud__score .scorebtn { font-size: 18px; }
+
+/* ---- загрузка вопросов ---- */
+.upload-modal {
+  position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+}
+.upload-modal__card {
+  background: var(--surface); color: var(--text); border: 1px solid var(--border);
+  border-radius: 12px; box-shadow: 0 8px 32px var(--shadow-strong);
+  width: min(520px, 92vw); max-height: 86vh; overflow-y: auto; padding: 16px 18px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.upload-modal__head { display: flex; align-items: center; justify-content: space-between; }
+.upload-modal__close { padding: 2px 8px; line-height: 1; }
+.dropzone {
+  border: 2px dashed var(--border-strong); border-radius: 10px; padding: 28px 16px;
+  text-align: center; color: var(--text-muted); font-size: 14px; cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.dropzone:hover, .dropzone--active { border-color: #2563eb; background: var(--hover); color: var(--text); }
+.upload-result { display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+.upload-result ul { margin: 4px 0 0; padding-left: 18px; }
+.upload-result__ok { color: #16a34a; }
+.upload-result__err { color: #dc2626; }
+.upload-result .muted { color: var(--text-faint); }
