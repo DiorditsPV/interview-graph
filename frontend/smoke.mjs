@@ -133,6 +133,40 @@ const hiddenMark = await page.locator(".qnode--hidden").count();
 if (hiddenMark < 1) fail("no .qnode--hidden marker after show-hidden");
 console.log(`OK: hide dims (${dimBeforeHide}→${dimAfterHide}), show-hidden un-dims+marks (${dimShown} dimmed, ${hiddenMark} marked)`);
 
+// 10. Удалить — НЕРАЗРУШАЮЩЕ: confirm всплывает → dismiss → банк не меняется.
+// (Реальное удаление покрывает pytest на копии; smoke бьёт по живому content/ — мутировать нельзя.)
+let confirmFired = false;
+page.on("dialog", (d) => { confirmFired = true; d.dismiss(); });
+const nodesBeforeDel = await page.locator(".qnode").count();
+await page.locator(".drawer__delete").click();
+await page.waitForTimeout(250);
+if (!confirmFired) fail("delete did not raise a confirm dialog");
+const nodesAfterDel = await page.locator(".qnode").count();
+if (nodesAfterDel !== nodesBeforeDel) fail(`dismissed delete changed bank (${nodesBeforeDel}→${nodesAfterDel})`);
+console.log(`OK: delete confirms + dismiss is non-destructive (${nodesAfterDel} nodes)`);
+
+// 11. Редактировать — НЕРАЗРУШАЮЩЕ: открыть режим правки → Отмена → форма закрыта.
+await page.locator(".drawer__edit").click();
+await page.waitForSelector(".drawer__editform", { timeout: 3000 });
+await page.locator(".drawer__editform textarea").first().fill("ЧЕРНОВИК — НЕ СОХРАНЯЕМ");
+await page.locator(".drawer__editbtns button", { hasText: "Отмена" }).click();
+await page.waitForTimeout(200);
+if ((await page.locator(".drawer__editform").count()) !== 0) fail("edit form still open after cancel");
+console.log("OK: edit mode opens + cancel is non-destructive");
+
+// 12. Добавить — НЕРАЗРУШАЮЩЕ: открыть форму → заполнить → Отмена → форма закрыта, банк цел.
+const nodesBeforeAdd = await page.locator(".qnode").count();
+await page.locator(".addbtn").click();
+await page.waitForSelector(".addform", { timeout: 3000 });
+await page.locator(".addform input").first().fill("smoke-topic");
+await page.locator(".addform textarea").first().fill("Вопрос-черновик?");
+await page.locator(".addform__btns button", { hasText: "Отмена" }).click();
+await page.waitForTimeout(200);
+if ((await page.locator(".addform").count()) !== 0) fail("add form still open after cancel");
+const nodesAfterAdd = await page.locator(".qnode").count();
+if (nodesAfterAdd !== nodesBeforeAdd) fail(`cancelled add changed bank (${nodesBeforeAdd}→${nodesAfterAdd})`);
+console.log(`OK: add form opens + cancel is non-destructive (${nodesAfterAdd} nodes)`);
+
 if (errors.length) fail(`console/page errors:\n${errors.join("\n")}`);
 
 console.log("\nALL SMOKE CHECKS PASSED ✓");
