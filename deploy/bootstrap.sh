@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 # Идемпотентный bootstrap+деплой сервиса «Интервью» на сервере.
 # Запускается из GitHub Actions по SSH под sudo:
-#     sudo bash ~/interview-src/deploy/bootstrap.sh ~/interview-src
+#     sudo bash ~/interview-src/deploy/bootstrap.sh ~/interview-src [env]
+# где [env] = prod (по умолчанию) | dev.
+#
+# prod и dev живут на одном сервере (один IP, одни SSH-секреты), но полностью
+# изолированы: разные каталоги кода/данных, свой systemd-юнит и свой порт.
 # Первый запуск — провижининг (venv, systemd, фаервол), последующие — обновление.
 #
 # Что делает:
@@ -13,14 +17,36 @@
 #   6. healthcheck по /api/health.
 set -euo pipefail
 
-SRC="${1:?usage: bootstrap.sh <src_dir>}"
-APP_DIR=/opt/interview
-DATA_DIR=/var/lib/interview
-PORT=8800
+SRC="${1:?usage: bootstrap.sh <src_dir> [env]}"
+ENV="${2:-prod}"
+
+# Профиль окружения: каталоги, порт и имя сервиса различаются для prod/dev,
+# чтобы две версии не пересекались на одном сервере (один IP, разные порты).
+case "$ENV" in
+  prod)
+    APP_DIR=/opt/interview
+    DATA_DIR=/var/lib/interview
+    PORT=8800
+    SVC=interview
+    SVC_DESC="Interview graph service (FastAPI)"
+    ;;
+  dev)
+    APP_DIR=/opt/interview-dev
+    DATA_DIR=/var/lib/interview-dev
+    PORT=8801
+    SVC=interview-dev
+    SVC_DESC="Interview graph service — DEV (FastAPI)"
+    ;;
+  *)
+    echo "✗ неизвестное окружение '$ENV' (ожидается prod|dev)" >&2
+    exit 2
+    ;;
+esac
+
 # Пользователь, под которым крутится сервис = тот, кто зашёл по SSH (не root).
 SVC_USER="${SUDO_USER:-$(id -un)}"
 
-echo "→ deploy as service user: $SVC_USER ; src=$SRC ; app=$APP_DIR ; port=$PORT"
+echo "→ deploy env=$ENV as service user: $SVC_USER ; src=$SRC ; app=$APP_DIR ; port=$PORT ; svc=$SVC"
 
 # 1) системные зависимости -----------------------------------------------
 export DEBIAN_FRONTEND=noninteractive
@@ -57,9 +83,9 @@ sudo -u "$SVC_USER" "$APP_DIR/backend/.venv/bin/python" -m pip install -q --upgr
 sudo -u "$SVC_USER" "$APP_DIR/backend/.venv/bin/pip" install -q -r "$APP_DIR/backend/requirements.txt"
 
 # 5) systemd-юнит ----------------------------------------------------------
-cat > /etc/systemd/system/interview.service <<UNIT
+cat > "/etc/systemd/system/$SVC.service" <<UNIT
 [Unit]
-Description=Interview graph service (FastAPI)
+Description=$SVC_DESC
 After=network.target
 
 [Service]
@@ -78,8 +104,8 @@ WantedBy=multi-user.target
 UNIT
 
 systemctl daemon-reload
-systemctl enable interview.service >/dev/null 2>&1 || true
-systemctl restart interview.service
+systemctl enable "$SVC.service" >/dev/null 2>&1 || true
+systemctl restart "$SVC.service"
 
 # 6) фаервол (если ufw активен) -------------------------------------------
 if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then
@@ -90,9 +116,9 @@ fi
 # 7) healthcheck -----------------------------------------------------------
 sleep 2
 if curl -fsS "http://127.0.0.1:$PORT/api/health" >/dev/null 2>&1; then
-  echo "✓ interview.service активен, /api/health отвечает на :$PORT"
+  echo "✓ $SVC.service активен, /api/health отвечает на :$PORT"
 else
   echo "✗ healthcheck не прошёл — лог сервиса:"
-  journalctl -u interview.service -n 40 --no-pager || true
+  journalctl -u "$SVC.service" -n 40 --no-pager || true
   exit 1
 fi
