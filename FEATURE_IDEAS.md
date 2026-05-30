@@ -19,7 +19,11 @@
 - [x] bank-export (feature/bank-export) — экспорт всего банка вопросов (вопрос+ответ+критерии) в печатный HTML
 - [x] shortcuts-help (feature/shortcuts-help) — оверлей хоткеев по «?» с захватом клавиатуры (capture-фаза)
 - [x] md-upload (feature/md-upload) — загрузка .md/.json вопросов через dropzone: POST /api/import (валидация + запись в content/), доска перезагружается
-- [ ] ux-live-polish: пакет UX-улучшений читаемости/управляемости (по консультации дизайнера, frontend-only) — единый фронтовый патч. Включает: акцентное кольцо «текущего» вопроса (сейчас бесцветное `currentColor` — баг); подключить готовый, но не отрендеренный сайдбар-агенду (`.interview` в styles.css) из `placement.order`; «Дальше →»/стрелки фильтро-осознанные (навигация по visibleIds, а не по всей сетке); поднять alpha тёмных тинтов блоков/полос (0.05→~0.13); типографика карточки (kind→эмодзи 14px, diff 11/700, теги slice 4→2); мини-прогресс под суб-хедером + ✓ на оценённых; поиск-по-тексту → centerOn; HUD с прогрессом {scored}/{total} + топик; минимапа кодирует прогресс (scored серым, current акцентом); свёртка панели 17 тегов; шпаргалка хоткеев по `?`; CTA «Завершить · Скачать отчёт» при 100% оценённых. Файлы: QuestionNode.tsx, App.tsx, styles.css, BlockGroupNode/BandsNode.tsx.
+- [x] ux-live-polish (feature/ux-live-polish) — пакет UX: акцентное кольцо текущего (фикс currentColor), тинты 0.10, теги 2+N, HUD-прогресс+топик, CTA на 100%, свёртка тегов. Out-of-scope (→ будущие идеи): сайдбар-агенда из placement.order, кодирование прогресса в минимапе, фильтро-осознанная навигация по visibleIds.
 
-## Сгенерировано (помечать [x] здесь автоматически)
+## Сгенерировано автоматически (из out-of-scope ux-live-polish)
+- [ ] agenda-sidebar: подключить готовый сайдбар-агенду (`.interview` в styles.css) — список вопросов из `placement.order` с переходом по клику (centerOn) и отметкой оценённых — фронт (App.tsx + новый компонент).
+- [ ] minimap-progress: кодировать прогресс в минимапе React Flow (оценённые — серым, текущий — акцентом) через nodeColor — фронт (App.tsx MiniMap props + buildNodes data).
+- [ ] filter-aware-nav: «Дальше →»/стрелки навигируют по видимым (не-dimmed) нодам, а не по всей сетке — фронт (App.tsx nextQuestion/keyboard используют visibleIds).
+
 <!-- feature-build переносит реализованные идеи сюда: - [x] <slug> (feature/<slug>) -->
