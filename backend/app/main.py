@@ -18,6 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from .content_ops import NodeNotFound, delete_node
 from .db import Database
 from .importer import load_content
 from .models import GraphResponse
@@ -83,6 +84,15 @@ def make_interview(req: InterviewRequest) -> dict:
         seed=req.seed,
     )
     return {"order": order}
+
+
+@app.delete("/api/nodes/{node_id}")
+def remove_node(node_id: str) -> dict:
+    """Безвозвратно удалить вопрос из банка (мутирует content/). 404, если нет."""
+    try:
+        return delete_node(CONTENT_DIR, node_id)
+    except NodeNotFound:
+        raise HTTPException(status_code=404, detail=f"node '{node_id}' not found")
 
 
 # ---------- sessions ----------
