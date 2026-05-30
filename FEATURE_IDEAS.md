@@ -9,7 +9,7 @@
 
 ## Идеи
 # Управление вопросами (зонтичная идея → разложена агентом на 4 фичи; «добавить через файл» уже есть в md-upload)
-- [ ] hide-local: скрыть вопрос с доски (localStorage Set скрытых id, кнопка в drawer + тумблер «показать скрытые», вливается в dimmed) — ЛЁГКАЯ, frontend-only, ноль мутаций content/. Делать ПЕРВОЙ.
+- [x] hide-local (feature/hide-local): скрыть вопрос с доски (localStorage Set скрытых id, кнопка в drawer + тумблер «показать скрытые», вливается в dimmed) — ЛЁГКАЯ, frontend-only, ноль мутаций content/.
 - [ ] node-delete: удалить вопрос из банка (DELETE /api/nodes/{id} + кнопка в drawer с confirm). Пререквизит: резолвер id→файл (парсить, не конкатенировать путь); ветка multi-node JSON (переписать файл, не unlink). Path-containment. — СРЕДНЯЯ.
 - [ ] node-edit: редактировать вопрос raw-text (GET/PUT /api/nodes/{id}/source: вернуть/перезаписать сырой файл через parse_file-валидацию; textarea в drawer). id неизменяем. — СРЕДНЯЯ.
 - [ ] inline-add: добавить вопрос формой (block/topic/difficulty/question/answer → собрать .md → переиспользовать существующий POST /api/import). — ЛЁГКАЯ, опц.
