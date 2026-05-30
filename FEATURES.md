@@ -9,3 +9,4 @@
 | `feature/node-notes` | node-notes | Заметка интервьюера на вопрос (node notes) | done | pass | ok — багов нет; мелочь: applyScore пересоздаётся при наборе note (perf-only, не блокер) | 2026-05-30 | .claude/features/node-notes.md |
 | `feature/question-search` | question-search | Поиск по тексту вопросов | done | pass | ok — багов нет | 2026-05-30 | .claude/features/question-search.md |
 | `feature/session-resume` | session-resume | Загрузка прошлой сессии кандидата (resume) | done | pass | ok — багов нет; мелочь: стиль .loadsess дублирует .tb__select (не блокер) | 2026-05-30 | .claude/features/session-resume.md |
+| `feature/unscored-filter` | unscored-filter | Фильтр «только неоценённые» | done | pass | ok — багов нет | 2026-05-30 | .claude/features/unscored-filter.md |
