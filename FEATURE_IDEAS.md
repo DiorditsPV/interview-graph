@@ -17,7 +17,7 @@
 - [x] interview-progress (feature/interview-progress) — прогресс-бар оценено/всего по текущему набору фильтров в шапке
 - [x] candidate-compare (feature/candidate-compare) — модалка сравнения сессий: средние баллы по блокам (backend-агрегат /api/sessions/compare)
 - [x] bank-export (feature/bank-export) — экспорт всего банка вопросов (вопрос+ответ+критерии) в печатный HTML
-- [ ] shortcuts-help: оверлей со списком горячих клавиш (по `?`) — фронт only (компонент + App.tsx).
+- [x] shortcuts-help (feature/shortcuts-help) — оверлей хоткеев по «?» с захватом клавиатуры (capture-фаза)
 - [ ] md-upload: загрузка `.md`/`.json` вопросов через drag-and-drop в UI с валидацией — backend POST-эндпоинт (импортёр) + фронт dropzone.
 - [ ] ux-live-polish: пакет UX-улучшений читаемости/управляемости (по консультации дизайнера, frontend-only) — единый фронтовый патч. Включает: акцентное кольцо «текущего» вопроса (сейчас бесцветное `currentColor` — баг); подключить готовый, но не отрендеренный сайдбар-агенду (`.interview` в styles.css) из `placement.order`; «Дальше →»/стрелки фильтро-осознанные (навигация по visibleIds, а не по всей сетке); поднять alpha тёмных тинтов блоков/полос (0.05→~0.13); типографика карточки (kind→эмодзи 14px, diff 11/700, теги slice 4→2); мини-прогресс под суб-хедером + ✓ на оценённых; поиск-по-тексту → centerOn; HUD с прогрессом {scored}/{total} + топик; минимапа кодирует прогресс (scored серым, current акцентом); свёртка панели 17 тегов; шпаргалка хоткеев по `?`; CTA «Завершить · Скачать отчёт» при 100% оценённых. Файлы: QuestionNode.tsx, App.tsx, styles.css, BlockGroupNode/BandsNode.tsx.
 
