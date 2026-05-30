@@ -17,6 +17,7 @@ import { DetailDrawer } from "./components/DetailDrawer";
 import { GuidesNode } from "./components/GuidesNode";
 import { QuestionNode } from "./components/QuestionNode";
 import { SubHeadNode } from "./components/SubHeadNode";
+import { UploadModal } from "./components/UploadModal";
 import { downloadReport } from "./report";
 import {
   BLOCK_ORDER,
@@ -156,6 +157,7 @@ export default function App() {
   const [fullscreen, setFullscreen] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [candidate, setCandidate] = useState("");
+  const [uploadOpen, setUploadOpen] = useState(false);
   const [activeBlocks, setActiveBlocks] = useState<Record<string, boolean>>(ALL_BLOCKS);
   const [activeDiffs, setActiveDiffs] = useState<Record<string, boolean>>(ALL_DIFFS);
   const [activeTags, setActiveTags] = useState<Record<string, boolean>>({});
@@ -186,16 +188,22 @@ export default function App() {
     [graph],
   );
 
+  const loadGraph = useCallback(
+    () =>
+      api
+        .graph()
+        .then((g) => {
+          setGraph(g.nodes);
+          setErrors(g.errors);
+          setPlacement(swimlaneLayout(g.nodes));
+        })
+        .catch((err) => setErrors([{ file: "API", error: String(err) }])),
+    [],
+  );
+
   useEffect(() => {
-    api
-      .graph()
-      .then((g) => {
-        setGraph(g.nodes);
-        setErrors(g.errors);
-        setPlacement(swimlaneLayout(g.nodes));
-      })
-      .catch((err) => setErrors([{ file: "API", error: String(err) }]));
-  }, []);
+    loadGraph();
+  }, [loadGraph]);
 
   const rfNodes = useMemo(
     () =>
@@ -392,6 +400,13 @@ export default function App() {
             </>
           )}
           <button
+            className="iconbtn uploadbtn"
+            onClick={() => setUploadOpen(true)}
+            title="Загрузить вопросы (.md/.json)"
+          >
+            ⬆ Загрузить
+          </button>
+          <button
             className="iconbtn dlbtn"
             onClick={() => downloadReport(session?.candidate ?? candidate, graph, scores)}
             disabled={scored === 0}
@@ -579,6 +594,9 @@ export default function App() {
           }}
         />
       </div>
+      {uploadOpen && (
+        <UploadModal onClose={() => setUploadOpen(false)} onImported={loadGraph} />
+      )}
     </div>
   );
 }
