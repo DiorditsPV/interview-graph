@@ -193,6 +193,30 @@ const fillPct = parseFloat(fillW);
 if (!(fillPct > 0)) fail(`progress fill not advanced after scoring: "${fillW}"`);
 console.log(`OK: progress bar (${progLabel}, fill ${fillW})`);
 
+// 9f. UX-полировка: HUD-прогресс+топик, чип переполнения тегов, свёртка панели тегов.
+// (ДО compare/resume: нужен активный HUD текущего вопроса — после resume-reload его нет.)
+await page.waitForSelector(".hud__progress", { timeout: 3000 });
+const hudProg = await page.locator(".hud__progress").innerText();
+if (!hudProg.includes("/")) fail(`HUD progress missing fraction: "${hudProg}"`);
+if (hudProg.replace(/[^·]/g, "").length < 1) fail(`HUD progress missing topic separator: "${hudProg}"`);
+console.log(`OK: HUD progress + topic (${hudProg})`);
+
+const moreChips = await page.locator(".tagchip--more").count();
+if (moreChips < 1) fail("no tag-overflow chip (+N) rendered on any card");
+console.log(`OK: card tag overflow chip (+N) on ${moreChips} cards`);
+
+const tagsBefore = await page.locator(".fp__tag").count();
+if (tagsBefore < 1) fail("expected tag chips in filter panel");
+await page.locator(".fp__collapse").click();
+await page.waitForTimeout(150);
+const tagsCollapsedCount = await page.locator(".fp__tag").count();
+if (tagsCollapsedCount !== 0) fail(`tag panel did not collapse (still ${tagsCollapsedCount})`);
+await page.locator(".fp__collapse").click(); // развернуть обратно
+await page.waitForTimeout(150);
+const tagsAgain = await page.locator(".fp__tag").count();
+if (tagsAgain !== tagsBefore) fail(`tag panel did not restore (${tagsAgain} vs ${tagsBefore})`);
+console.log(`OK: tag panel collapse toggle (${tagsBefore} ⇄ 0)`);
+
 // 10. Сравнение кандидатов: старт сессии (сессии ещё нет) → оценка текущего через HUD → модалка-агрегат.
 await page.locator(".session input").fill("Cmp Bot");
 await page.locator(".session button", { hasText: "Начать сессию" }).click();

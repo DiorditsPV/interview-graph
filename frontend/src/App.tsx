@@ -195,6 +195,7 @@ export default function App() {
   const [compareOpen, setCompareOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [tagsCollapsed, setTagsCollapsed] = useState(false);
   const [activeBlocks, setActiveBlocks] = useState<Record<string, boolean>>(ALL_BLOCKS);
   const [activeDiffs, setActiveDiffs] = useState<Record<string, boolean>>(ALL_DIFFS);
   const [activeTags, setActiveTags] = useState<Record<string, boolean>>({});
@@ -593,6 +594,15 @@ export default function App() {
           >
             📥 Скачать
           </button>
+          {graph.length > 0 && scored === graph.length && (
+            <button
+              className="cta-done"
+              onClick={() => downloadReport(session?.candidate ?? candidate, graph, scores)}
+              title="Все вопросы оценены — скачать итоговый отчёт"
+            >
+              ✓ Завершить · Скачать отчёт
+            </button>
+          )}
           <button
             className="iconbtn cmpbtn"
             onClick={() => setCompareOpen(true)}
@@ -745,22 +755,29 @@ export default function App() {
                   </div>
                   <div className="fp__group fp__group--tags">
                     <div className="fp__title">
-                      Теги
+                      <button
+                        className="fp__collapse"
+                        onClick={() => setTagsCollapsed((v) => !v)}
+                        title={tagsCollapsed ? "Развернуть теги" : "Свернуть теги"}
+                      >
+                        {tagsCollapsed ? "▸" : "▾"} Теги
+                      </button>
                       {anyTagActive && (
                         <button className="fp__clear" onClick={clearTags}>
                           сбросить
                         </button>
                       )}
                     </div>
-                    {allTags.map((t) => (
-                      <button
-                        key={t}
-                        className={`fp__tag ${activeTags[t] ? "fp__tag--on" : ""}`}
-                        onClick={() => toggleTag(t)}
-                      >
-                        {t}
-                      </button>
-                    ))}
+                    {!tagsCollapsed &&
+                      allTags.map((t) => (
+                        <button
+                          key={t}
+                          className={`fp__tag ${activeTags[t] ? "fp__tag--on" : ""}`}
+                          onClick={() => toggleTag(t)}
+                        >
+                          {t}
+                        </button>
+                      ))}
                   </div>
                 </div>
               </Panel>
@@ -777,6 +794,9 @@ export default function App() {
                     <span className="hud__timer" title="Время на вопрос · вся сессия">
                       ⏱ {mmss(now - questionStart)}
                       {sessionStart != null && ` · ${mmss(now - sessionStart)}`}
+                    </span>
+                    <span className="hud__progress">
+                      {scored}/{graph.length} · {currentNode.topic}
                     </span>
                     <span className="hud__score">
                       {[1, 2, 3, 4, 5].map((i) => (

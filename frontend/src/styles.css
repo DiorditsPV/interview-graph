@@ -17,6 +17,7 @@
   --code-inline-bg: #f3f4f6;
   --shadow: rgba(0, 0, 0, 0.08);
   --shadow-strong: rgba(0, 0, 0, 0.18);
+  --accent: #2563eb;
 }
 [data-theme="dark"] {
   --bg: #0f172a;
@@ -36,6 +37,7 @@
   --code-inline-bg: #334155;
   --shadow: rgba(0, 0, 0, 0.45);
   --shadow-strong: rgba(0, 0, 0, 0.6);
+  --accent: #60a5fa;
 }
 
 * { box-sizing: border-box; }
@@ -134,7 +136,7 @@ button:disabled:hover { background: var(--surface); }
 .qnode--current {
   opacity: 1 !important;
   transform: scale(1.02);
-  box-shadow: 0 4px 14px var(--shadow-strong), 0 0 0 2px currentColor;
+  box-shadow: 0 4px 14px var(--shadow-strong), 0 0 0 2px var(--accent);
   z-index: 5;
 }
 .qnode--dimmed { opacity: 0.15; }
@@ -385,3 +387,18 @@ kbd {
 .upload-result__ok { color: #16a34a; }
 .upload-result__err { color: #dc2626; }
 .upload-result .muted { color: var(--text-faint); }
+
+/* ---- UX-полировка ---- */
+.tagchip--more { background: var(--border); color: var(--text-muted); font-weight: 600; }
+.hud__progress {
+  font-size: 12px; color: var(--text-faint); font-variant-numeric: tabular-nums; white-space: nowrap;
+  padding-left: 8px; border-left: 1px solid var(--border); margin-left: 2px;
+}
+.cta-done {
+  background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600;
+}
+.cta-done:hover { filter: brightness(1.08); background: var(--accent); }
+.fp__collapse {
+  background: none; border: none; padding: 0; font: inherit; color: inherit; cursor: pointer;
+}
+.fp__collapse:hover { background: none; color: var(--accent); }

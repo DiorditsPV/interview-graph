@@ -41,11 +41,14 @@ function QuestionNodeImpl({ data, selected }: NodeProps) {
 
       {node.tags.length > 0 && (
         <div className="qnode__tags">
-          {node.tags.slice(0, 4).map((t) => (
+          {node.tags.slice(0, 2).map((t) => (
             <span key={t} className="tagchip">
               {t}
             </span>
           ))}
+          {node.tags.length > 2 && (
+            <span className="tagchip tagchip--more">+{node.tags.length - 2}</span>
+          )}
         </div>
       )}
 
