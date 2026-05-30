@@ -22,7 +22,7 @@
 - [x] ux-live-polish (feature/ux-live-polish) — пакет UX: акцентное кольцо текущего (фикс currentColor), тинты 0.10, теги 2+N, HUD-прогресс+топик, CTA на 100%, свёртка тегов. Out-of-scope (→ будущие идеи): сайдбар-агенда из placement.order, кодирование прогресса в минимапе, фильтро-осознанная навигация по visibleIds.
 
 ## Сгенерировано автоматически (из out-of-scope ux-live-polish)
-- [ ] agenda-sidebar: подключить готовый сайдбар-агенду (`.interview` в styles.css) — список вопросов из `placement.order` с переходом по клику (centerOn) и отметкой оценённых — фронт (App.tsx + новый компонент).
+- [x] agenda-sidebar (feature/agenda-sidebar) — сайдбар-агенда (.interview): список вопросов из placement.order по блокам, ✓ на оценённых, клик → текущий + центрирование, тоггл в шапке
 - [ ] minimap-progress: кодировать прогресс в минимапе React Flow (оценённые — серым, текущий — акцентом) через nodeColor — фронт (App.tsx MiniMap props + buildNodes data).
 - [ ] filter-aware-nav: «Дальше →»/стрелки навигируют по видимым (не-dimmed) нодам, а не по всей сетке — фронт (App.tsx nextQuestion/keyboard используют visibleIds).
 
