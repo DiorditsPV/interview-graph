@@ -34,6 +34,7 @@
 | ERP / HRM | передача нанятого в кадровый учёт и зарплату | 1С:ЗУП, 1С:ERP, VK HR Tek, БОСС-Кадровик, Галактика | `crm-erp.md` |
 | Диски / документы / СХД | хранение отчётов, записей интервью, вложений в РФ-облаке/on-prem | Яндекс 360, VK WorkDisk, Облако Mail, МойОфис, Р7-Офис, S3 (Yandex/VK/Selectel) | `storage-docs.md` |
 | SSO / каталоги | корпоративный вход и провижининг пользователей | Yandex ID, VK ID, Active Directory/LDAP, Keycloak, ALD Pro, ЕСИА (Госуслуги) | `sso-identity.md` |
+| Календарь / почта | расписание интервью, приглашения, переход из встречи в доску | Яндекс 360 (Календарь/Почта), VK Календарь/WorkMail, МойОфис, CalDAV/ICS, SMTP/IMAP | `calendar-email.md` |
 | Мессенджеры / уведомления | приглашения, напоминания, боты-ассистенты интервьюера | Telegram, VK Teams, Пачка, eXpress, Squadus | `messaging-video.md` |
 | ВКС (видеоинтервью) | удалённые интервью со звонком прямо из доски | Яндекс Телемост, TrueConf, Контур.Толк, VK Звонки, МТС Линк | `messaging-video.md` |
 | Compliance | юридическая возможность продажи | 152-ФЗ, реестр росПО, КриптоПро/ГОСТ, on-prem/рособлака | `compliance-rf.md` |
@@ -65,6 +66,8 @@
 | `integration-hub` | фундамент, без него остальное — хаос | M | **P0** |
 | `ats-huntflow-sync` | Huntflow — де-факто стандарт ATS в РФ; прямое попадание в наш домен | M | **P0** |
 | `hh-jobboards-import` | hh.ru — главный источник кандидатов; импорт резюме/вакансий | M | **P1** |
+| `scheduler-page` | страница-расписание: кандидат при назначении встречи → один клик в доску; сильный UX | M | **P1** |
+| `calendar-email-sync` | синк с корпоративным календарём/почтой (CalDAV/ICS, SMTP/IMAP), ICS-инвайты | M | **P1** |
 | `sso-ru-identity` | корпоративный вход (AD/Yandex ID/VK ID) — требование любого enterprise | M | **P1** |
 | `storage-ru-disks` | отчёты/записи в Яндекс 360 / VK / S3 — и хранение, и 152-ФЗ | M | **P1** |
 | `notify-telegram-vkteams` | дешёвая, очень заметная ценность (боты-напоминания) | S | **P1** |
@@ -81,7 +84,8 @@
 1. **Волна 1 (фундамент + якорь):** `integration-hub` → `ats-huntflow-sync`. Один сильный
    ATS-коннектор на готовой платформе — это уже продаваемая история.
 2. **Волна 2 (enterprise-вход и охват):** `sso-ru-identity` + `hh-jobboards-import` +
-   `notify-telegram-vkteams`. Закрывает вход, источник кандидатов и вовлечение.
+   `notify-telegram-vkteams` + `scheduler-page` (+ `calendar-email-sync`). Закрывает вход,
+   источник кандидатов, вовлечение и «день интервьюера» (расписание → доска одним кликом).
 3. **Волна 3 (глубина процесса):** `storage-ru-disks`, `crm-bitrix-amocrm`, `erp-1c-hrm`,
    `video-vks-ru` — по запросу конкретных сделок.
 4. **Параллельно/по требованию гос:** `compliance-rf` (on-prem, рособлака, реестр росПО).
@@ -92,6 +96,7 @@
 - `ats-recruiting.md` — ATS и job-boards (Huntflow, hh.ru, Поток, Talantix…).
 - `crm-erp.md` — CRM (Bitrix24, amoCRM…) и ERP/HRM (1С:ЗУП, VK HR Tek…).
 - `storage-docs.md` — диски/СХД/документы (Яндекс 360, VK, МойОфис, S3…).
+- `calendar-email.md` — календарь/почта и страница-расписание (CalDAV/ICS, SMTP/IMAP, Яндекс/VK/МойОфис).
 - `sso-identity.md` — SSO и каталоги (AD/LDAP, Yandex ID, VK ID, Keycloak, ALD Pro…).
 - `messaging-video.md` — мессенджеры (Telegram, VK Teams…) и ВКС (Телемост, TrueConf…).
 - `compliance-rf.md` — 152-ФЗ, реестр росПО, варианты развёртывания.
