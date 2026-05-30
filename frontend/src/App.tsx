@@ -12,6 +12,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "./api";
 import { BandsNode } from "./components/BandsNode";
+import { BankBrowser } from "./components/BankBrowser";
 import { BlockGroupNode } from "./components/BlockGroupNode";
 import { CompareModal } from "./components/CompareModal";
 import { DetailDrawer } from "./components/DetailDrawer";
@@ -41,9 +42,15 @@ import {
   type ImportErr,
   type QNode,
   type Session,
+  type SessionMeta,
   type SessionSummary,
   type Track,
 } from "./types";
+
+// Снимок сессии с сервера → плоская карта оценок, которой оперирует UI.
+function scoresOf(s: { scores: Session["scores"] }): Record<string, number> {
+  return Object.fromEntries(Object.entries(s.scores).map(([id, v]) => [id, v.score]));
+}
 
 const nodeTypes = {
   question: QuestionNode,
@@ -182,9 +189,12 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
+  const [showBank, setShowBank] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [candidate, setCandidate] = useState("");
   const [pastSessions, setPastSessions] = useState<SessionSummary[]>([]);
+  const [sessions, setSessions] = useState<SessionMeta[]>([]);
+  const [live, setLive] = useState(false);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [now, setNow] = useState(() => Date.now());
   const [sessionStart, setSessionStart] = useState<number | null>(() => {
@@ -451,16 +461,80 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, [placement, currentId, selectedId, applyScore, moveCurrent, nextQuestion]);
 
+  // Привязать активную сессию к URL (?session=<id>) — ссылкой можно поделиться с HR.
+  const setSessionParam = useCallback((id: number | null) => {
+    const url = new URL(window.location.href);
+    if (id == null) url.searchParams.delete("session");
+    else url.searchParams.set("session", String(id));
+    window.history.replaceState(null, "", url.toString());
+  }, []);
+
   const startSession = useCallback(async () => {
     if (!candidate.trim()) return;
     const s = await api.createSession(candidate.trim());
     setSession(s);
-    setScores({});
-    api.listSessions().then(setPastSessions).catch(() => void 0);
+    setScores(scoresOf(s));
+    setSessionParam(s.id);
+    // Обновляем оба списка сессий (loadsess-резюме и live-пикер).
+    api.listSessions().then((ls) => {
+      setPastSessions(ls);
+      setSessions(ls);
+    }).catch(() => void 0);
     const t = Date.now();
     setSessionStart(t);
     localStorage.setItem("timerStart", String(t));
-  }, [candidate]);
+  }, [candidate, setSessionParam]);
+
+  // Подключиться к уже существующей сессии (другой интервьюер / HR): подтянуть оценки.
+  const joinSession = useCallback(
+    async (id: number) => {
+      try {
+        const s = await api.getSession(id);
+        setSession(s);
+        setScores(scoresOf(s));
+        setSessionParam(id);
+      } catch {
+        setSessionParam(null);
+      }
+    },
+    [setSessionParam],
+  );
+
+  const leaveSession = useCallback(() => {
+    setSession(null);
+    setLive(false);
+    setSessionParam(null);
+  }, [setSessionParam]);
+
+  // Список сессий для пикера + авто-подключение по ?session=<id> при загрузке.
+  useEffect(() => {
+    api.listSessions().then(setSessions).catch(() => void 0);
+    const fromUrl = new URLSearchParams(window.location.search).get("session");
+    if (fromUrl) joinSession(Number(fromUrl));
+  }, [joinSession]);
+
+  // Live-синхронизация: подписка на SSE-поток активной сессии. Входящие снимки
+  // сливаются объединением, чтобы не затирать только что выставленную локальную оценку.
+  useEffect(() => {
+    if (!session) return;
+    const es = new EventSource(api.eventsUrl(session.id));
+    const merge = (e: MessageEvent) => {
+      try {
+        const snap = JSON.parse(e.data) as Session;
+        setScores((prev) => ({ ...prev, ...scoresOf(snap) }));
+      } catch {
+        /* ignore malformed frame */
+      }
+    };
+    es.addEventListener("snapshot", merge as EventListener);
+    es.addEventListener("update", merge as EventListener);
+    es.onopen = () => setLive(true);
+    es.onerror = () => setLive(false);
+    return () => {
+      es.close();
+      setLive(false);
+    };
+  }, [session]);
 
   // Загрузить прошлую сессию: восстановить оценки на доске.
   const loadSession = useCallback(async (id: number) => {
@@ -576,9 +650,20 @@ export default function App() {
 
         <div className="session">
           {session ? (
-            <span className="session__active">
-              👤 {session.candidate} · оценено {scored} · средн. {avg}
-            </span>
+            <>
+              <span className="session__active">
+                👤 {session.candidate} · оценено {scored} · средн. {avg}
+              </span>
+              <span
+                className={`livedot ${live ? "livedot--on" : ""}`}
+                title={live ? "Live: изменения синхронизируются с HR" : "Подключение к live…"}
+              >
+                ● {live ? "LIVE" : "…"}
+              </span>
+              <button className="iconbtn" onClick={leaveSession} title="Выйти из сессии">
+                Выйти
+              </button>
+            </>
           ) : (
             <>
               <input
@@ -603,6 +688,21 @@ export default function App() {
                   ))}
                 </select>
               )}
+              {sessions.length > 0 && (
+                <select
+                  className="session__pick"
+                  value=""
+                  onChange={(e) => e.target.value && joinSession(Number(e.target.value))}
+                  title="Подключиться к существующей сессии (live)"
+                >
+                  <option value="">Подключиться…</option>
+                  {sessions.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.candidate} · {s.created_at.slice(0, 10)}
+                    </option>
+                  ))}
+                </select>
+              )}
             </>
           )}
           <button
@@ -611,6 +711,14 @@ export default function App() {
             title="Загрузить вопросы (.md/.json)"
           >
             ⬆ Загрузить
+          </button>
+          <button
+            className="iconbtn"
+            onClick={() => setShowBank(true)}
+            disabled={graph.length === 0}
+            title="Открыть экран со всеми вопросами банка"
+          >
+            📋 Все вопросы
           </button>
           <button
             className="iconbtn dlbtn"
@@ -899,6 +1007,7 @@ export default function App() {
       {uploadOpen && (
         <UploadModal onClose={() => setUploadOpen(false)} onImported={loadGraph} />
       )}
+      {showBank && <BankBrowser nodes={graph} onClose={() => setShowBank(false)} />}
     </div>
   );
 }

@@ -233,10 +233,22 @@ const cmpText = await page.locator(".cmp-table").innerText();
 if (!cmpText.includes("Cmp Bot")) fail(`compare table missing candidate: "${cmpText}"`);
 console.log("OK: candidate compare table renders (Cmp Bot)");
 
-// 11. Resume ПОСЛЕДНЕЙ: создать сессию+оценку через API → reload (стирает всё) → выбрать в .loadsess.
+// 11. Resume ПОСЛЕДНЕЙ: создать сессию+оценку через API → reload → выбрать в .loadsess.
+// NB: после compare (шаг 10) активна live-сессия + открыт SSE-поток, а ссылка несёт ?session=<id>,
+// поэтому reload авто-подключается к ней (фича live-session-sync) и держит соединение → networkidle
+// не наступит. Используем "load" и затем выходим из авто-подключённой сессии («Выйти»), чтобы
+// открылся выпадающий список .loadsess (он рендерится только вне активной сессии).
 const sid = (await (await page.request.post(URL + "api/sessions", { data: { candidate: "SmokeResume" } })).json()).id;
 await page.request.post(`${URL}api/sessions/${sid}/score`, { data: { nodeId: "sql-01", score: 5 } });
-await page.reload({ waitUntil: "networkidle" });
+await page.reload({ waitUntil: "load" });
+// reload авто-подключается к ?session=<id> (live-session-sync) → дождаться и выйти, чтобы
+// показался выпадающий .loadsess (рендерится только вне активной сессии).
+await page.waitForTimeout(500);
+const leaveBtn = page.locator(".session button", { hasText: "Выйти" });
+if (await leaveBtn.count()) {
+  await leaveBtn.click();
+  await page.waitForTimeout(200);
+}
 await page.waitForSelector(".loadsess", { timeout: 5000 });
 await page.locator(".loadsess").selectOption(String(sid));
 await page.waitForSelector(".session__active", { timeout: 3000 });
@@ -291,6 +303,27 @@ await page.waitForSelector(".hud", { timeout: 3000 });
 const agHud = await page.locator(".hud__title").innerText();
 if (!agHud || agHud.length < 2) fail(`agenda click did not set current question: "${agHud}"`);
 console.log(`OK: agenda sidebar (${ivCount} items, click → HUD "${agHud.slice(0, 30)}")`);
+
+// 16. Экран «Все вопросы» (bank-browser): открыть, список всего банка, поиск, раскрытие, закрытие.
+await page.locator(".session .iconbtn", { hasText: "Все вопросы" }).click();
+await page.waitForSelector(".bankbrowser", { timeout: 5000 });
+const bankRows = await page.locator(".bankrow").count();
+if (bankRows < nodeCount) fail(`bank shows fewer rows (${bankRows}) than canvas nodes (${nodeCount})`);
+console.log(`OK: bank screen lists ${bankRows} questions`);
+await page.locator(".bankbrowser__search").fill("ROW_NUMBER");
+await page.waitForTimeout(250);
+const bankFiltered = await page.locator(".bankrow").count();
+if (bankFiltered < 1 || bankFiltered >= bankRows) fail(`bank search did not narrow rows (${bankRows} → ${bankFiltered})`);
+console.log(`OK: bank search narrows ${bankRows} → ${bankFiltered}`);
+await page.locator(".bankrow__head").first().click();
+await page.waitForSelector(".bankrow--open .bankrow__body", { timeout: 3000 });
+const bodyLen = (await page.locator(".bankrow--open .bankrow__body").first().innerText()).length;
+if (bodyLen < 30) fail(`expanded bank row body too short (${bodyLen})`);
+console.log("OK: bank row expands with question/answer/criteria");
+await page.keyboard.press("Escape");
+await page.waitForTimeout(200);
+if ((await page.locator(".bankbrowser").count()) !== 0) fail("bank screen did not close on Esc");
+console.log("OK: bank screen closes on Esc");
 
 if (errors.length) fail(`console/page errors:\n${errors.join("\n")}`);
 

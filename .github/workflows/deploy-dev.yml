@@ -1,14 +1,16 @@
-name: Deploy
+name: Deploy (dev)
 
-# Разворачивает новую версию при вливании в main (merge из любой ветки = push в main).
+# Разворачивает dev-версию на том же сервере (тот же IP и те же SSH-секреты),
+# но в изолированное окружение на отдельном порту 8801 (prod — 8800).
+# Триггеры: push в ветку dev или ручной запуск.
 on:
   push:
-    branches: [main]
+    branches: [dev]
   workflow_dispatch: {}
 
-# Не запускать два деплоя одновременно (но и не отменять уже идущий).
+# Свой concurrency-группа, чтобы dev-деплои не мешали prod и друг другу.
 concurrency:
-  group: deploy-production
+  group: deploy-dev
   cancel-in-progress: false
 
 jobs:
@@ -39,7 +41,7 @@ jobs:
           printf '%s\n' "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
 
-      - name: Rsync sources to server (staging)
+      - name: Rsync sources to server (dev staging)
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
@@ -54,9 +56,9 @@ jobs:
             --exclude '*.db' \
             --exclude '.deploy' \
             -e "ssh -i ~/.ssh/deploy_key -p ${PORT}" \
-            ./ "${SSH_USER}@${SSH_HOST}:~/interview-src/"
+            ./ "${SSH_USER}@${SSH_HOST}:~/interview-src-dev/"
 
-      - name: Bootstrap & restart on server
+      - name: Bootstrap & restart on server (dev)
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
@@ -64,4 +66,4 @@ jobs:
         run: |
           PORT="${SSH_PORT:-22}"
           ssh -i ~/.ssh/deploy_key -p "${PORT}" "${SSH_USER}@${SSH_HOST}" \
-            'sudo bash ~/interview-src/deploy/bootstrap.sh ~/interview-src prod'
+            'sudo bash ~/interview-src-dev/deploy/bootstrap.sh ~/interview-src-dev dev'

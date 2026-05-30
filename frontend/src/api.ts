@@ -1,4 +1,4 @@
-import type { Comparison, GraphResponse, ImportResult, Session, SessionSummary, Track } from "./types";
+import type { Comparison, GraphResponse, ImportResult, Session, SessionMeta, Track } from "./types";
 
 // В dev /api проксируется Vite на :8000; в прод тот же origin (раздаёт FastAPI).
 const BASE = "/api";
@@ -26,7 +26,7 @@ export const api = {
     }).then(json<Session>),
   getSession: (sessionId: number) =>
     fetch(`${BASE}/sessions/${sessionId}`).then(json<Session>),
-  listSessions: () => fetch(`${BASE}/sessions`).then(json<SessionSummary[]>),
+  listSessions: () => fetch(`${BASE}/sessions`).then(json<SessionMeta[]>),
   compareSessions: (ids: number[]) =>
     fetch(`${BASE}/sessions/compare?ids=${ids.join(",")}`).then(json<Comparison>),
   importFile: (filename: string, content: string) =>
@@ -35,4 +35,5 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ filename, content }),
     }).then(json<ImportResult>),
+  eventsUrl: (sessionId: number) => `${BASE}/sessions/${sessionId}/events`,
 };

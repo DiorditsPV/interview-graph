@@ -8,9 +8,40 @@ GitHub Actions → сборка фронта на раннере → доста�
 push в main ─▶ GitHub Actions (.github/workflows/deploy.yml)
                  ├─ npm ci && npm run build        (фронт собирается на раннере)
                  ├─ rsync кода → ~/interview-src    (staging в домашней папке)
-                 └─ ssh sudo bootstrap.sh           (provision + restart)
+                 └─ ssh sudo bootstrap.sh prod      (provision + restart)
                          └─ /opt/interview (код+контент) · /var/lib/interview (БД) · systemd · ufw
 ```
+
+## Dev-окружение (на том же сервере)
+
+Dev-версия крутится на **том же сервере и IP** и использует **те же GitHub-секреты**
+(SSH-доступ), но полностью изолирована от прода: отдельный порт, свой systemd-юнит,
+свои каталоги кода и данных. Push в ветку `dev` (или ручной запуск *Actions → Deploy (dev)*)
+поднимает её через `.github/workflows/deploy-dev.yml` → `bootstrap.sh … dev`.
+
+```
+push в dev ─▶ GitHub Actions (.github/workflows/deploy-dev.yml)
+                 ├─ npm ci && npm run build         (фронт собирается на раннере)
+                 ├─ rsync кода → ~/interview-src-dev (отдельный staging)
+                 └─ ssh sudo bootstrap.sh dev        (provision + restart)
+                         └─ /opt/interview-dev · /var/lib/interview-dev (БД) · systemd · ufw
+```
+
+| | prod | dev |
+|---|---|---|
+| URL | http://45.114.62.236:**8800** | http://45.114.62.236:**8801** |
+| Триггер | push в `main` | push в `dev` / ручной запуск |
+| systemd-юнит | `interview.service` | `interview-dev.service` |
+| Код + контент | `/opt/interview` | `/opt/interview-dev` |
+| БД (SQLite) | `/var/lib/interview/interview.db` | `/var/lib/interview-dev/interview.db` |
+| Staging на сервере | `~/interview-src` | `~/interview-src-dev` |
+
+У dev — **своя БД**, поэтому эксперименты в dev не затрагивают сессии и оценки прода.
+Никаких дополнительных секретов заводить не нужно: dev переиспользует те же
+`SSH_HOST` / `SSH_USER` / `SSH_PRIVATE_KEY` / `SSH_KNOWN_HOSTS` / `SSH_PORT`.
+
+**Локально** dev-версию можно поднять на отдельном порту той же командой:
+`./run.sh dev` (порт 8001, отдельная БД `interview-dev.db`, авто-reload); `./run.sh` — как прод на :8000.
 
 ## Что куда кладётся на сервере
 
@@ -60,13 +91,15 @@ chmod 600 ~/.ssh/authorized_keys
 
 ## Запуск деплоя
 
-- **Автоматически:** любой push/merge в `main`.
-- **Вручную:** вкладка *Actions* → *Deploy* → *Run workflow* (`workflow_dispatch`).
+- **Автоматически:** любой push/merge в `main` (prod) или в `dev` (dev).
+- **Вручную:** вкладка *Actions* → *Deploy* (prod) или *Deploy (dev)* → *Run workflow* (`workflow_dispatch`).
 
-После успешного прогона приложение доступно на **http://45.114.62.236:8800**.
+После успешного прогона приложение доступно на **http://45.114.62.236:8800** (prod)
+и **http://45.114.62.236:8801** (dev).
 
 ## Безопасность
 
-Сервис биндится на `0.0.0.0:8800` и будет доступен публично по IP. Аутентификации в приложении нет
-(изначально это локальный однопользовательский инструмент). Если доступ нужно ограничить — варианты:
-закрыть 8800 фаерволом и ходить через VPN/SSH-туннель, либо поставить reverse-proxy с basic-auth.
+Сервис биндится на `0.0.0.0` (prod — `:8800`, dev — `:8801`) и будет доступен публично по IP.
+Аутентификации в приложении нет (изначально это локальный однопользовательский инструмент).
+Если доступ нужно ограничить — варианты: закрыть порты фаерволом и ходить через VPN/SSH-туннель,
+либо поставить reverse-proxy с basic-auth. Учтите, что dev-порт публичен так же, как и prod.

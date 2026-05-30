@@ -56,10 +56,13 @@ export interface ImportResult {
   errors: ImportErr[];
 }
 
-export interface Session {
+export interface SessionMeta {
   id: number;
   candidate: string;
   created_at: string;
+}
+
+export interface Session extends SessionMeta {
   scores: Record<string, { node_id: string; score: number; note?: string; created_at: string }>;
 }
 
