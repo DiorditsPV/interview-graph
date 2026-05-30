@@ -4,6 +4,7 @@ title: Экспорт всего банка вопросов в HTML
 status: done
 created: 2026-05-30
 branch: feature/bank-export
+merged: integration/all-ideas
 verify: pass
 review: ok — поле starterCode (не starter_code) поймано build-гейтом и исправлено
 ---

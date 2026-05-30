@@ -66,6 +66,17 @@ if (dimmed < 1) fail("tag filter did not dim any nodes");
 console.log(`OK: tag filter dims ${dimmed} non-matching nodes`);
 await page.locator(".fp__clear").click(); // сброс тегов
 
+// 5c. Направление интервью: смена трека на «Аналитик» гасит вне-трековые ноды (PySpark и т.п.).
+const trackSel = page.locator(".tb__select");
+if ((await trackSel.count()) < 1) fail("track selector (.tb__select) missing");
+const dimBefore = await page.locator(".qnode--dimmed").count();
+await trackSel.selectOption("analyst");
+await page.waitForTimeout(300);
+const dimAfter = await page.locator(".qnode--dimmed").count();
+if (dimAfter <= dimBefore) fail(`track switch did not dim more nodes (${dimBefore}→${dimAfter})`);
+console.log(`OK: track selector scopes board (analyst → ${dimAfter} dimmed)`);
+await trackSel.selectOption("data-engineer"); // сброс трека
+
 // 5c. Фильтр по типу (вопрос/задача): выключение «вопрос» гасит вопросные ноды.
 await page.locator(".fp__chip", { hasText: "вопрос" }).click();
 await page.waitForTimeout(250);
@@ -118,7 +129,182 @@ const after = await page.evaluate(() => document.documentElement.dataset.theme);
 if (after === before) fail(`theme toggle did not change theme (${before} → ${after})`);
 console.log(`OK: theme toggles (${before} → ${after})`);
 
-// 9. Экран «Все вопросы» (bank-browser): открыть, список всего банка, поиск, раскрытие, закрытие.
+// --- Накопленные проверки фич. Порядок важен (объяснения у каждой):
+//  локально-стейтовые (note/timer/search/unscored/progress) → compare (стартует свою сессию)
+//  → resume ПОСЛЕДНЕЙ (делает page.reload(), стирающий всё накопленное состояние).
+
+// 9. Заметка на ноду: ввод в drawer переживает закрытие/повторное открытие.
+// Открываем/закрываем drawer текущего вопроса клавиатурой (Enter/Esc) — без клика по карточке.
+await page.keyboard.press("Escape"); // закрыть открытый drawer (current сохраняется)
+await page.waitForTimeout(150);
+await page.keyboard.press("Enter"); // открыть drawer текущего вопроса
+await page.waitForSelector(".drawer__note", { timeout: 3000 });
+const noteText = "smoke-note-проверка";
+await page.locator(".drawer__note").fill(noteText);
+await page.keyboard.press("Escape");
+await page.waitForTimeout(150);
+await page.keyboard.press("Enter"); // повторно открыть тот же вопрос
+await page.waitForSelector(".drawer__note", { timeout: 3000 });
+const restored = await page.locator(".drawer__note").inputValue();
+if (restored !== noteText) fail(`note not retained across reopen: "${restored}"`);
+console.log("OK: node note retained across reopen");
+
+// 9b. Таймер: HUD показывает M:SS и инкрементируется (есть текущий вопрос с прошлых шагов).
+await page.waitForSelector(".hud__timer", { timeout: 3000 });
+const tmr1 = (await page.locator(".hud__timer").first().innerText()).trim();
+if (!/\d+:\d{2}/.test(tmr1)) fail(`timer format wrong: "${tmr1}"`);
+await page.waitForTimeout(1300);
+const tmr2 = (await page.locator(".hud__timer").first().innerText()).trim();
+if (tmr2 === tmr1) fail(`timer not ticking (${tmr1} == ${tmr2})`);
+console.log(`OK: HUD timer ticks (${tmr1} → ${tmr2})`);
+
+// 9c. Поиск по вопросам: запрос гасит несовпавшие ноды; очистка убирает гашение.
+// (После клавиатурных проверок: фокус уходит в input — дальше body-клавиатура не нужна.)
+const search = page.locator(".fp__search");
+await search.fill("MergeTree");
+await page.waitForTimeout(300);
+const dimSearch = await page.locator(".qnode--dimmed").count();
+if (dimSearch < 1) fail("search did not dim non-matching nodes");
+await search.fill("");
+await page.waitForTimeout(300);
+const dimCleared = await page.locator(".qnode--dimmed").count();
+if (dimCleared >= dimSearch) fail(`clearing search did not remove dim (${dimSearch} → ${dimCleared})`);
+console.log(`OK: question search dims ${dimSearch}, clears to ${dimCleared}`);
+
+// 9d. «Только неоценённые»: оценённая на шаге 4 нода (ROW_NUMBER) гаснет при включении тумблера.
+// (dimUnscoredAfter — не dimAfter: тот уже объявлен в track-проверке выше.)
+const unscoredBtn = page.locator(".fp__chip", { hasText: "Только неоценённые" });
+await unscoredBtn.click();
+await page.waitForTimeout(250);
+const dimUnscored = await page.locator(".qnode--dimmed").count();
+if (dimUnscored < 1) fail("unscored-only did not dim scored nodes");
+await unscoredBtn.click();
+await page.waitForTimeout(250);
+const dimUnscoredAfter = await page.locator(".qnode--dimmed").count();
+if (dimUnscoredAfter >= dimUnscored) fail(`toggling off did not clear dim (${dimUnscored} → ${dimUnscoredAfter})`);
+console.log(`OK: «только неоценённые» dims ${dimUnscored}, clears to ${dimUnscoredAfter}`);
+
+// 9e. Прогресс-бар в шапке: присутствует, подпись с дробью, заполнение > 0 (оценка со шага 4).
+await page.waitForSelector(".progress", { timeout: 3000 });
+const progLabel = await page.locator(".progress__label").innerText();
+if (!progLabel.includes("/")) fail(`progress label has no fraction: "${progLabel}"`);
+const fillW = await page.locator(".progress__fill").evaluate((el) => el.style.width);
+const fillPct = parseFloat(fillW);
+if (!(fillPct > 0)) fail(`progress fill not advanced after scoring: "${fillW}"`);
+console.log(`OK: progress bar (${progLabel}, fill ${fillW})`);
+
+// 9f. UX-полировка: HUD-прогресс+топик, чип переполнения тегов, свёртка панели тегов.
+// (ДО compare/resume: нужен активный HUD текущего вопроса — после resume-reload его нет.)
+await page.waitForSelector(".hud__progress", { timeout: 3000 });
+const hudProg = await page.locator(".hud__progress").innerText();
+if (!hudProg.includes("/")) fail(`HUD progress missing fraction: "${hudProg}"`);
+if (hudProg.replace(/[^·]/g, "").length < 1) fail(`HUD progress missing topic separator: "${hudProg}"`);
+console.log(`OK: HUD progress + topic (${hudProg})`);
+
+const moreChips = await page.locator(".tagchip--more").count();
+if (moreChips < 1) fail("no tag-overflow chip (+N) rendered on any card");
+console.log(`OK: card tag overflow chip (+N) on ${moreChips} cards`);
+
+const tagsBefore = await page.locator(".fp__tag").count();
+if (tagsBefore < 1) fail("expected tag chips in filter panel");
+await page.locator(".fp__collapse").click();
+await page.waitForTimeout(150);
+const tagsCollapsedCount = await page.locator(".fp__tag").count();
+if (tagsCollapsedCount !== 0) fail(`tag panel did not collapse (still ${tagsCollapsedCount})`);
+await page.locator(".fp__collapse").click(); // развернуть обратно
+await page.waitForTimeout(150);
+const tagsAgain = await page.locator(".fp__tag").count();
+if (tagsAgain !== tagsBefore) fail(`tag panel did not restore (${tagsAgain} vs ${tagsBefore})`);
+console.log(`OK: tag panel collapse toggle (${tagsBefore} ⇄ 0)`);
+
+// 10. Сравнение кандидатов: старт сессии (сессии ещё нет) → оценка текущего через HUD → модалка-агрегат.
+await page.locator(".session input").fill("Cmp Bot");
+await page.locator(".session button", { hasText: "Начать сессию" }).click();
+await page.waitForSelector(".session__active", { timeout: 3000 });
+await page.waitForSelector(".hud__score .scorebtn", { timeout: 3000 });
+await page.locator(".hud__score .scorebtn").nth(2).click(); // 3/5 → персист в сессию
+await page.waitForTimeout(400);
+await page.locator(".cmpbtn").click();
+await page.waitForSelector(".cmp-modal", { timeout: 3000 });
+await page.locator(".cmp-modal__item input[type=checkbox]").first().check();
+await page.locator(".cmp-modal__run").click();
+await page.waitForSelector(".cmp-table", { timeout: 3000 });
+const cmpText = await page.locator(".cmp-table").innerText();
+if (!cmpText.includes("Cmp Bot")) fail(`compare table missing candidate: "${cmpText}"`);
+console.log("OK: candidate compare table renders (Cmp Bot)");
+
+// 11. Resume ПОСЛЕДНЕЙ: создать сессию+оценку через API → reload → выбрать в .loadsess.
+// NB: после compare (шаг 10) активна live-сессия + открыт SSE-поток, а ссылка несёт ?session=<id>,
+// поэтому reload авто-подключается к ней (фича live-session-sync) и держит соединение → networkidle
+// не наступит. Используем "load" и затем выходим из авто-подключённой сессии («Выйти»), чтобы
+// открылся выпадающий список .loadsess (он рендерится только вне активной сессии).
+const sid = (await (await page.request.post(URL + "api/sessions", { data: { candidate: "SmokeResume" } })).json()).id;
+await page.request.post(`${URL}api/sessions/${sid}/score`, { data: { nodeId: "sql-01", score: 5 } });
+await page.reload({ waitUntil: "load" });
+// reload авто-подключается к ?session=<id> (live-session-sync) → дождаться и выйти, чтобы
+// показался выпадающий .loadsess (рендерится только вне активной сессии).
+await page.waitForTimeout(500);
+const leaveBtn = page.locator(".session button", { hasText: "Выйти" });
+if (await leaveBtn.count()) {
+  await leaveBtn.click();
+  await page.waitForTimeout(200);
+}
+await page.waitForSelector(".loadsess", { timeout: 5000 });
+await page.locator(".loadsess").selectOption(String(sid));
+await page.waitForSelector(".session__active", { timeout: 3000 });
+const active = await page.locator(".session__active").innerText();
+if (!active.includes("SmokeResume")) fail(`resume did not load session: ${active}`);
+const scoredCount = await page.locator(".qnode--scored").count();
+if (scoredCount < 1) fail("resume did not restore scores onto the board");
+console.log(`OK: session resume restores scores (${scoredCount} scored)`);
+
+// 12. Экспорт банка вопросов: кнопка отдаёт interview_bank_*.html (всегда активна, без reload).
+const [dlBank] = await Promise.all([
+  page.waitForEvent("download"),
+  page.locator(".bankbtn").click(),
+]);
+const bankFn = dlBank.suggestedFilename();
+if (!bankFn.includes("bank") || !bankFn.endsWith(".html")) fail(`bank export wrong file: ${bankFn}`);
+console.log(`OK: question bank export (${bankFn})`);
+
+// 13. Шпаргалка горячих клавиш: «?» открывает оверлей, Esc закрывает.
+// (После bank: фокус на кнопке, не в input — «?» доходит до обработчика.)
+await page.keyboard.press("?");
+await page.waitForSelector(".help-modal", { timeout: 3000 });
+const helpText = await page.locator(".help-modal").innerText();
+if (!helpText.includes("неоценённому")) fail(`help overlay missing shortcuts: "${helpText}"`);
+await page.keyboard.press("Escape");
+await page.waitForSelector(".help-modal", { state: "detached", timeout: 3000 });
+console.log("OK: shortcuts help overlay (? opens, Esc closes)");
+
+// 14. Загрузка вопросов: открыть модалку, загрузить НЕвалидный .md → показана ошибка (файл не пишется).
+await page.locator(".uploadbtn").click();
+await page.waitForSelector(".upload-modal", { timeout: 3000 });
+const badMd = "---\nid: smoke-bad-01\nblock: NOPE\ntopic: x\n---\n## Вопрос\nq\n";
+await page.setInputFiles(".upload-modal input[type=file]", {
+  name: "smoke-bad.md",
+  mimeType: "text/markdown",
+  buffer: Buffer.from(badMd),
+});
+await page.waitForSelector(".upload-result__err", { timeout: 3000 });
+const upErr = await page.locator(".upload-result__err").innerText();
+if (!upErr.toLowerCase().includes("ошибк")) fail(`upload error not shown: "${upErr}"`);
+console.log("OK: upload rejects invalid file with error");
+await page.keyboard.press("Escape");
+await page.waitForSelector(".upload-modal", { state: "detached", timeout: 3000 });
+
+// 15. Сайдбар-агенда: тоггл показывает список вопросов; клик по пункту делает ноду текущей (HUD).
+await page.locator(".tb__toggle", { hasText: "Агенда" }).click();
+await page.waitForSelector(".interview", { timeout: 3000 });
+const ivCount = await page.locator(".interview .ivbtn").count();
+if (ivCount < 5) fail(`agenda has too few items: ${ivCount}`);
+await page.locator(".interview .ivbtn").first().click();
+await page.waitForSelector(".hud", { timeout: 3000 });
+const agHud = await page.locator(".hud__title").innerText();
+if (!agHud || agHud.length < 2) fail(`agenda click did not set current question: "${agHud}"`);
+console.log(`OK: agenda sidebar (${ivCount} items, click → HUD "${agHud.slice(0, 30)}")`);
+
+// 16. Экран «Все вопросы» (bank-browser): открыть, список всего банка, поиск, раскрытие, закрытие.
 await page.locator(".session .iconbtn", { hasText: "Все вопросы" }).click();
 await page.waitForSelector(".bankbrowser", { timeout: 5000 });
 const bankRows = await page.locator(".bankrow").count();

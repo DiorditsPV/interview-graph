@@ -4,6 +4,7 @@ title: Поиск по тексту вопросов
 status: done
 created: 2026-05-30
 branch: feature/question-search
+merged: integration/all-ideas
 verify: pass
 review: ok — багов нет
 ---

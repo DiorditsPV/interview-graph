@@ -4,6 +4,7 @@ title: Загрузка прошлой сессии кандидата (resume)
 status: done
 created: 2026-05-30
 branch: feature/session-resume
+merged: integration/all-ideas
 verify: pass
 review: ok — багов нет; мелочь: стиль .loadsess дублирует .tb__select (не блокер)
 ---

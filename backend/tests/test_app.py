@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 
 from app.importer import load_content
 from app.models import Node
-from app.sampler import build_interview, load_weights
+from app.sampler import build_interview, load_tracks, load_weights, node_in_track
 
 CONTENT = Path(__file__).resolve().parent.parent.parent / "content"
 
@@ -190,3 +190,148 @@ def test_api_interview():
     r = _client().post("/api/interview", json={"count": 8, "seed": 1})
     assert r.status_code == 200
     assert len(r.json()["order"]) <= 8
+
+
+# --- tracks ---
+def test_load_tracks():
+    tracks = load_tracks(CONTENT)
+    ids = {t["id"] for t in tracks}
+    assert {"data-engineer", "backend", "analyst"} <= ids
+    for t in tracks:
+        assert t.get("id") and "label" in t and isinstance(t["include"], list)
+
+
+def test_node_in_track_matcher():
+    nmap = {n.id: n for n in load_content(CONTENT)[0]}
+    inc = ["python", "databases/sql", "frameworks/airflow"]
+    assert node_in_track(nmap["py-lang-01"], inc)          # python (block)
+    assert node_in_track(nmap["sql-01"], inc)              # databases/sql
+    assert node_in_track(nmap["af-orchestration-01"], inc)  # frameworks/airflow
+    assert not node_in_track(nmap["spark-batch-01"], inc)   # frameworks/pyspark — нет
+    assert node_in_track(nmap["sql-01"], [])               # пустой include = все
+
+
+def test_api_tracks_endpoint():
+    r = _client().get("/api/tracks")
+    assert r.status_code == 200
+    assert {"data-engineer", "backend", "analyst"} <= {t["id"] for t in r.json()}
+
+
+def test_interview_track_scoped():
+    nmap = {n.id: n for n in load_content(CONTENT)[0]}
+    inc = ["databases/sql", "databases/dbms", "python", "platform"]
+    order = _client().post("/api/interview", json={"count": 50, "track": "analyst", "seed": 1}).json()["order"]
+    assert order
+    for nid in order:
+        assert node_in_track(nmap[nid], inc), f"{nid} вне трека analyst"
+
+
+def test_api_list_sessions_for_resume():
+    c = _client()
+    sid = c.post("/api/sessions", json={"candidate": "Resume"}).json()["id"]
+    c.post(f"/api/sessions/{sid}/score", json={"nodeId": "sql-01", "score": 5})
+    sessions = c.get("/api/sessions").json()
+    assert any(x["id"] == sid and x["candidate"] == "Resume" for x in sessions)
+    # деталь сессии содержит восстановимые оценки
+    detail = c.get(f"/api/sessions/{sid}").json()
+    assert detail["scores"]["sql-01"]["score"] == 5
+
+
+def test_api_score_note_persists():
+    c = _client()
+    sid = c.post("/api/sessions", json={"candidate": "Notes"}).json()["id"]
+    c.post(f"/api/sessions/{sid}/score", json={"nodeId": "sql-01", "score": 4, "note": "хороший ответ"})
+    detail = c.get(f"/api/sessions/{sid}").json()
+    assert detail["scores"]["sql-01"]["note"] == "хороший ответ"
+
+
+def test_api_compare():
+    c = _client()
+    a = c.post("/api/sessions", json={"candidate": "Cmp-A"}).json()
+    b = c.post("/api/sessions", json={"candidate": "Cmp-B"}).json()
+    c.post(f"/api/sessions/{a['id']}/score", json={"nodeId": "sql-01", "score": 4})
+    c.post(f"/api/sessions/{a['id']}/score", json={"nodeId": "sql-02", "score": 2})
+    c.post(f"/api/sessions/{b['id']}/score", json={"nodeId": "sql-01", "score": 5})
+
+    r = c.get(f"/api/sessions/compare?ids={a['id']},{b['id']}")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["blocks"], "blocks should be non-empty"
+    out = {s["id"]: s for s in data["sessions"]}
+    assert set(out) == {a["id"], b["id"]}
+    # sql-01/sql-02 → блок databases; среднее A = (4+2)/2 = 3.0
+    assert out[a["id"]]["overall"]["avg"] == 3.0
+    assert out[a["id"]]["overall"]["scored"] == 2
+    assert out[a["id"]]["byBlock"]["databases"]["avg"] == 3.0
+    assert out[b["id"]]["byBlock"]["databases"]["avg"] == 5.0
+    # блок без оценок → avg=null, scored=0
+    empty_block = next(bl for bl in data["blocks"] if bl != "databases")
+    assert out[b["id"]]["byBlock"][empty_block]["avg"] is None
+    assert out[b["id"]]["byBlock"][empty_block]["scored"] == 0
+
+
+def test_api_compare_bad_ids():
+    c = _client()
+    assert c.get("/api/sessions/compare?ids=").status_code == 400
+    assert c.get("/api/sessions/compare?ids=abc").status_code == 400
+
+
+def test_api_import_valid_with_id():
+    c = _client()
+    md = (
+        "---\nid: zzz-upload-test-01\nblock: databases\ntopic: Загрузка\n---\n"
+        "## Вопрос\nТестовый вопрос?\n## Ответ\nОтвет.\n"
+    )
+    created = []
+    try:
+        r = c.post("/api/import", json={"filename": "whatever.md", "content": md})
+        assert r.status_code == 200
+        data = r.json()
+        created = [a["path"] for a in data["added"]]
+        assert data["errors"] == []
+        assert any(a["id"] == "zzz-upload-test-01" for a in data["added"])
+        assert (CONTENT / "databases" / "zzz-upload-test-01.md").exists()
+    finally:
+        for p in created:
+            (CONTENT / p).unlink(missing_ok=True)
+
+
+def test_api_import_idless_md_takes_stem():
+    c = _client()
+    md = "---\nblock: python\ntopic: Стем\n---\n## Вопрос\nОткуда id?\n"
+    created = []
+    try:
+        r = c.post("/api/import", json={"filename": "zzz-stem-01.md", "content": md})
+        data = r.json()
+        created = [a["path"] for a in data["added"]]
+        assert data["added"], f"nothing added: {data}"
+        assert data["added"][0]["id"] == "zzz-stem-01"  # id из имени файла, не из temp-stem
+    finally:
+        for p in created:
+            (CONTENT / p).unlink(missing_ok=True)
+
+
+def test_api_import_invalid_not_written():
+    c = _client()
+    bad = "---\nid: zzz-bad-01\nblock: NOPE\ntopic: x\n---\n## Вопрос\nq\n"
+    r = c.post("/api/import", json={"filename": "bad.md", "content": bad})
+    data = r.json()
+    assert data["added"] == []
+    assert data["errors"]
+    assert not (CONTENT / "NOPE" / "zzz-bad-01.md").exists()
+
+
+def test_api_import_duplicate_id():
+    c = _client()
+    dup = "---\nid: sql-01\nblock: databases\ntopic: dup\n---\n## Вопрос\nq\n"
+    r = c.post("/api/import", json={"filename": "dup.md", "content": dup})
+    data = r.json()
+    assert data["added"] == []
+    assert any("duplicate" in e["error"] for e in data["errors"])
+    # существующий sql-01 не перезаписан (всё ещё на месте)
+    assert (CONTENT / "databases" / "sql-01.md").exists()
+
+
+def test_api_import_bad_extension():
+    r = _client().post("/api/import", json={"filename": "x.txt", "content": "hi"})
+    assert r.status_code == 400

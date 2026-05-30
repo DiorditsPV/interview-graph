@@ -25,8 +25,34 @@ export interface ImportErr {
   error: string;
 }
 
+// Направление интервью (трек/роль) — профиль-охват над block/subblock.
+export interface Track {
+  id: string;
+  label: string;
+  include: string[];
+}
+
+// Нода входит в трек: include пуст ИЛИ совпал block / "block/subblock".
+export function nodeInTrack(n: QNode, include: string[]): boolean {
+  if (!include.length) return true;
+  if (include.includes(n.block)) return true;
+  return !!n.subblock && include.includes(`${n.block}/${n.subblock}`);
+}
+
 export interface GraphResponse {
   nodes: QNode[];
+  errors: ImportErr[];
+}
+
+// Результат загрузки файла вопросов (POST /api/import).
+export interface ImportAdded {
+  id: string;
+  block: Block;
+  title: string;
+  path: string;
+}
+export interface ImportResult {
+  added: ImportAdded[];
   errors: ImportErr[];
 }
 
@@ -38,6 +64,30 @@ export interface SessionMeta {
 
 export interface Session extends SessionMeta {
   scores: Record<string, { node_id: string; score: number; note?: string; created_at: string }>;
+}
+
+// Сессия без оценок — для списков (GET /api/sessions возвращает SELECT * без scores).
+export interface SessionSummary {
+  id: number;
+  candidate: string;
+  created_at: string;
+}
+
+// Агрегат сравнения кандидатов (GET /api/sessions/compare).
+export interface BlockAgg {
+  avg: number | null;
+  scored: number;
+}
+export interface SessionAgg {
+  id: number;
+  candidate: string;
+  created_at: string;
+  overall: BlockAgg;
+  byBlock: Record<string, BlockAgg>;
+}
+export interface Comparison {
+  blocks: Block[];
+  sessions: SessionAgg[];
 }
 
 export const BLOCK_LABEL: Record<Block, string> = {

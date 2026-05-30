@@ -4,6 +4,7 @@ title: Заметка интервьюера на вопрос (node notes)
 status: done
 created: 2026-05-30
 branch: feature/node-notes
+merged: integration/all-ideas
 verify: pass
 review: ok — багов нет; мелочь: applyScore пересоздаётся при наборе note (perf-only, не блокер)
 ---

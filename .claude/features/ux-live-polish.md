@@ -4,6 +4,7 @@ title: Пакет UX-полировки (читаемость/управляем
 status: done
 created: 2026-05-30
 branch: feature/ux-live-polish
+merged: integration/all-ideas
 verify: pass
 review: ok — багов нет (фикс currentColor→--accent для кольца текущего вопроса)
 ---

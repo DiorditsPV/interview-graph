@@ -1,4 +1,4 @@
-import type { GraphResponse, Session, SessionMeta } from "./types";
+import type { Comparison, GraphResponse, ImportResult, Session, SessionMeta, Track } from "./types";
 
 // В dev /api проксируется Vite на :8000; в прод тот же origin (раздаёт FastAPI).
 const BASE = "/api";
@@ -11,6 +11,7 @@ async function json<T>(res: Response): Promise<T> {
 export const api = {
   graph: () => fetch(`${BASE}/graph`).then(json<GraphResponse>),
   weights: () => fetch(`${BASE}/weights`).then(json<Record<string, number>>),
+  tracks: () => fetch(`${BASE}/tracks`).then(json<Track[]>),
   createSession: (candidate: string) =>
     fetch(`${BASE}/sessions`, {
       method: "POST",
@@ -26,5 +27,13 @@ export const api = {
   getSession: (sessionId: number) =>
     fetch(`${BASE}/sessions/${sessionId}`).then(json<Session>),
   listSessions: () => fetch(`${BASE}/sessions`).then(json<SessionMeta[]>),
+  compareSessions: (ids: number[]) =>
+    fetch(`${BASE}/sessions/compare?ids=${ids.join(",")}`).then(json<Comparison>),
+  importFile: (filename: string, content: string) =>
+    fetch(`${BASE}/import`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filename, content }),
+    }).then(json<ImportResult>),
   eventsUrl: (sessionId: number) => `${BASE}/sessions/${sessionId}/events`,
 };

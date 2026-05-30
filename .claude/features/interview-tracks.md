@@ -4,6 +4,7 @@ title: Выбор направления интервью (треки/роли)
 status: done
 created: 2026-05-30
 branch: feature/interview-tracks
+merged: integration/all-ideas
 verify: pass
 review: ok — 1 minor reuse note (filter predicate duplicated buildNodes/visibleIds; не блокер)
 ---

@@ -85,6 +85,17 @@ def _nodes_from_json(path: Path) -> List[Node]:
     return out
 
 
+def parse_file(path: Path) -> List[Node]:
+    """Распарсить один файл (.md → одна нода, .json → одна или несколько) в список Node.
+
+    Бросает ValidationError/ValueError/JSONDecodeError/OSError при проблемах — вызывающий ловит.
+    id-less Markdown берёт id из `path.stem`, поэтому имя файла важно (см. /api/import).
+    """
+    if path.suffix.lower() == ".md":
+        return [_node_from_markdown(path)]
+    return _nodes_from_json(path)
+
+
 def load_content(content_dir: Path) -> Tuple[List[Node], List[ImportError_]]:
     """Загрузить все *.md и *.json из директории контента (рекурсивно)."""
     nodes: List[Node] = []
@@ -101,7 +112,7 @@ def load_content(content_dir: Path) -> Tuple[List[Node], List[ImportError_]]:
     for path in files:
         rel = str(path.relative_to(content_dir))
         try:
-            batch = [_node_from_markdown(path)] if path.suffix.lower() == ".md" else _nodes_from_json(path)
+            batch = parse_file(path)
         except (ValidationError, ValueError, json.JSONDecodeError, OSError) as exc:
             errors.append(ImportError_(file=rel, error=_fmt_error(exc)))
             continue

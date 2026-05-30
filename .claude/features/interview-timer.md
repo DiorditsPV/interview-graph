@@ -4,6 +4,7 @@ title: Таймеры вопроса и сессии в HUD
 status: done
 created: 2026-05-30
 branch: feature/interview-timer
+merged: integration/all-ideas
 verify: pass
 review: ok — багов нет
 ---

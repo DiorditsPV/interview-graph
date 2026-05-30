@@ -4,6 +4,7 @@ title: Оверлей горячих клавиш (по «?»)
 status: done
 created: 2026-05-30
 branch: feature/shortcuts-help
+merged: integration/all-ideas
 verify: pass
 review: ok — найден и устранён баг двойного Escape-listener'а (capture-фаза + stopImmediatePropagation)
 ---

@@ -22,7 +22,7 @@ function BandsNodeImpl({ data }: { data: BandsNodeData }) {
           <div
             key={b.difficulty}
             className="bands__label"
-            style={{ top: b.y, height: b.height, width: labelW, color, background: hexA(color, 0.05) }}
+            style={{ top: b.y, height: b.height, width: labelW, color, background: hexA(color, 0.1) }}
           >
             <span>{b.label}</span>
           </div>

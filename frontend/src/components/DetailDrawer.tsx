@@ -7,14 +7,16 @@ import { BLOCK_COLOR, BLOCK_LABEL, type QNode } from "../types";
 interface Props {
   node: QNode | null;
   score?: number;
+  note?: string;
   fullscreen: boolean;
   onScore: (nodeId: string, score: number) => void;
+  onNote: (nodeId: string, text: string) => void;
   onToggleFullscreen: () => void;
   onClose: () => void;
 }
 
 // Немодальный drawer: полный текст вопроса/ответа. Закрывается с клавиатуры (Esc).
-export function DetailDrawer({ node, score, fullscreen, onScore, onToggleFullscreen, onClose }: Props) {
+export function DetailDrawer({ node, score, note, fullscreen, onScore, onNote, onToggleFullscreen, onClose }: Props) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -119,6 +121,12 @@ export function DetailDrawer({ node, score, fullscreen, onScore, onToggleFullscr
             ))}
             {score != null && <span className="scoreval">{score}/5</span>}
           </div>
+          <textarea
+            className="drawer__note"
+            placeholder="Заметка интервьюера…"
+            value={note ?? ""}
+            onChange={(e) => onNote(node.id, e.target.value)}
+          />
         </section>
       </div>
     </aside>

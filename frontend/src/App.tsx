@@ -14,11 +14,14 @@ import { api } from "./api";
 import { BandsNode } from "./components/BandsNode";
 import { BankBrowser } from "./components/BankBrowser";
 import { BlockGroupNode } from "./components/BlockGroupNode";
+import { CompareModal } from "./components/CompareModal";
 import { DetailDrawer } from "./components/DetailDrawer";
 import { GuidesNode } from "./components/GuidesNode";
 import { QuestionNode } from "./components/QuestionNode";
+import { ShortcutsHelp } from "./components/ShortcutsHelp";
 import { SubHeadNode } from "./components/SubHeadNode";
-import { downloadReport } from "./report";
+import { UploadModal } from "./components/UploadModal";
+import { downloadBank, downloadReport } from "./report";
 import {
   BLOCK_ORDER,
   CARD_H,
@@ -33,12 +36,15 @@ import {
   BLOCK_COLOR,
   BLOCK_LABEL,
   DIFF_COLOR,
+  nodeInTrack,
   type Block,
   type Difficulty,
   type ImportErr,
   type QNode,
   type Session,
   type SessionMeta,
+  type SessionSummary,
+  type Track,
 } from "./types";
 
 // Снимок сессии с сервера → плоская карта оценок, которой оперирует UI.
@@ -55,6 +61,18 @@ const nodeTypes = {
 };
 const NO_EDGES: Edge[] = [];
 
+// M:SS из миллисекунд (для таймеров вопроса/сессии).
+function mmss(ms: number): string {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+// Совпадение ноды с поисковым запросом (подстрока в title/question/topic/tags).
+function matchesQuery(n: QNode, q: string): boolean {
+  if (!q) return true;
+  return `${n.title ?? ""} ${n.question} ${n.topic} ${n.tags.join(" ")}`.toLowerCase().includes(q);
+}
+
 // Настройки отображения холста (фон + направляющие), сохраняются в localStorage.
 // База — без сетки; точки — единственный альтернативный вариант (переключается иконкой).
 type BgVariant = "off" | "dots";
@@ -69,6 +87,9 @@ function buildNodes(
   activeDiffs: Record<string, boolean>,
   activeTags: Record<string, boolean>,
   activeKinds: Record<string, boolean>,
+  trackInclude: string[],
+  query: string,
+  unscoredOnly: boolean,
   guidesH: boolean,
   guidesV: boolean,
 ): Node[] {
@@ -130,7 +151,14 @@ function buildNodes(
     const pos = p.positions[n.id];
     if (!pos) continue;
     const tagOk = !anyTag || n.tags.some((t) => activeTags[t]);
-    const dimmed = !activeBlocks[n.block] || !activeDiffs[n.difficulty] || !activeKinds[n.kind] || !tagOk;
+    const dimmed =
+      !activeBlocks[n.block] ||
+      !activeDiffs[n.difficulty] ||
+      !activeKinds[n.kind] ||
+      !tagOk ||
+      !nodeInTrack(n, trackInclude) ||
+      !matchesQuery(n, query) ||
+      (unscoredOnly && scores[n.id] != null);
     nodes.push({
       id: n.id,
       type: "question",
@@ -164,12 +192,30 @@ export default function App() {
   const [showBank, setShowBank] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [candidate, setCandidate] = useState("");
+  const [pastSessions, setPastSessions] = useState<SessionSummary[]>([]);
   const [sessions, setSessions] = useState<SessionMeta[]>([]);
   const [live, setLive] = useState(false);
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const [now, setNow] = useState(() => Date.now());
+  const [sessionStart, setSessionStart] = useState<number | null>(() => {
+    const v = localStorage.getItem("timerStart");
+    return v ? Number(v) : null;
+  });
+  const [questionStart, setQuestionStart] = useState<number>(() => Date.now());
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [tagsCollapsed, setTagsCollapsed] = useState(false);
   const [activeBlocks, setActiveBlocks] = useState<Record<string, boolean>>(ALL_BLOCKS);
   const [activeDiffs, setActiveDiffs] = useState<Record<string, boolean>>(ALL_DIFFS);
   const [activeTags, setActiveTags] = useState<Record<string, boolean>>({});
   const [activeKinds, setActiveKinds] = useState<Record<string, boolean>>(ALL_KINDS);
+  const [tracks, setTracks] = useState<Track[]>([]);
+  const [activeTrack, setActiveTrack] = useState<string>(
+    () => localStorage.getItem("track") || "data-engineer",
+  );
+  const [query, setQuery] = useState("");
+  const [unscoredOnly, setUnscoredOnly] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">(
     () =>
       (localStorage.getItem("theme") as "light" | "dark") ||
@@ -180,6 +226,7 @@ export default function App() {
   );
   const [guidesH, setGuidesH] = useState<boolean>(() => localStorage.getItem("guidesH") === "1");
   const [guidesV, setGuidesV] = useState<boolean>(() => localStorage.getItem("guidesV") === "1");
+  const [agendaOpen, setAgendaOpen] = useState<boolean>(() => localStorage.getItem("agendaOpen") === "1");
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -188,6 +235,25 @@ export default function App() {
   useEffect(() => localStorage.setItem("bgVariant", bgVariant), [bgVariant]);
   useEffect(() => localStorage.setItem("guidesH", guidesH ? "1" : "0"), [guidesH]);
   useEffect(() => localStorage.setItem("guidesV", guidesV ? "1" : "0"), [guidesV]);
+  useEffect(() => localStorage.setItem("track", activeTrack), [activeTrack]);
+  useEffect(() => localStorage.setItem("agendaOpen", agendaOpen ? "1" : "0"), [agendaOpen]);
+
+  // Таймеры: сброс «времени на вопрос» при смене текущего; старт «времени сессии» при первом выборе.
+  useEffect(() => {
+    if (!currentId) return;
+    setQuestionStart(Date.now());
+    setSessionStart((s) => {
+      if (s != null) return s;
+      const t = Date.now();
+      localStorage.setItem("timerStart", String(t));
+      return t;
+    });
+  }, [currentId]);
+  useEffect(() => {
+    if (!currentId && sessionStart == null) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [currentId, sessionStart]);
 
   const instance = useRef<ReactFlowInstance<Node, Edge> | null>(null);
   const nodeMap = useMemo(() => Object.fromEntries(graph.map((n) => [n.id, n])), [graph]);
@@ -195,24 +261,81 @@ export default function App() {
     () => Array.from(new Set(graph.flatMap((n) => n.tags))).sort(),
     [graph],
   );
+  const trackInclude = useMemo(
+    () => tracks.find((t) => t.id === activeTrack)?.include ?? [],
+    [tracks, activeTrack],
+  );
+  const trackLabel = useMemo(
+    () => tracks.find((t) => t.id === activeTrack)?.label,
+    [tracks, activeTrack],
+  );
+  // Видимый срез (трек + активные фильтры) — для навигации «Дальше».
+  const visibleIds = useMemo(() => {
+    const anyTag = Object.values(activeTags).some(Boolean);
+    const s = new Set<string>();
+    for (const n of graph) {
+      const tagOk = !anyTag || n.tags.some((t) => activeTags[t]);
+      if (
+        activeBlocks[n.block] &&
+        activeDiffs[n.difficulty] &&
+        activeKinds[n.kind] &&
+        tagOk &&
+        nodeInTrack(n, trackInclude)
+      ) {
+        s.add(n.id);
+      }
+    }
+    return s;
+  }, [graph, activeBlocks, activeDiffs, activeKinds, activeTags, trackInclude]);
+
+  // Строки агенды в порядке клавиатурной навигации, с заголовком при смене блока.
+  const agendaRows = useMemo(() => {
+    if (!placement) return [] as ({ kind: "head"; block: Block } | { kind: "item"; node: QNode })[];
+    const rows: ({ kind: "head"; block: Block } | { kind: "item"; node: QNode })[] = [];
+    let last: Block | null = null;
+    for (const id of placement.order.flat()) {
+      const n = nodeMap[id];
+      if (!n) continue;
+      if (n.block !== last) {
+        rows.push({ kind: "head", block: n.block });
+        last = n.block;
+      }
+      rows.push({ kind: "item", node: n });
+    }
+    return rows;
+  }, [placement, nodeMap]);
+
+  const loadGraph = useCallback(
+    () =>
+      api
+        .graph()
+        .then((g) => {
+          setGraph(g.nodes);
+          setErrors(g.errors);
+          setPlacement(swimlaneLayout(g.nodes));
+        })
+        .catch((err) => setErrors([{ file: "API", error: String(err) }])),
+    [],
+  );
 
   useEffect(() => {
-    api
-      .graph()
-      .then((g) => {
-        setGraph(g.nodes);
-        setErrors(g.errors);
-        setPlacement(swimlaneLayout(g.nodes));
-      })
-      .catch((err) => setErrors([{ file: "API", error: String(err) }]));
+    loadGraph();
+  }, [loadGraph]);
+
+  useEffect(() => {
+    api.tracks().then(setTracks).catch(() => setTracks([]));
+  }, []);
+
+  useEffect(() => {
+    api.listSessions().then(setPastSessions).catch(() => setPastSessions([]));
   }, []);
 
   const rfNodes = useMemo(
     () =>
       placement
-        ? buildNodes(graph, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, guidesH, guidesV)
+        ? buildNodes(graph, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, trackInclude, query.toLowerCase().trim(), unscoredOnly, guidesH, guidesV)
         : [],
-    [graph, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, guidesH, guidesV],
+    [graph, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, trackInclude, query, unscoredOnly, guidesH, guidesV],
   );
 
   const centerOn = useCallback(
@@ -228,9 +351,20 @@ export default function App() {
   const applyScore = useCallback(
     (nodeId: string, score: number) => {
       setScores((s) => ({ ...s, [nodeId]: score }));
-      if (session) api.setScore(session.id, nodeId, score).catch(() => void 0);
+      if (session) api.setScore(session.id, nodeId, score, notes[nodeId]).catch(() => void 0);
     },
-    [session],
+    [session, notes],
+  );
+
+  // Заметка интервьюера на ноду: персистится вместе с оценкой (схема scores: score+note).
+  const setNote = useCallback(
+    (nodeId: string, text: string) => {
+      setNotes((s) => ({ ...s, [nodeId]: text }));
+      if (session && scores[nodeId] != null) {
+        api.setScore(session.id, nodeId, scores[nodeId], text).catch(() => void 0);
+      }
+    },
+    [session, scores],
   );
 
   const onNodeClick = useCallback((_: unknown, node: Node) => {
@@ -250,7 +384,8 @@ export default function App() {
   // «Дальше»: следующий НЕОЦЕНЁННЫЙ вопрос по порядку сетки (с переносом по кругу).
   const nextQuestion = useCallback(() => {
     if (!placement) return;
-    const flat = placement.order.flat();
+    // только видимый срез (трек + фильтры)
+    const flat = placement.order.flat().filter((id) => visibleIds.has(id));
     if (!flat.length) return;
     const start = currentId ? flat.indexOf(currentId) : -1;
     for (let k = 1; k <= flat.length; k++) {
@@ -261,13 +396,19 @@ export default function App() {
       }
     }
     moveCurrent(flat[(start + 1 + flat.length) % flat.length]);
-  }, [placement, currentId, scores, moveCurrent]);
+  }, [placement, currentId, scores, moveCurrent, visibleIds]);
 
   // Клавиатура: 1-5 — оценка, Enter — открыть, стрелки — навигация, n — далее, Esc — снять текущий.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
+      // «?» открывает шпаргалку. Пока она открыта, ShortcutsHelp перехватывает клавиши в capture-фазе
+      // (stopImmediatePropagation), поэтому сюда они не доходят и захват клавиатуры обеспечен там.
+      if (e.key === "?") {
+        setHelpOpen(true);
+        return;
+      }
       if (!placement) return;
       if (e.key >= "1" && e.key <= "5") {
         if (currentId) applyScore(currentId, Number(e.key));
@@ -334,7 +475,14 @@ export default function App() {
     setSession(s);
     setScores(scoresOf(s));
     setSessionParam(s.id);
-    api.listSessions().then(setSessions).catch(() => void 0);
+    // Обновляем оба списка сессий (loadsess-резюме и live-пикер).
+    api.listSessions().then((ls) => {
+      setPastSessions(ls);
+      setSessions(ls);
+    }).catch(() => void 0);
+    const t = Date.now();
+    setSessionStart(t);
+    localStorage.setItem("timerStart", String(t));
   }, [candidate, setSessionParam]);
 
   // Подключиться к уже существующей сессии (другой интервьюер / HR): подтянуть оценки.
@@ -388,6 +536,14 @@ export default function App() {
     };
   }, [session]);
 
+  // Загрузить прошлую сессию: восстановить оценки на доске.
+  const loadSession = useCallback(async (id: number) => {
+    if (!id) return;
+    const s = await api.getSession(id);
+    setSession(s);
+    setScores(Object.fromEntries(Object.entries(s.scores).map(([nid, v]) => [nid, v.score])));
+  }, []);
+
   const toggleBlock = (b: Block) => setActiveBlocks((s) => ({ ...s, [b]: !s[b] }));
   const toggleDiff = (d: Difficulty) => setActiveDiffs((s) => ({ ...s, [d]: !s[d] }));
   const toggleTag = (t: string) => setActiveTags((s) => ({ ...s, [t]: !s[t] }));
@@ -408,6 +564,20 @@ export default function App() {
   }, [graph, scores]);
 
   const anyTagActive = Object.values(activeTags).some(Boolean);
+  // Прогресс по ТЕКУЩЕМУ отфильтрованному набору. Условие "проходит фильтры" держать в
+  // синхроне с предикатом `dimmed` в buildNodes (block/diff/kind/tag).
+  const coverage = useMemo(() => {
+    let total = 0;
+    let done = 0;
+    for (const n of graph) {
+      const tagOk = !anyTagActive || n.tags.some((t) => activeTags[t]);
+      if (activeBlocks[n.block] && activeDiffs[n.difficulty] && activeKinds[n.kind] && tagOk) {
+        total++;
+        if (scores[n.id] != null) done++;
+      }
+    }
+    return { done, total, pct: total ? Math.round((done / total) * 100) : 0 };
+  }, [graph, scores, activeBlocks, activeDiffs, activeKinds, activeTags, anyTagActive]);
   const currentNode = currentId ? nodeMap[currentId] : null;
   const selectedNode = selectedId ? nodeMap[selectedId] : null;
 
@@ -416,6 +586,31 @@ export default function App() {
       <header className="topbar">
         <strong>Интервью · граф вопросов</strong>
         <span className="muted">{graph.length} нод</span>
+
+        <div className="tb__field">
+          <span className="tb__lbl">Направление</span>
+          <select
+            className="tb__select"
+            value={activeTrack}
+            onChange={(e) => setActiveTrack(e.target.value)}
+            title="Направление интервью — фокусирует доску на релевантных вопросах"
+          >
+            {tracks.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="progress" title="Оценено по текущему набору фильтров">
+          <div className="progress__track">
+            <div className="progress__fill" style={{ width: `${coverage.pct}%` }} />
+          </div>
+          <span className="progress__label">
+            оценено {coverage.done} / {coverage.total} ({coverage.pct}%)
+          </span>
+        </div>
 
         <div className="toolbar" role="group" aria-label="Отображение холста">
           <button
@@ -444,6 +639,13 @@ export default function App() {
           >
             ☰ Гор.
           </button>
+          <button
+            className={`tb__toggle ${agendaOpen ? "tb__toggle--on" : ""}`}
+            onClick={() => setAgendaOpen((v) => !v)}
+            title="Сайдбар-агенда: список вопросов с переходом"
+          >
+            ☰ Агенда
+          </button>
         </div>
 
         <div className="session">
@@ -471,6 +673,21 @@ export default function App() {
                 onKeyDown={(e) => e.key === "Enter" && startSession()}
               />
               <button onClick={startSession}>Начать сессию</button>
+              {pastSessions.length > 0 && (
+                <select
+                  className="loadsess"
+                  value=""
+                  onChange={(e) => e.target.value && loadSession(Number(e.target.value))}
+                  title="Загрузить прошлую сессию (восстановить оценки)"
+                >
+                  <option value="">Загрузить сессию…</option>
+                  {pastSessions.map((ps) => (
+                    <option key={ps.id} value={ps.id}>
+                      {ps.candidate} · {ps.created_at.slice(0, 16).replace("T", " ")}
+                    </option>
+                  ))}
+                </select>
+              )}
               {sessions.length > 0 && (
                 <select
                   className="session__pick"
@@ -489,6 +706,13 @@ export default function App() {
             </>
           )}
           <button
+            className="iconbtn uploadbtn"
+            onClick={() => setUploadOpen(true)}
+            title="Загрузить вопросы (.md/.json)"
+          >
+            ⬆ Загрузить
+          </button>
+          <button
             className="iconbtn"
             onClick={() => setShowBank(true)}
             disabled={graph.length === 0}
@@ -498,11 +722,42 @@ export default function App() {
           </button>
           <button
             className="iconbtn dlbtn"
-            onClick={() => downloadReport(session?.candidate ?? candidate, graph, scores)}
+            onClick={() => downloadReport(session?.candidate ?? candidate, graph, scores, trackLabel, notes)}
             disabled={scored === 0}
             title={scored === 0 ? "Сначала выставьте оценки" : "Скачать результаты (HTML)"}
           >
             📥 Скачать
+          </button>
+          {graph.length > 0 && scored === graph.length && (
+            <button
+              className="cta-done"
+              onClick={() => downloadReport(session?.candidate ?? candidate, graph, scores)}
+              title="Все вопросы оценены — скачать итоговый отчёт"
+            >
+              ✓ Завершить · Скачать отчёт
+            </button>
+          )}
+          <button
+            className="iconbtn cmpbtn"
+            onClick={() => setCompareOpen(true)}
+            title="Сравнить кандидатов по блокам"
+          >
+            📊 Сравнить
+          </button>
+          <button
+            className="iconbtn bankbtn"
+            onClick={() => downloadBank(graph)}
+            disabled={graph.length === 0}
+            title="Скачать весь банк вопросов (HTML)"
+          >
+            🗂 Банк
+          </button>
+          <button
+            className="iconbtn helpbtn"
+            onClick={() => setHelpOpen(true)}
+            title="Горячие клавиши (?)"
+          >
+            ?
           </button>
           <button
             className="iconbtn themebtn"
@@ -526,6 +781,33 @@ export default function App() {
       )}
 
       <div className="main">
+        {agendaOpen && placement && (
+          <aside className="interview">
+            <h4>Агенда · {agendaRows.filter((r) => r.kind === "item").length}</h4>
+            {agendaRows.map((r, i) =>
+              r.kind === "head" ? (
+                <div key={`h-${r.block}-${i}`} className="iv-block" style={{ color: BLOCK_COLOR[r.block] }}>
+                  {BLOCK_LABEL[r.block]}
+                </div>
+              ) : (
+                <button
+                  key={r.node.id}
+                  className={[
+                    "ivbtn",
+                    r.node.id === currentId ? "ivbtn--current" : "",
+                    scores[r.node.id] != null ? "ivbtn--scored" : "",
+                  ].join(" ")}
+                  style={{ borderLeftColor: BLOCK_COLOR[r.node.block] }}
+                  onClick={() => moveCurrent(r.node.id)}
+                  title={r.node.question}
+                >
+                  {scores[r.node.id] != null && <span className="ivbtn__check">✓</span>}
+                  {r.node.title || r.node.topic}
+                </button>
+              ),
+            )}
+          </aside>
+        )}
         <div className="canvas">
           {rfNodes.length === 0 ? (
             <div className="loading">Загрузка графа…</div>
@@ -561,6 +843,12 @@ export default function App() {
 
               <Panel position="top-right">
                 <div className="filterpanel">
+                  <input
+                    className="fp__search"
+                    placeholder="Поиск по вопросам…"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                  />
                   <div className="fp__group">
                     <div className="fp__title">Направления</div>
                     {BLOCK_ORDER.map((b) => (
@@ -612,24 +900,45 @@ export default function App() {
                       </button>
                     ))}
                   </div>
+                  <div className="fp__group">
+                    <div className="fp__title">Прогресс</div>
+                    <button
+                      className={`fp__chip ${unscoredOnly ? "" : "fp__chip--off"}`}
+                      style={{
+                        borderColor: "#16a34a",
+                        color: unscoredOnly ? "#fff" : "#16a34a",
+                        background: unscoredOnly ? "#16a34a" : "transparent",
+                      }}
+                      onClick={() => setUnscoredOnly((v) => !v)}
+                    >
+                      Только неоценённые
+                    </button>
+                  </div>
                   <div className="fp__group fp__group--tags">
                     <div className="fp__title">
-                      Теги
+                      <button
+                        className="fp__collapse"
+                        onClick={() => setTagsCollapsed((v) => !v)}
+                        title={tagsCollapsed ? "Развернуть теги" : "Свернуть теги"}
+                      >
+                        {tagsCollapsed ? "▸" : "▾"} Теги
+                      </button>
                       {anyTagActive && (
                         <button className="fp__clear" onClick={clearTags}>
                           сбросить
                         </button>
                       )}
                     </div>
-                    {allTags.map((t) => (
-                      <button
-                        key={t}
-                        className={`fp__tag ${activeTags[t] ? "fp__tag--on" : ""}`}
-                        onClick={() => toggleTag(t)}
-                      >
-                        {t}
-                      </button>
-                    ))}
+                    {!tagsCollapsed &&
+                      allTags.map((t) => (
+                        <button
+                          key={t}
+                          className={`fp__tag ${activeTags[t] ? "fp__tag--on" : ""}`}
+                          onClick={() => toggleTag(t)}
+                        >
+                          {t}
+                        </button>
+                      ))}
                   </div>
                 </div>
               </Panel>
@@ -642,6 +951,13 @@ export default function App() {
                     </span>
                     <span className="hud__title" title={currentNode.question}>
                       {currentNode.title || currentNode.question}
+                    </span>
+                    <span className="hud__timer" title="Время на вопрос · вся сессия">
+                      ⏱ {mmss(now - questionStart)}
+                      {sessionStart != null && ` · ${mmss(now - sessionStart)}`}
+                    </span>
+                    <span className="hud__progress">
+                      {scored}/{graph.length} · {currentNode.topic}
                     </span>
                     <span className="hud__score">
                       {[1, 2, 3, 4, 5].map((i) => (
@@ -675,8 +991,10 @@ export default function App() {
         <DetailDrawer
           node={selectedNode}
           score={selectedId ? scores[selectedId] : undefined}
+          note={selectedId ? notes[selectedId] : undefined}
           fullscreen={fullscreen}
           onScore={applyScore}
+          onNote={setNote}
           onToggleFullscreen={() => setFullscreen((f) => !f)}
           onClose={() => {
             setSelectedId(null);
@@ -684,7 +1002,11 @@ export default function App() {
           }}
         />
       </div>
-
+      {compareOpen && <CompareModal onClose={() => setCompareOpen(false)} />}
+      {helpOpen && <ShortcutsHelp onClose={() => setHelpOpen(false)} />}
+      {uploadOpen && (
+        <UploadModal onClose={() => setUploadOpen(false)} onImported={loadGraph} />
+      )}
       {showBank && <BankBrowser nodes={graph} onClose={() => setShowBank(false)} />}
     </div>
   );
