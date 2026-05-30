@@ -4,6 +4,7 @@ title: Сравнение кандидатов по блокам
 status: done
 created: 2026-05-30
 branch: feature/candidate-compare
+merged: integration/all-ideas
 verify: pass
 review: ok — багов нет (route-order проверен живым запросом, не 422)
 ---

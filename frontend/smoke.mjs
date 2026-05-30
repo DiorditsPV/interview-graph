@@ -129,8 +129,11 @@ const after = await page.evaluate(() => document.documentElement.dataset.theme);
 if (after === before) fail(`theme toggle did not change theme (${before} → ${after})`);
 console.log(`OK: theme toggles (${before} → ${after})`);
 
+// --- Накопленные проверки фич. Порядок важен (объяснения у каждой):
+//  локально-стейтовые (note/timer/search/unscored/progress) → compare (стартует свою сессию)
+//  → resume ПОСЛЕДНЕЙ (делает page.reload(), стирающий всё накопленное состояние).
+
 // 9. Заметка на ноду: ввод в drawer переживает закрытие/повторное открытие.
-// (ДО resume-проверки: она делает reload и сбрасывает current/drawer.)
 // Открываем/закрываем drawer текущего вопроса клавиатурой (Enter/Esc) — без клика по карточке.
 await page.keyboard.press("Escape"); // закрыть открытый drawer (current сохраняется)
 await page.waitForTimeout(150);
@@ -147,7 +150,6 @@ if (restored !== noteText) fail(`note not retained across reopen: "${restored}"`
 console.log("OK: node note retained across reopen");
 
 // 9b. Таймер: HUD показывает M:SS и инкрементируется (есть текущий вопрос с прошлых шагов).
-// (ДО resume-проверки: reload сбрасывает HUD/текущий вопрос.)
 await page.waitForSelector(".hud__timer", { timeout: 3000 });
 const tmr1 = (await page.locator(".hud__timer").first().innerText()).trim();
 if (!/\d+:\d{2}/.test(tmr1)) fail(`timer format wrong: "${tmr1}"`);
@@ -157,7 +159,7 @@ if (tmr2 === tmr1) fail(`timer not ticking (${tmr1} == ${tmr2})`);
 console.log(`OK: HUD timer ticks (${tmr1} → ${tmr2})`);
 
 // 9c. Поиск по вопросам: запрос гасит несовпавшие ноды; очистка убирает гашение.
-// (После клавиатурных проверок: фокус уходит в input — дальше body-клавиатура не нужна, только resume.)
+// (После клавиатурных проверок: фокус уходит в input — дальше body-клавиатура не нужна.)
 const search = page.locator(".fp__search");
 await search.fill("MergeTree");
 await page.waitForTimeout(300);
@@ -169,21 +171,7 @@ const dimCleared = await page.locator(".qnode--dimmed").count();
 if (dimCleared >= dimSearch) fail(`clearing search did not remove dim (${dimSearch} → ${dimCleared})`);
 console.log(`OK: question search dims ${dimSearch}, clears to ${dimCleared}`);
 
-// 10. Resume: создать сессию+оценку через API → reload → выбрать в .loadsess → оценки восстановлены.
-// (Делает page.reload() — должна идти ПОСЛЕ проверок, опирающихся на накопленное состояние.)
-const sid = (await (await page.request.post(URL + "api/sessions", { data: { candidate: "SmokeResume" } })).json()).id;
-await page.request.post(`${URL}api/sessions/${sid}/score`, { data: { nodeId: "sql-01", score: 5 } });
-await page.reload({ waitUntil: "networkidle" });
-await page.waitForSelector(".loadsess", { timeout: 5000 });
-await page.locator(".loadsess").selectOption(String(sid));
-await page.waitForSelector(".session__active", { timeout: 3000 });
-const active = await page.locator(".session__active").innerText();
-if (!active.includes("SmokeResume")) fail(`resume did not load session: ${active}`);
-const scoredCount = await page.locator(".qnode--scored").count();
-if (scoredCount < 1) fail("resume did not restore scores onto the board");
-console.log(`OK: session resume restores scores (${scoredCount} scored)`);
-
-// 11. «Только неоценённые»: восстановленная resume-оценка гаснет при включении тумблера.
+// 9d. «Только неоценённые»: оценённая на шаге 4 нода (ROW_NUMBER) гаснет при включении тумблера.
 // (dimUnscoredAfter — не dimAfter: тот уже объявлен в track-проверке выше.)
 const unscoredBtn = page.locator(".fp__chip", { hasText: "Только неоценённые" });
 await unscoredBtn.click();
@@ -196,7 +184,7 @@ const dimUnscoredAfter = await page.locator(".qnode--dimmed").count();
 if (dimUnscoredAfter >= dimUnscored) fail(`toggling off did not clear dim (${dimUnscored} → ${dimUnscoredAfter})`);
 console.log(`OK: «только неоценённые» dims ${dimUnscored}, clears to ${dimUnscoredAfter}`);
 
-// 12. Прогресс-бар в шапке: присутствует, подпись с дробью, заполнение > 0 (resume восстановил оценку).
+// 9e. Прогресс-бар в шапке: присутствует, подпись с дробью, заполнение > 0 (оценка со шага 4).
 await page.waitForSelector(".progress", { timeout: 3000 });
 const progLabel = await page.locator(".progress__label").innerText();
 if (!progLabel.includes("/")) fail(`progress label has no fraction: "${progLabel}"`);
@@ -204,6 +192,35 @@ const fillW = await page.locator(".progress__fill").evaluate((el) => el.style.wi
 const fillPct = parseFloat(fillW);
 if (!(fillPct > 0)) fail(`progress fill not advanced after scoring: "${fillW}"`);
 console.log(`OK: progress bar (${progLabel}, fill ${fillW})`);
+
+// 10. Сравнение кандидатов: старт сессии (сессии ещё нет) → оценка текущего через HUD → модалка-агрегат.
+await page.locator(".session input").fill("Cmp Bot");
+await page.locator(".session button", { hasText: "Начать сессию" }).click();
+await page.waitForSelector(".session__active", { timeout: 3000 });
+await page.waitForSelector(".hud__score .scorebtn", { timeout: 3000 });
+await page.locator(".hud__score .scorebtn").nth(2).click(); // 3/5 → персист в сессию
+await page.waitForTimeout(400);
+await page.locator(".cmpbtn").click();
+await page.waitForSelector(".cmp-modal", { timeout: 3000 });
+await page.locator(".cmp-modal__item input[type=checkbox]").first().check();
+await page.locator(".cmp-modal__run").click();
+await page.waitForSelector(".cmp-table", { timeout: 3000 });
+const cmpText = await page.locator(".cmp-table").innerText();
+if (!cmpText.includes("Cmp Bot")) fail(`compare table missing candidate: "${cmpText}"`);
+console.log("OK: candidate compare table renders (Cmp Bot)");
+
+// 11. Resume ПОСЛЕДНЕЙ: создать сессию+оценку через API → reload (стирает всё) → выбрать в .loadsess.
+const sid = (await (await page.request.post(URL + "api/sessions", { data: { candidate: "SmokeResume" } })).json()).id;
+await page.request.post(`${URL}api/sessions/${sid}/score`, { data: { nodeId: "sql-01", score: 5 } });
+await page.reload({ waitUntil: "networkidle" });
+await page.waitForSelector(".loadsess", { timeout: 5000 });
+await page.locator(".loadsess").selectOption(String(sid));
+await page.waitForSelector(".session__active", { timeout: 3000 });
+const active = await page.locator(".session__active").innerText();
+if (!active.includes("SmokeResume")) fail(`resume did not load session: ${active}`);
+const scoredCount = await page.locator(".qnode--scored").count();
+if (scoredCount < 1) fail("resume did not restore scores onto the board");
+console.log(`OK: session resume restores scores (${scoredCount} scored)`);
 
 if (errors.length) fail(`console/page errors:\n${errors.join("\n")}`);
 

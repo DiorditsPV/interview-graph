@@ -1,4 +1,4 @@
-import type { GraphResponse, Session, SessionSummary, Track } from "./types";
+import type { Comparison, GraphResponse, Session, SessionSummary, Track } from "./types";
 
 // В dev /api проксируется Vite на :8000; в прод тот же origin (раздаёт FastAPI).
 const BASE = "/api";
@@ -27,4 +27,6 @@ export const api = {
   getSession: (sessionId: number) =>
     fetch(`${BASE}/sessions/${sessionId}`).then(json<Session>),
   listSessions: () => fetch(`${BASE}/sessions`).then(json<SessionSummary[]>),
+  compareSessions: (ids: number[]) =>
+    fetch(`${BASE}/sessions/compare?ids=${ids.join(",")}`).then(json<Comparison>),
 };

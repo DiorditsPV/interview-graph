@@ -149,3 +149,34 @@ def test_api_score_note_persists():
     c.post(f"/api/sessions/{sid}/score", json={"nodeId": "sql-01", "score": 4, "note": "хороший ответ"})
     detail = c.get(f"/api/sessions/{sid}").json()
     assert detail["scores"]["sql-01"]["note"] == "хороший ответ"
+
+
+def test_api_compare():
+    c = _client()
+    a = c.post("/api/sessions", json={"candidate": "Cmp-A"}).json()
+    b = c.post("/api/sessions", json={"candidate": "Cmp-B"}).json()
+    c.post(f"/api/sessions/{a['id']}/score", json={"nodeId": "sql-01", "score": 4})
+    c.post(f"/api/sessions/{a['id']}/score", json={"nodeId": "sql-02", "score": 2})
+    c.post(f"/api/sessions/{b['id']}/score", json={"nodeId": "sql-01", "score": 5})
+
+    r = c.get(f"/api/sessions/compare?ids={a['id']},{b['id']}")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["blocks"], "blocks should be non-empty"
+    out = {s["id"]: s for s in data["sessions"]}
+    assert set(out) == {a["id"], b["id"]}
+    # sql-01/sql-02 → блок databases; среднее A = (4+2)/2 = 3.0
+    assert out[a["id"]]["overall"]["avg"] == 3.0
+    assert out[a["id"]]["overall"]["scored"] == 2
+    assert out[a["id"]]["byBlock"]["databases"]["avg"] == 3.0
+    assert out[b["id"]]["byBlock"]["databases"]["avg"] == 5.0
+    # блок без оценок → avg=null, scored=0
+    empty_block = next(bl for bl in data["blocks"] if bl != "databases")
+    assert out[b["id"]]["byBlock"][empty_block]["avg"] is None
+    assert out[b["id"]]["byBlock"][empty_block]["scored"] == 0
+
+
+def test_api_compare_bad_ids():
+    c = _client()
+    assert c.get("/api/sessions/compare?ids=").status_code == 400
+    assert c.get("/api/sessions/compare?ids=abc").status_code == 400
