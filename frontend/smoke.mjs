@@ -118,6 +118,15 @@ const after = await page.evaluate(() => document.documentElement.dataset.theme);
 if (after === before) fail(`theme toggle did not change theme (${before} → ${after})`);
 console.log(`OK: theme toggles (${before} → ${after})`);
 
+// 9. Шпаргалка горячих клавиш: «?» открывает оверлей, Esc закрывает.
+await page.keyboard.press("?");
+await page.waitForSelector(".help-modal", { timeout: 3000 });
+const helpText = await page.locator(".help-modal").innerText();
+if (!helpText.includes("неоценённому")) fail(`help overlay missing shortcuts: "${helpText}"`);
+await page.keyboard.press("Escape");
+await page.waitForSelector(".help-modal", { state: "detached", timeout: 3000 });
+console.log("OK: shortcuts help overlay (? opens, Esc closes)");
+
 if (errors.length) fail(`console/page errors:\n${errors.join("\n")}`);
 
 console.log("\nALL SMOKE CHECKS PASSED ✓");
