@@ -37,7 +37,13 @@ import {
   type ImportErr,
   type QNode,
   type Session,
+  type SessionMeta,
 } from "./types";
+
+// Снимок сессии с сервера → плоская карта оценок, которой оперирует UI.
+function scoresOf(s: { scores: Session["scores"] }): Record<string, number> {
+  return Object.fromEntries(Object.entries(s.scores).map(([id, v]) => [id, v.score]));
+}
 
 const nodeTypes = {
   question: QuestionNode,
@@ -156,6 +162,8 @@ export default function App() {
   const [fullscreen, setFullscreen] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [candidate, setCandidate] = useState("");
+  const [sessions, setSessions] = useState<SessionMeta[]>([]);
+  const [live, setLive] = useState(false);
   const [activeBlocks, setActiveBlocks] = useState<Record<string, boolean>>(ALL_BLOCKS);
   const [activeDiffs, setActiveDiffs] = useState<Record<string, boolean>>(ALL_DIFFS);
   const [activeTags, setActiveTags] = useState<Record<string, boolean>>({});
@@ -310,12 +318,73 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, [placement, currentId, selectedId, applyScore, moveCurrent, nextQuestion]);
 
+  // Привязать активную сессию к URL (?session=<id>) — ссылкой можно поделиться с HR.
+  const setSessionParam = useCallback((id: number | null) => {
+    const url = new URL(window.location.href);
+    if (id == null) url.searchParams.delete("session");
+    else url.searchParams.set("session", String(id));
+    window.history.replaceState(null, "", url.toString());
+  }, []);
+
   const startSession = useCallback(async () => {
     if (!candidate.trim()) return;
     const s = await api.createSession(candidate.trim());
     setSession(s);
-    setScores({});
-  }, [candidate]);
+    setScores(scoresOf(s));
+    setSessionParam(s.id);
+    api.listSessions().then(setSessions).catch(() => void 0);
+  }, [candidate, setSessionParam]);
+
+  // Подключиться к уже существующей сессии (другой интервьюер / HR): подтянуть оценки.
+  const joinSession = useCallback(
+    async (id: number) => {
+      try {
+        const s = await api.getSession(id);
+        setSession(s);
+        setScores(scoresOf(s));
+        setSessionParam(id);
+      } catch {
+        setSessionParam(null);
+      }
+    },
+    [setSessionParam],
+  );
+
+  const leaveSession = useCallback(() => {
+    setSession(null);
+    setLive(false);
+    setSessionParam(null);
+  }, [setSessionParam]);
+
+  // Список сессий для пикера + авто-подключение по ?session=<id> при загрузке.
+  useEffect(() => {
+    api.listSessions().then(setSessions).catch(() => void 0);
+    const fromUrl = new URLSearchParams(window.location.search).get("session");
+    if (fromUrl) joinSession(Number(fromUrl));
+  }, [joinSession]);
+
+  // Live-синхронизация: подписка на SSE-поток активной сессии. Входящие снимки
+  // сливаются объединением, чтобы не затирать только что выставленную локальную оценку.
+  useEffect(() => {
+    if (!session) return;
+    const es = new EventSource(api.eventsUrl(session.id));
+    const merge = (e: MessageEvent) => {
+      try {
+        const snap = JSON.parse(e.data) as Session;
+        setScores((prev) => ({ ...prev, ...scoresOf(snap) }));
+      } catch {
+        /* ignore malformed frame */
+      }
+    };
+    es.addEventListener("snapshot", merge as EventListener);
+    es.addEventListener("update", merge as EventListener);
+    es.onopen = () => setLive(true);
+    es.onerror = () => setLive(false);
+    return () => {
+      es.close();
+      setLive(false);
+    };
+  }, [session]);
 
   const toggleBlock = (b: Block) => setActiveBlocks((s) => ({ ...s, [b]: !s[b] }));
   const toggleDiff = (d: Difficulty) => setActiveDiffs((s) => ({ ...s, [d]: !s[d] }));
@@ -377,9 +446,20 @@ export default function App() {
 
         <div className="session">
           {session ? (
-            <span className="session__active">
-              👤 {session.candidate} · оценено {scored} · средн. {avg}
-            </span>
+            <>
+              <span className="session__active">
+                👤 {session.candidate} · оценено {scored} · средн. {avg}
+              </span>
+              <span
+                className={`livedot ${live ? "livedot--on" : ""}`}
+                title={live ? "Live: изменения синхронизируются с HR" : "Подключение к live…"}
+              >
+                ● {live ? "LIVE" : "…"}
+              </span>
+              <button className="iconbtn" onClick={leaveSession} title="Выйти из сессии">
+                Выйти
+              </button>
+            </>
           ) : (
             <>
               <input
@@ -389,6 +469,21 @@ export default function App() {
                 onKeyDown={(e) => e.key === "Enter" && startSession()}
               />
               <button onClick={startSession}>Начать сессию</button>
+              {sessions.length > 0 && (
+                <select
+                  className="session__pick"
+                  value=""
+                  onChange={(e) => e.target.value && joinSession(Number(e.target.value))}
+                  title="Подключиться к существующей сессии (live)"
+                >
+                  <option value="">Подключиться…</option>
+                  {sessions.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.candidate} · {s.created_at.slice(0, 10)}
+                    </option>
+                  ))}
+                </select>
+              )}
             </>
           )}
           <button
