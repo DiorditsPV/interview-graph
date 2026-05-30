@@ -287,3 +287,7 @@ button:disabled:hover { background: var(--surface); }
 }
 .hud__score { display: flex; gap: 2px; }
 .hud__score .scorebtn { font-size: 18px; }
+.hud__timer {
+  font-size: 13px; font-variant-numeric: tabular-nums; color: var(--text-muted);
+  white-space: nowrap; padding: 0 4px;
+}

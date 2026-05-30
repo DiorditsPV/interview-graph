@@ -146,6 +146,16 @@ const restored = await page.locator(".drawer__note").inputValue();
 if (restored !== noteText) fail(`note not retained across reopen: "${restored}"`);
 console.log("OK: node note retained across reopen");
 
+// 9b. Таймер: HUD показывает M:SS и инкрементируется (есть текущий вопрос с прошлых шагов).
+// (ДО resume-проверки: reload сбрасывает HUD/текущий вопрос.)
+await page.waitForSelector(".hud__timer", { timeout: 3000 });
+const tmr1 = (await page.locator(".hud__timer").first().innerText()).trim();
+if (!/\d+:\d{2}/.test(tmr1)) fail(`timer format wrong: "${tmr1}"`);
+await page.waitForTimeout(1300);
+const tmr2 = (await page.locator(".hud__timer").first().innerText()).trim();
+if (tmr2 === tmr1) fail(`timer not ticking (${tmr1} == ${tmr2})`);
+console.log(`OK: HUD timer ticks (${tmr1} → ${tmr2})`);
+
 // 10. Resume: создать сессию+оценку через API → reload → выбрать в .loadsess → оценки восстановлены.
 // (Делает page.reload() — должна идти ПОСЛЕ проверок, опирающихся на накопленное состояние.)
 const sid = (await (await page.request.post(URL + "api/sessions", { data: { candidate: "SmokeResume" } })).json()).id;
