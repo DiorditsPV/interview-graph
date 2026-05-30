@@ -25,5 +25,6 @@
 - [x] agenda-sidebar (feature/agenda-sidebar) — сайдбар-агенда (.interview): список вопросов из placement.order по блокам, ✓ на оценённых, клик → текущий + центрирование, тоггл в шапке
 - [x] minimap-progress (feature/minimap-progress) — минимапа кодирует прогресс: текущий красным, оценённые серым (+ фикс: v12-минимапе добавлены размеры нод, иначе была пустой)
 - [x] filter-aware-nav (feature/filter-aware-nav) — «Дальше»/стрелки навигируют только по видимым (не-dimmed) нодам через visibleIds
+- [ ] draft-autosave: автосохранение оценок без активной сессии в localStorage + восстановление при перезагрузке (защита от потери «быстрой» оценки); очищать при старте именованной сессии — фронт (App.tsx scores персист/restore).
 
 <!-- feature-build переносит реализованные идеи сюда: - [x] <slug> (feature/<slug>) -->
