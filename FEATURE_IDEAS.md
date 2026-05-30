@@ -12,7 +12,7 @@
 - [x] session-resume (feature/session-resume) — загрузка прошлой сессии кандидата на доску (восстановление оценок)
 - [x] node-notes (feature/node-notes) — заметка интервьюера на вопрос (drawer textarea, персист с оценкой, в отчёте)
 - [x] interview-timer (feature/interview-timer) — таймеры вопроса и сессии в HUD (тик 1с, localStorage)
-- [ ] question-search: строка поиска по тексту вопросов → подсветка/фильтр нод — фронт (App.tsx, filter panel, dimmed-механизм).
+- [x] question-search (feature/question-search) — поиск по тексту вопросов, гасит несовпавшие карточки
 - [ ] unscored-filter: быстрый переключатель «только неоценённые» и «только задачи» — фронт (filter panel + buildNodes).
 - [ ] interview-progress: прогресс-бар пройдено/осталось по выбранному профилю в шапке — фронт (App.tsx topbar).
 - [ ] candidate-compare: сравнение нескольких сессий рядом (средние по блокам) — backend агрегаты + фронт-панель/HTML.
