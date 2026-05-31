@@ -325,6 +325,77 @@ await page.waitForTimeout(200);
 if ((await page.locator(".bankbrowser").count()) !== 0) fail("bank screen did not close on Esc");
 console.log("OK: bank screen closes on Esc");
 
+// 17. topbar-redeclutter: разгруженная шапка — ровно два ряда, панель отображения внутри шапки.
+const topRows = await page.locator(".topbar > .topbar__row").count();
+if (topRows !== 2) fail(`expected 2 topbar rows, got ${topRows}`);
+if ((await page.locator(".topbar .toolbar").count()) !== 1) fail("display toolbar must stay inside topbar");
+console.log(`OK: decluttered topbar (${topRows} rows, toolbar nested)`);
+
+// 18. question-management: добавить вопрос через форму шапки → доска растёт (бэкенд пишет в БД).
+const qBeforeAdd = await page.locator(".qnode").count();
+await page.locator(".addbtn").click();
+await page.waitForSelector(".addform", { timeout: 3000 });
+await page.locator(".addform input").nth(1).fill("smoke-add-topic"); // 2-е поле формы = Тема
+await page.locator(".addform textarea").first().fill("Smoke вопрос-добавление?");
+await page.locator(".addform__btns button", { hasText: "Создать" }).click();
+await page.waitForTimeout(700);
+const qAfterAdd = await page.locator(".qnode").count();
+if (qAfterAdd <= qBeforeAdd) fail(`add-question did not grow board (${qBeforeAdd}→${qAfterAdd})`);
+console.log(`OK: add question grows board (${qBeforeAdd}→${qAfterAdd})`);
+
+// 19. question-management: открыть вопрос → drawer; правка (открыть/Отмена) неразрушающа.
+await page.locator(".qnode__title", { hasText: "ROW_NUMBER" }).first().click();
+await page.waitForSelector(".drawer__edit", { timeout: 3000 });
+await page.locator(".drawer__edit").click();
+await page.waitForSelector(".drawer__editform", { timeout: 3000 });
+await page.locator(".drawer__editform textarea").first().fill("ЧЕРНОВИК — НЕ СОХРАНЯЕМ");
+await page.locator(".drawer__editbtns button", { hasText: "Отмена" }).click();
+await page.waitForTimeout(200);
+if ((await page.locator(".drawer__editform").count()) !== 0) fail("edit form still open after cancel");
+console.log("OK: edit mode opens + cancel is non-destructive");
+
+// hide-local: «Скрыть» гасит карточку; тумблер «Скрытые» помечает её (.qnode--hidden).
+const dimBeforeHide = await page.locator(".qnode--dimmed").count();
+await page.locator(".drawer__hide").click();
+await page.waitForTimeout(250);
+const dimAfterHide = await page.locator(".qnode--dimmed").count();
+if (dimAfterHide <= dimBeforeHide) fail(`hide did not dim node (${dimBeforeHide}→${dimAfterHide})`);
+await page.locator(".tb__toggle", { hasText: "Скрытые" }).click();
+await page.waitForTimeout(250);
+const hiddenMark = await page.locator(".qnode--hidden").count();
+if (hiddenMark < 1) fail("no .qnode--hidden marker after show-hidden");
+await page.locator(".tb__toggle", { hasText: "Скрытые" }).click(); // спрятать обратно
+await page.locator(".drawer__hide").click(); // вернуть карточку на доску
+await page.waitForTimeout(150);
+console.log(`OK: hide dims (${dimBeforeHide}→${dimAfterHide}), show-hidden marks (${hiddenMark})`);
+
+// 20. question-management: удаление — confirm всплывает; dismiss НЕ меняет банк.
+let confirmFired = false;
+page.on("dialog", (d) => { confirmFired = true; d.dismiss(); });
+const qBeforeDel = await page.locator(".qnode").count();
+await page.locator(".drawer__delete").click();
+await page.waitForTimeout(250);
+if (!confirmFired) fail("delete did not raise a confirm dialog");
+if ((await page.locator(".qnode").count()) !== qBeforeDel) fail("dismissed delete changed bank");
+console.log(`OK: delete confirms + dismiss non-destructive (${qBeforeDel} nodes)`);
+
+// 21. draft-autosave: оценка без активной сессии переживает перезагрузку (ПОСЛЕДНЕЙ — делает reload).
+// Снимаем возможный ?session из URL (resume-шаг мог его выставить), чтобы сессии точно не было.
+await page.evaluate(() => {
+  const u = new URL(location.href); u.searchParams.delete("session"); history.replaceState(null, "", u.toString());
+});
+await page.keyboard.press("Escape"); // закрыть drawer
+await page.locator(".qnode__title", { hasText: "ROW_NUMBER" }).first().click();
+await page.waitForSelector(".drawer__scoring .scorebtn", { timeout: 3000 });
+await page.locator(".drawer__scoring .scorebtn").nth(4).click(); // 5/5
+await page.waitForTimeout(200);
+await page.goto(URL, { waitUntil: "networkidle" });
+await page.waitForSelector(".qnode", { timeout: 10000 });
+await page.waitForTimeout(400);
+const restoredScored = await page.locator(".qnode--scored").count();
+if (restoredScored < 1) fail("draft autosave did not restore scores after reload");
+console.log(`OK: draft autosave restores ${restoredScored} scored node(s) after reload`);
+
 if (errors.length) fail(`console/page errors:\n${errors.join("\n")}`);
 
 console.log("\nALL SMOKE CHECKS PASSED ✓");

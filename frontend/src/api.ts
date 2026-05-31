@@ -1,4 +1,32 @@
-import type { Comparison, GraphResponse, ImportResult, Session, SessionMeta, Track } from "./types";
+import type {
+  Block,
+  Comparison,
+  Difficulty,
+  GraphResponse,
+  ImportResult,
+  Session,
+  SessionMeta,
+  Track,
+} from "./types";
+
+// question-management: правка/создание вопроса банка (бэкенд пишет в БД, не в content/*.md).
+export interface NodeUpdate {
+  title?: string;
+  difficulty?: Difficulty;
+  question?: string;
+  answer?: string;
+}
+
+export interface NodeCreate {
+  block: Block;
+  topic: string;
+  difficulty: Difficulty;
+  kind: "question" | "task";
+  title?: string;
+  question: string;
+  answer: string;
+  tags: string[];
+}
 
 // В dev /api проксируется Vite на :8000; в прод тот же origin (раздаёт FastAPI).
 const BASE = "/api";
@@ -36,4 +64,21 @@ export const api = {
       body: JSON.stringify({ filename, content }),
     }).then(json<ImportResult>),
   eventsUrl: (sessionId: number) => `${BASE}/sessions/${sessionId}/events`,
+  // question-management CRUD банка вопросов (источник правды — БД на бэкенде).
+  createNode: (data: NodeCreate) =>
+    fetch(`${BASE}/nodes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }).then(json<{ id: string; block: string; title: string }>),
+  updateNode: (id: string, fields: NodeUpdate) =>
+    fetch(`${BASE}/nodes/${encodeURIComponent(id)}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(fields),
+    }).then(json<{ updated: string }>),
+  deleteNode: (id: string) =>
+    fetch(`${BASE}/nodes/${encodeURIComponent(id)}`, { method: "DELETE" }).then(
+      json<{ deleted: string }>,
+    ),
 };

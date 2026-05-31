@@ -10,7 +10,7 @@ import {
   type ReactFlowInstance,
 } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api } from "./api";
+import { api, type NodeCreate, type NodeUpdate } from "./api";
 import { BandsNode } from "./components/BandsNode";
 import { BankBrowser } from "./components/BankBrowser";
 import { BlockGroupNode } from "./components/BlockGroupNode";
@@ -90,6 +90,8 @@ function buildNodes(
   trackInclude: string[],
   query: string,
   unscoredOnly: boolean,
+  hiddenIds: Set<string>,
+  showHidden: boolean,
   guidesH: boolean,
   guidesV: boolean,
 ): Node[] {
@@ -151,6 +153,8 @@ function buildNodes(
     const pos = p.positions[n.id];
     if (!pos) continue;
     const tagOk = !anyTag || n.tags.some((t) => activeTags[t]);
+    // hide-local: скрытый вопрос гасится (если не показываем скрытые); при показе — помечается.
+    const hidden = hiddenIds.has(n.id);
     const dimmed =
       !activeBlocks[n.block] ||
       !activeDiffs[n.difficulty] ||
@@ -158,12 +162,13 @@ function buildNodes(
       !tagOk ||
       !nodeInTrack(n, trackInclude) ||
       !matchesQuery(n, query) ||
-      (unscoredOnly && scores[n.id] != null);
+      (unscoredOnly && scores[n.id] != null) ||
+      (hidden && !showHidden);
     nodes.push({
       id: n.id,
       type: "question",
       position: pos,
-      data: { node: n, score: scores[n.id], current: n.id === currentId, dimmed },
+      data: { node: n, score: scores[n.id], current: n.id === currentId, dimmed, hidden: hidden && showHidden },
       selected: n.id === selectedId,
       draggable: false,
       selectable: !dimmed,
@@ -174,22 +179,62 @@ function buildNodes(
   return nodes;
 }
 
+// hide-local: набор локально скрытых id (в localStorage). Читаем безопасно.
+function readHiddenIds(): Set<string> {
+  try {
+    const raw = JSON.parse(localStorage.getItem("hiddenIds") || "[]");
+    return new Set(Array.isArray(raw) ? raw.filter((x) => typeof x === "string") : []);
+  } catch {
+    return new Set();
+  }
+}
+
+// draft-autosave: черновик оценок (без активной сессии) — устойчивость к refresh/крашу.
+function readDraftScores(): Record<string, number> {
+  try {
+    const raw = JSON.parse(localStorage.getItem("draftScores") || "{}");
+    if (!raw || typeof raw !== "object") return {};
+    const out: Record<string, number> = {};
+    for (const [k, v] of Object.entries(raw)) if (typeof v === "number") out[k] = v;
+    return out;
+  } catch {
+    return {};
+  }
+}
+
 const ALL_BLOCKS: Record<string, boolean> = Object.fromEntries(BLOCK_ORDER.map((b) => [b, true]));
 const ALL_DIFFS: Record<string, boolean> = Object.fromEntries(DIFFS.map((d) => [d, true]));
 const KINDS = ["question", "task"] as const;
 const KIND_LABEL: Record<string, string> = { question: "вопрос", task: "задача" };
 const KIND_COLOR: Record<string, string> = { question: "#2563eb", task: "#9333ea" };
 const ALL_KINDS: Record<string, boolean> = { question: true, task: true };
+// question-management: пустой черновик формы добавления вопроса.
+const EMPTY_ADD = {
+  block: "databases",
+  topic: "",
+  difficulty: "middle",
+  kind: "question",
+  title: "",
+  question: "",
+  answer: "",
+  tags: "",
+};
 
 export default function App() {
   const [graph, setGraph] = useState<QNode[]>([]);
   const [errors, setErrors] = useState<ImportErr[]>([]);
   const [placement, setPlacement] = useState<Placement | null>(null);
-  const [scores, setScores] = useState<Record<string, number>>({});
+  const [scores, setScores] = useState<Record<string, number>>(readDraftScores);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
   const [showBank, setShowBank] = useState(false);
+  // hide-local: скрытые с доски вопросы (клиентски) + тумблер показа.
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(readHiddenIds);
+  const [showHidden, setShowHidden] = useState(false);
+  // question-management: модалка добавления вопроса + её черновик.
+  const [addOpen, setAddOpen] = useState(false);
+  const [addDraft, setAddDraft] = useState(EMPTY_ADD);
   const [session, setSession] = useState<Session | null>(null);
   const [candidate, setCandidate] = useState("");
   const [pastSessions, setPastSessions] = useState<SessionSummary[]>([]);
@@ -237,6 +282,27 @@ export default function App() {
   useEffect(() => localStorage.setItem("guidesV", guidesV ? "1" : "0"), [guidesV]);
   useEffect(() => localStorage.setItem("track", activeTrack), [activeTrack]);
   useEffect(() => localStorage.setItem("agendaOpen", agendaOpen ? "1" : "0"), [agendaOpen]);
+  // hide-local: персист набора скрытых id.
+  useEffect(() => localStorage.setItem("hiddenIds", JSON.stringify([...hiddenIds])), [hiddenIds]);
+  // draft-autosave: persist черновика оценок, пока нет активной сессии (в сессии — БД источник правды).
+  useEffect(() => {
+    if (session) return;
+    try {
+      localStorage.setItem("draftScores", JSON.stringify(scores));
+    } catch {
+      /* ignore quota errors */
+    }
+  }, [scores, session]);
+
+  // hide-local: скрыть/вернуть вопрос на доску (клиентски, не трогает банк/БД).
+  const toggleHide = useCallback((id: string) => {
+    setHiddenIds((s) => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
 
   // Таймеры: сброс «времени на вопрос» при смене текущего; старт «времени сессии» при первом выборе.
   useEffect(() => {
@@ -322,6 +388,67 @@ export default function App() {
     loadGraph();
   }, [loadGraph]);
 
+  // question-management: удалить вопрос из банка (DELETE → перечитать граф → снять выбор/оценку).
+  const deleteNode = useCallback(
+    async (id: string) => {
+      try {
+        await api.deleteNode(id);
+      } catch {
+        alert("Не удалось удалить вопрос");
+        return;
+      }
+      await loadGraph();
+      setSelectedId((s) => (s === id ? null : s));
+      setCurrentId((c) => (c === id ? null : c));
+      setScores((prev) => {
+        if (!(id in prev)) return prev;
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+    },
+    [loadGraph],
+  );
+
+  // question-management: правка структурных полей вопроса (PUT → перечитать граф).
+  const updateNode = useCallback(
+    async (id: string, fields: NodeUpdate) => {
+      try {
+        await api.updateNode(id, fields);
+      } catch {
+        alert("Не удалось сохранить изменения");
+        return;
+      }
+      await loadGraph();
+    },
+    [loadGraph],
+  );
+
+  // question-management: создать вопрос из формы шапки (POST → перечитать граф → выбрать новый).
+  const createNode = useCallback(async () => {
+    const payload: NodeCreate = {
+      block: addDraft.block as Block,
+      topic: addDraft.topic.trim(),
+      difficulty: addDraft.difficulty as Difficulty,
+      kind: addDraft.kind as "question" | "task",
+      title: addDraft.title.trim() || undefined,
+      question: addDraft.question,
+      answer: addDraft.answer,
+      tags: addDraft.tags.split(",").map((t) => t.trim()).filter(Boolean),
+    };
+    let res: { id: string };
+    try {
+      res = await api.createNode(payload);
+    } catch {
+      alert("Не удалось создать вопрос");
+      return;
+    }
+    await loadGraph();
+    setAddOpen(false);
+    setAddDraft(EMPTY_ADD);
+    setSelectedId(res.id);
+  }, [addDraft, loadGraph]);
+
   useEffect(() => {
     api.tracks().then(setTracks).catch(() => setTracks([]));
   }, []);
@@ -333,9 +460,9 @@ export default function App() {
   const rfNodes = useMemo(
     () =>
       placement
-        ? buildNodes(graph, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, trackInclude, query.toLowerCase().trim(), unscoredOnly, guidesH, guidesV)
+        ? buildNodes(graph, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, trackInclude, query.toLowerCase().trim(), unscoredOnly, hiddenIds, showHidden, guidesH, guidesV)
         : [],
-    [graph, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, trackInclude, query, unscoredOnly, guidesH, guidesV],
+    [graph, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, trackInclude, query, unscoredOnly, hiddenIds, showHidden, guidesH, guidesV],
   );
 
   const centerOn = useCallback(
@@ -471,6 +598,8 @@ export default function App() {
 
   const startSession = useCallback(async () => {
     if (!candidate.trim()) return;
+    // draft-autosave: именованная сессия персистит в БД — локальный черновик больше не нужен.
+    localStorage.removeItem("draftScores");
     const s = await api.createSession(candidate.trim());
     setSession(s);
     setScores(scoresOf(s));
@@ -584,6 +713,8 @@ export default function App() {
   return (
     <div className="app">
       <header className="topbar">
+        {/* topbar-redeclutter, ряд 1 — поток интервью: направление, прогресс, сессия */}
+        <div className="topbar__row topbar__row--flow">
         <strong>Интервью · граф вопросов</strong>
         <span className="muted">{graph.length} нод</span>
 
@@ -611,7 +742,10 @@ export default function App() {
             оценено {coverage.done} / {coverage.total} ({coverage.pct}%)
           </span>
         </div>
+        </div>
 
+        {/* topbar-redeclutter, ряд 2 — служебное: отображение холста, контент/аналитика, переключатели */}
+        <div className="topbar__row topbar__row--utility">
         <div className="toolbar" role="group" aria-label="Отображение холста">
           <button
             className={`tb__toggle ${bgVariant === "dots" ? "tb__toggle--on" : ""}`}
@@ -645,6 +779,13 @@ export default function App() {
             title="Сайдбар-агенда: список вопросов с переходом"
           >
             ☰ Агенда
+          </button>
+          <button
+            className={`tb__toggle ${showHidden ? "tb__toggle--on" : ""}`}
+            onClick={() => setShowHidden((v) => !v)}
+            title={`Скрытые вопросы (${hiddenIds.size}) — показать/спрятать`}
+          >
+            🙈 Скрытые{hiddenIds.size ? ` (${hiddenIds.size})` : ""}
           </button>
         </div>
 
@@ -706,6 +847,13 @@ export default function App() {
             </>
           )}
           <button
+            className="iconbtn addbtn"
+            onClick={() => setAddOpen(true)}
+            title="Добавить вопрос в банк"
+          >
+            ＋ Вопрос
+          </button>
+          <button
             className="iconbtn uploadbtn"
             onClick={() => setUploadOpen(true)}
             title="Загрузить вопросы (.md/.json)"
@@ -766,6 +914,7 @@ export default function App() {
           >
             {theme === "dark" ? "☀️" : "🌙"}
           </button>
+        </div>
         </div>
       </header>
 
@@ -993,8 +1142,12 @@ export default function App() {
           score={selectedId ? scores[selectedId] : undefined}
           note={selectedId ? notes[selectedId] : undefined}
           fullscreen={fullscreen}
+          hidden={selectedId ? hiddenIds.has(selectedId) : false}
+          onToggleHide={toggleHide}
           onScore={applyScore}
           onNote={setNote}
+          onDelete={deleteNode}
+          onUpdate={updateNode}
           onToggleFullscreen={() => setFullscreen((f) => !f)}
           onClose={() => {
             setSelectedId(null);
@@ -1008,6 +1161,72 @@ export default function App() {
         <UploadModal onClose={() => setUploadOpen(false)} onImported={loadGraph} />
       )}
       {showBank && <BankBrowser nodes={graph} onClose={() => setShowBank(false)} />}
+
+      {/* question-management: модалка добавления вопроса в банк */}
+      {addOpen && (
+        <div className="modal" onClick={() => setAddOpen(false)}>
+          <div className="modal__card addform" onClick={(e) => e.stopPropagation()}>
+            <h3>Новый вопрос</h3>
+            <div className="addform__row">
+              <label className="drawer__field">
+                Блок
+                <select value={addDraft.block} onChange={(e) => setAddDraft({ ...addDraft, block: e.target.value })}>
+                  {BLOCK_ORDER.map((b) => (
+                    <option key={b} value={b}>{BLOCK_LABEL[b as Block]}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="drawer__field">
+                Тема
+                <input
+                  value={addDraft.topic}
+                  onChange={(e) => setAddDraft({ ...addDraft, topic: e.target.value })}
+                  placeholder="например, sql"
+                />
+              </label>
+            </div>
+            <div className="addform__row">
+              <label className="drawer__field">
+                Сложность
+                <select value={addDraft.difficulty} onChange={(e) => setAddDraft({ ...addDraft, difficulty: e.target.value })}>
+                  {DIFFS.map((d) => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="drawer__field">
+                Тип
+                <select value={addDraft.kind} onChange={(e) => setAddDraft({ ...addDraft, kind: e.target.value })}>
+                  <option value="question">вопрос</option>
+                  <option value="task">задача</option>
+                </select>
+              </label>
+            </div>
+            <label className="drawer__field">
+              Заголовок
+              <input value={addDraft.title} onChange={(e) => setAddDraft({ ...addDraft, title: e.target.value })} />
+            </label>
+            <label className="drawer__field">
+              {addDraft.kind === "task" ? "Задача" : "Вопрос"}
+              <textarea rows={3} value={addDraft.question} onChange={(e) => setAddDraft({ ...addDraft, question: e.target.value })} />
+            </label>
+            <label className="drawer__field">
+              {addDraft.kind === "task" ? "Эталон / решение" : "Ответ"}
+              <textarea rows={5} value={addDraft.answer} onChange={(e) => setAddDraft({ ...addDraft, answer: e.target.value })} />
+            </label>
+            <label className="drawer__field">
+              Теги (через запятую)
+              <input value={addDraft.tags} onChange={(e) => setAddDraft({ ...addDraft, tags: e.target.value })} />
+            </label>
+            <div className="addform__btns">
+              <button className="btn--primary" onClick={createNode} disabled={!addDraft.topic.trim() || !addDraft.question.trim()}>
+                Создать
+              </button>
+              <button onClick={() => setAddOpen(false)}>Отмена</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
