@@ -20,3 +20,5 @@ frontend/dist-demo/
 # deploy: локальная пара ключей раннера (НЕ коммитить)
 /.deploy/
 .claude/*.lock
+.idea
+last_run.json

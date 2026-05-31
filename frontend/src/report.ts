@@ -22,12 +22,20 @@ function pad(n: number): string {
   return String(n).padStart(2, "0");
 }
 
+// people-schema: люди в шапке отчёта (интервьюер + позиция/грейд кандидата).
+export interface ReportPeople {
+  interviewer?: string | null;
+  position?: string | null;
+  seniority?: string | null;
+}
+
 export function buildReportHtml(
   candidate: string,
   nodes: QNode[],
   scores: Record<string, number>,
   trackLabel?: string,
   notes?: Record<string, string>,
+  people?: ReportPeople,
 ): string {
   const now = new Date();
   const dateStr = `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
@@ -146,8 +154,12 @@ export function buildReportHtml(
   <div class="sheet">
     <div class="head">
       <h1>Результаты интервью</h1>
-      <div class="sub">Кандидат: <b>${esc(candidate || "—")}</b> · ${dateStr}${
-        trackLabel ? ` · направление: <b>${esc(trackLabel)}</b>` : ""
+      <div class="sub">Кандидат: <b>${esc(candidate || "—")}</b>${
+        people?.position || people?.seniority
+          ? ` (${esc([people?.position, people?.seniority].filter(Boolean).join(", "))})`
+          : ""
+      } · ${dateStr}${trackLabel ? ` · направление: <b>${esc(trackLabel)}</b>` : ""}${
+        people?.interviewer ? ` · интервьюер: <b>${esc(people.interviewer)}</b>` : ""
       }</div>
     </div>
     <div class="summary">
@@ -299,8 +311,9 @@ export function downloadReport(
   scores: Record<string, number>,
   trackLabel?: string,
   notes?: Record<string, string>,
+  people?: ReportPeople,
 ): void {
-  const html = buildReportHtml(candidate, nodes, scores, trackLabel, notes);
+  const html = buildReportHtml(candidate, nodes, scores, trackLabel, notes, people);
   const blob = new Blob([html], { type: "text/html;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const now = new Date();

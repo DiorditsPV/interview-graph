@@ -217,10 +217,21 @@ const tagsAgain = await page.locator(".fp__tag").count();
 if (tagsAgain !== tagsBefore) fail(`tag panel did not restore (${tagsAgain} vs ${tagsBefore})`);
 console.log(`OK: tag panel collapse toggle (${tagsBefore} ⇄ 0)`);
 
-// 10. Сравнение кандидатов: старт сессии (сессии ещё нет) → оценка текущего через HUD → модалка-агрегат.
-await page.locator(".session input").fill("Cmp Bot");
+// 10. people-schema: старт сессии через пикер кандидата (ввод имени → создаётся карточка) +
+//     дефолтный интервьюер преселектится и показывается в шапке активной сессии.
+//     Затем оценка текущего через HUD → модалка-сравнения агрегирует.
+// Дефолтный интервьюер засеян на бэкенде → селектор интервьюера присутствует.
+const ivPick = page.locator(".iv-pick");
+if ((await ivPick.count()) < 1) fail("interviewer picker (.iv-pick) missing at session start");
+// Имя нового кандидата в специальный input (несколько input'ов: имя/позиция/грейд).
+await page.locator(".session input[placeholder='Кандидат…']").fill("Cmp Bot");
+await page.locator(".session input[placeholder^='Грейд']").fill("middle");
 await page.locator(".session button", { hasText: "Начать сессию" }).click();
 await page.waitForSelector(".session__active", { timeout: 3000 });
+const activeHdr = await page.locator(".session__active").innerText();
+if (!activeHdr.includes("Cmp Bot")) fail(`active session missing candidate: "${activeHdr}"`);
+if (!activeHdr.includes("🎤")) fail(`active session missing interviewer marker: "${activeHdr}"`);
+console.log(`OK: session start picks candidate + interviewer (${activeHdr.replace(/\s+/g, " ").slice(0, 50)})`);
 await page.waitForSelector(".hud__score .scorebtn", { timeout: 3000 });
 await page.locator(".hud__score .scorebtn").nth(2).click(); // 3/5 → персист в сессию
 await page.waitForTimeout(400);
@@ -335,7 +346,7 @@ console.log(`OK: decluttered topbar (${topRows} rows, toolbar nested)`);
 const qBeforeAdd = await page.locator(".qnode").count();
 await page.locator(".addbtn").click();
 await page.waitForSelector(".addform", { timeout: 3000 });
-await page.locator(".addform input").nth(1).fill("smoke-add-topic"); // 2-е поле формы = Тема
+await page.locator(".addform input[placeholder^='например']").fill("smoke-add-topic"); // поле «Тема» (обязательное)
 await page.locator(".addform textarea").first().fill("Smoke вопрос-добавление?");
 await page.locator(".addform__btns button", { hasText: "Создать" }).click();
 await page.waitForTimeout(700);
