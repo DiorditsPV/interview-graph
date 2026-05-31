@@ -92,14 +92,14 @@ tags: [spark, optimization]
 
 ## API
 
-| метод | путь | назначение |
-|---|---|---|
-| GET | `/api/graph` | ноды + ошибки импорта |
-| GET | `/api/weights` | веса блоков |
-| POST | `/api/interview` | собрать набор вопросов пропорц. весам (`{count, difficulties?, seed?}`) |
-| POST | `/api/sessions` | создать сессию кандидата |
-| POST | `/api/sessions/{id}/score` | выставить оценку (`{nodeId, score}`) |
-| GET | `/api/sessions/{id}` | сессия с оценками |
+| метод | путь                       | назначение                                                              |
+| ----- | -------------------------- | ----------------------------------------------------------------------- |
+| GET   | `/api/graph`               | ноды + ошибки импорта                                                   |
+| GET   | `/api/weights`             | веса блоков                                                             |
+| POST  | `/api/interview`           | собрать набор вопросов пропорц. весам (`{count, difficulties?, seed?}`) |
+| POST  | `/api/sessions`            | создать сессию кандидата                                                |
+| POST  | `/api/sessions/{id}/score` | выставить оценку (`{nodeId, score}`)                                    |
+| GET   | `/api/sessions/{id}`       | сессия с оценками                                                       |
 
 ## Тесты
 
