@@ -1,9 +1,11 @@
 import type {
   Block,
+  Candidate,
   Comparison,
   Difficulty,
   GraphResponse,
   ImportResult,
+  Interviewer,
   Session,
   SessionMeta,
   Track,
@@ -40,11 +42,11 @@ export const api = {
   graph: () => fetch(`${BASE}/graph`).then(json<GraphResponse>),
   weights: () => fetch(`${BASE}/weights`).then(json<Record<string, number>>),
   tracks: () => fetch(`${BASE}/tracks`).then(json<Track[]>),
-  createSession: (candidate: string) =>
+  createSession: (candidate: string, candidateId?: number, interviewerId?: number) =>
     fetch(`${BASE}/sessions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ candidate }),
+      body: JSON.stringify({ candidate, candidateId, interviewerId }),
     }).then(json<Session>),
   setScore: (sessionId: number, nodeId: string, score: number, note?: string) =>
     fetch(`${BASE}/sessions/${sessionId}/score`, {
@@ -81,4 +83,31 @@ export const api = {
     fetch(`${BASE}/nodes/${encodeURIComponent(id)}`, { method: "DELETE" }).then(
       json<{ deleted: string }>,
     ),
+  // people-schema: кандидаты и интервьюеры (сущности БD, per-tenant на бэкенде).
+  listCandidates: () => fetch(`${BASE}/candidates`).then(json<Candidate[]>),
+  createCandidate: (data: {
+    name: string;
+    position?: string;
+    seniority?: string;
+    contact?: string;
+    note?: string;
+  }) =>
+    fetch(`${BASE}/candidates`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }).then(json<Candidate>),
+  updateCandidate: (id: number, fields: Partial<Omit<Candidate, "id">>) =>
+    fetch(`${BASE}/candidates/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(fields),
+    }).then(json<Candidate>),
+  listInterviewers: () => fetch(`${BASE}/interviewers`).then(json<Interviewer[]>),
+  createInterviewer: (data: { name: string; email?: string; role?: string }) =>
+    fetch(`${BASE}/interviewers`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }).then(json<Interviewer>),
 };

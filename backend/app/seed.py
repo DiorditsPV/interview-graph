@@ -26,3 +26,16 @@ def seed_tenant_if_empty(db: Database, tenant_id: str, content_dir: Path) -> Tup
     rows = [n.model_dump() for n in nodes]
     inserted = db.seed_nodes(tenant_id, rows)
     return inserted, errors
+
+
+def seed_interviewer_if_empty(db: Database, tenant_id: str) -> int:
+    """Сид одного интервьюера по умолчанию («Я») при пустой таблице interviewers тенанта.
+
+    Без auth у сессии всё равно должен быть проводивший: дефолтный интервьюер
+    преселектится в UI. Идемпотентно: при непустой таблице ничего не делает.
+    """
+    db.ensure_tenant(tenant_id)
+    if db.count_interviewers(tenant_id) > 0:
+        return 0
+    db.create_interviewer(tenant_id, {"name": "Я", "role": "Ведущий"})
+    return 1

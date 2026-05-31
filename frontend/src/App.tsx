@@ -38,8 +38,10 @@ import {
   DIFF_COLOR,
   nodeInTrack,
   type Block,
+  type Candidate,
   type Difficulty,
   type ImportErr,
+  type Interviewer,
   type QNode,
   type Session,
   type SessionMeta,
@@ -237,6 +239,13 @@ export default function App() {
   const [addDraft, setAddDraft] = useState(EMPTY_ADD);
   const [session, setSession] = useState<Session | null>(null);
   const [candidate, setCandidate] = useState("");
+  // people-schema: кандидаты/интервьюеры как сущности БД + выбор при старте сессии.
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [interviewers, setInterviewers] = useState<Interviewer[]>([]);
+  const [pickedCandidateId, setPickedCandidateId] = useState<number | null>(null);
+  const [pickedInterviewerId, setPickedInterviewerId] = useState<number | null>(null);
+  const [candPosition, setCandPosition] = useState("");
+  const [candSeniority, setCandSeniority] = useState("");
   const [pastSessions, setPastSessions] = useState<SessionSummary[]>([]);
   const [sessions, setSessions] = useState<SessionMeta[]>([]);
   const [live, setLive] = useState(false);
@@ -597,10 +606,34 @@ export default function App() {
   }, []);
 
   const startSession = useCallback(async () => {
-    if (!candidate.trim()) return;
+    // people-schema: либо выбран существующий кандидат (pickedCandidateId), либо вводим имя.
+    let candidateId = pickedCandidateId;
+    let name = candidate.trim();
+    if (candidateId != null) {
+      name = candidates.find((c) => c.id === candidateId)?.name ?? name;
+    }
+    if (candidateId == null && !name) return;
     // draft-autosave: именованная сессия персистит в БД — локальный черновик больше не нужен.
     localStorage.removeItem("draftScores");
-    const s = await api.createSession(candidate.trim());
+    // Новое имя без выбранной карточки → завести кандидата (с опц. позицией/грейдом).
+    if (candidateId == null && name) {
+      try {
+        const created = await api.createCandidate({
+          name,
+          position: candPosition.trim() || undefined,
+          seniority: candSeniority.trim() || undefined,
+        });
+        candidateId = created.id;
+        setCandidates((cs) => [...cs, created]);
+      } catch {
+        /* при сбое создания кандидата всё равно стартуем сессию по свободному имени */
+      }
+    }
+    const s = await api.createSession(
+      name || "—",
+      candidateId ?? undefined,
+      pickedInterviewerId ?? undefined,
+    );
     setSession(s);
     setScores(scoresOf(s));
     setSessionParam(s.id);
@@ -612,7 +645,15 @@ export default function App() {
     const t = Date.now();
     setSessionStart(t);
     localStorage.setItem("timerStart", String(t));
-  }, [candidate, setSessionParam]);
+  }, [
+    candidate,
+    candidates,
+    pickedCandidateId,
+    pickedInterviewerId,
+    candPosition,
+    candSeniority,
+    setSessionParam,
+  ]);
 
   // Подключиться к уже существующей сессии (другой интервьюер / HR): подтянуть оценки.
   const joinSession = useCallback(
@@ -641,6 +682,18 @@ export default function App() {
     const fromUrl = new URLSearchParams(window.location.search).get("session");
     if (fromUrl) joinSession(Number(fromUrl));
   }, [joinSession]);
+
+  // people-schema: подтянуть кандидатов и интервьюеров; преселект дефолтного интервьюера.
+  useEffect(() => {
+    api.listCandidates().then(setCandidates).catch(() => void 0);
+    api
+      .listInterviewers()
+      .then((iv) => {
+        setInterviewers(iv);
+        setPickedInterviewerId((cur) => cur ?? (iv.length ? iv[0].id : null));
+      })
+      .catch(() => void 0);
+  }, []);
 
   // Live-синхронизация: подписка на SSE-поток активной сессии. Входящие снимки
   // сливаются объединением, чтобы не затирать только что выставленную локальную оценку.
@@ -681,6 +734,16 @@ export default function App() {
 
   const scored = Object.keys(scores).length;
   const avg = scored > 0 ? (Object.values(scores).reduce((a, b) => a + b, 0) / scored).toFixed(1) : "—";
+  // people-schema: интервьюер + позиция/грейд кандидата для шапки отчёта.
+  const reportPeople = useMemo(() => {
+    const iv = interviewers.find((i) => i.id === session?.interviewer_id) ?? interviewers.find((i) => i.id === pickedInterviewerId);
+    const cand = candidates.find((c) => c.id === (session?.candidate_id ?? pickedCandidateId));
+    return {
+      interviewer: iv?.name ?? null,
+      position: cand?.position ?? null,
+      seniority: cand?.seniority ?? null,
+    };
+  }, [interviewers, candidates, session, pickedInterviewerId, pickedCandidateId]);
   const progress = useMemo(() => {
     const out: Record<string, { done: number; total: number }> = {};
     for (const b of BLOCK_ORDER) out[b] = { done: 0, total: 0 };
@@ -793,7 +856,12 @@ export default function App() {
           {session ? (
             <>
               <span className="session__active">
-                👤 {session.candidate} · оценено {scored} · средн. {avg}
+                👤 {session.candidate}
+                {(() => {
+                  const iv = interviewers.find((i) => i.id === session.interviewer_id);
+                  return iv ? ` · 🎤 ${iv.name}` : "";
+                })()}
+                {" · "}оценено {scored} · средн. {avg}
               </span>
               <span
                 className={`livedot ${live ? "livedot--on" : ""}`}
@@ -807,12 +875,65 @@ export default function App() {
             </>
           ) : (
             <>
-              <input
-                placeholder="Кандидат…"
-                value={candidate}
-                onChange={(e) => setCandidate(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && startSession()}
-              />
+              {candidates.length > 0 && (
+                <select
+                  className="cand-pick"
+                  value={pickedCandidateId ?? ""}
+                  onChange={(e) => {
+                    const v = e.target.value ? Number(e.target.value) : null;
+                    setPickedCandidateId(v);
+                    if (v != null) setCandidate("");
+                  }}
+                  title="Выбрать существующего кандидата"
+                >
+                  <option value="">Новый кандидат…</option>
+                  {candidates.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                      {c.seniority ? ` · ${c.seniority}` : ""}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {pickedCandidateId == null && (
+                <>
+                  <input
+                    placeholder="Кандидат…"
+                    value={candidate}
+                    onChange={(e) => setCandidate(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && startSession()}
+                  />
+                  <input
+                    className="cand-pos"
+                    placeholder="Позиция (опц.)"
+                    value={candPosition}
+                    onChange={(e) => setCandPosition(e.target.value)}
+                  />
+                  <input
+                    className="cand-sen"
+                    placeholder="Грейд (опц.)"
+                    value={candSeniority}
+                    onChange={(e) => setCandSeniority(e.target.value)}
+                  />
+                </>
+              )}
+              {interviewers.length > 0 && (
+                <select
+                  className="iv-pick"
+                  value={pickedInterviewerId ?? ""}
+                  onChange={(e) =>
+                    setPickedInterviewerId(e.target.value ? Number(e.target.value) : null)
+                  }
+                  title="Кто проводит интервью"
+                >
+                  {interviewers.map((iv) => (
+                    <option key={iv.id} value={iv.id}>
+                      {iv.name}
+                      {iv.role ? ` · ${iv.role}` : ""}
+                    </option>
+                  ))}
+                </select>
+              )}
               <button onClick={startSession}>Начать сессию</button>
               {pastSessions.length > 0 && (
                 <select
@@ -870,7 +991,7 @@ export default function App() {
           </button>
           <button
             className="iconbtn dlbtn"
-            onClick={() => downloadReport(session?.candidate ?? candidate, graph, scores, trackLabel, notes)}
+            onClick={() => downloadReport(session?.candidate ?? candidate, graph, scores, trackLabel, notes, reportPeople)}
             disabled={scored === 0}
             title={scored === 0 ? "Сначала выставьте оценки" : "Скачать результаты (HTML)"}
           >
@@ -879,7 +1000,7 @@ export default function App() {
           {graph.length > 0 && scored === graph.length && (
             <button
               className="cta-done"
-              onClick={() => downloadReport(session?.candidate ?? candidate, graph, scores)}
+              onClick={() => downloadReport(session?.candidate ?? candidate, graph, scores, trackLabel, notes, reportPeople)}
               title="Все вопросы оценены — скачать итоговый отчёт"
             >
               ✓ Завершить · Скачать отчёт
