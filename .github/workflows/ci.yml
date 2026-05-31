@@ -1,0 +1,84 @@
+name: CI
+
+# Гейт качества + durability. Гоняется на КАЖДОМ PR в dev/main и на push в feature/*.
+# Главная цель: ни одна фича не вливается без зелёной сборки/тестов/smoke, а сам факт
+# прогона на GitHub-раннере означает, что код уже в origin (не «потеряется» с эфемерным
+# контейнером, как это случилось с local-only autodev-ветками).
+on:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches:
+      - "feature/**"
+      - "fix/**"
+      - "ci/**"
+  workflow_dispatch: {}
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # --- 1. Фронт: типы + бандл (tsc --noEmit + vite build) ---
+      - name: Frontend build (tsc + vite)
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      # --- 2. Бэкенд: зависимости ---
+      - name: Backend deps
+        working-directory: backend
+        run: pip install -r requirements.txt
+
+      # --- 3. Импорт контента: 0 ошибок (офлайн, без сервера) ---
+      - name: Content import check
+        working-directory: backend
+        run: |
+          python -c "import sys; from pathlib import Path; from app.importer import load_content; \
+          ns, errs = load_content(Path('../content')); \
+          print(f'{len(ns)} nodes, {len(errs)} errors'); \
+          [print('ERR:', e) for e in errs]; \
+          sys.exit(1 if errs else 0)"
+
+      # --- 4. Backend-тесты ---
+      - name: Pytest
+        working-directory: backend
+        env:
+          INTERVIEW_DB_PATH: /tmp/iv_ci.db
+        run: python -m pytest -q
+
+      # --- 5. Браузер для smoke (на раннере — без allowlist-ограничений) ---
+      - name: Install Playwright Chromium
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      # --- 6. Smoke: реальный рантайм против собранного dist ---
+      - name: Smoke (headless runtime)
+        env:
+          INTERVIEW_DB_PATH: /tmp/iv_smoke.db
+          SMOKE_URL: http://localhost:8000/
+        run: |
+          cd backend
+          python -m uvicorn app.main:app --port 8000 > /tmp/uvicorn.log 2>&1 &
+          for i in $(seq 1 40); do curl -sf http://localhost:8000/api/graph >/dev/null && break; sleep 0.5; done
+          cd ../frontend
+          npm run smoke

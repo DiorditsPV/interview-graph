@@ -56,9 +56,35 @@ export interface ImportResult {
   errors: ImportErr[];
 }
 
+// Кандидат/специалист (people-schema) — запись в БД, история сессий по candidate_id.
+export interface Candidate {
+  id: number;
+  tenant_id?: string;
+  name: string;
+  position?: string | null;
+  seniority?: string | null;
+  contact?: string | null;
+  note?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// Интервьюер (кто проводит). user_id — шов к auth-пользователю (пока null).
+export interface Interviewer {
+  id: number;
+  tenant_id?: string;
+  name: string;
+  email?: string | null;
+  role?: string | null;
+  user_id?: string | null;
+  created_at?: string;
+}
+
 export interface SessionMeta {
   id: number;
   candidate: string;
+  candidate_id?: number | null;
+  interviewer_id?: number | null;
   created_at: string;
 }
 
@@ -70,6 +96,8 @@ export interface Session extends SessionMeta {
 export interface SessionSummary {
   id: number;
   candidate: string;
+  candidate_id?: number | null;
+  interviewer_id?: number | null;
   created_at: string;
 }
 
