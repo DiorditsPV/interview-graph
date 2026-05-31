@@ -1,11 +1,11 @@
 ---
 slug: people-schema
 title: Люди интервью — интервьюеры и кандидаты (tenant-ready)
-status: designed        # designed -> building -> done
+status: done            # designed -> building -> done
 created: 2026-05-30
 branch: feature/people-schema
-verify: —
-review: —
+verify: import 61 nodes / 0 errors; pytest 54 passed (incl. test_people.py 14: candidate CRUD, interviewer create/list, tenant isolation candidates+interviewers, sessions_by_candidate, create_session with candidate_id/interviewer_id, old-DB schema migration); frontend tsc+vite build OK; smoke ALL PASSED (download artifact reads "download" not "*.html" in sandbox — accepted).
+review: tables interviewers+candidates added with composite PK (tenant_id,id); sessions extended via guarded ALTER ADD COLUMN (PRAGMA table_info) — old free-text sessions load unchanged; all DAL methods filter by tenant_id; endpoints /api/candidates (GET/POST/PUT), /api/interviewers (GET/POST), /api/sessions accepts candidateId/interviewerId; default interviewer «Я» seeded; UI candidate picker (select existing / create new with position+seniority) + interviewer select (default preselected) at session start, interviewer shown in HUD header and report.
 ---
 
 ## Проблема / цель
@@ -105,24 +105,24 @@ CREATE TABLE IF NOT EXISTS candidates (
   проставить `candidate_id` (идемпотентно, по имени).
 
 ## План реализации (чеклист для feature-build)
-1. [ ] `db.py`: таблицы `interviewers`, `candidates`; расширить `sessions` (tenant_id, candidate_id,
+1. [x] `db.py`: таблицы `interviewers`, `candidates`; расширить `sessions` (tenant_id, candidate_id,
    interviewer_id) с безопасной миграцией существующей БД (ALTER ADD COLUMN если столбца нет).
-2. [ ] DAL per-tenant: `list/create/update_candidate`, `list/create_interviewer`, `sessions_by_candidate(t,cid)`,
+2. [x] DAL per-tenant: `list/create/update_candidate`, `list/create_interviewer`, `sessions_by_candidate(t,cid)`,
    `create_session(t, candidate_name, candidate_id?, interviewer_id?)`.
-3. [ ] `seed.py`: интервьюер `default` («Я») для тенанта default при пустой таблице.
-4. [ ] `main.py`: `/api/candidates` (GET/POST/PUT), `/api/interviewers` (GET/POST); `/api/sessions` принимает
+3. [x] `seed.py`: интервьюер `default` («Я») для тенанта default при пустой таблице.
+4. [x] `main.py`: `/api/candidates` (GET/POST/PUT), `/api/interviewers` (GET/POST); `/api/sessions` принимает
    candidate_id/interviewer_id; все запросы через `resolve_tenant`.
-5. [ ] `models.py`: схемы `Candidate`, `Interviewer`, расширить session-ответ.
-6. [ ] frontend: types/api/App — пикер кандидата (выбрать/создать) + выбор интервьюера при старте сессии;
+5. [x] request-схемы (Candidate*/Interviewer* в main.py рядом с прочими): схемы `Candidate`, `Interviewer`, расширить session-ответ.
+6. [x] frontend: types/api/App — пикер кандидата (выбрать/создать) + выбор интервьюера при старте сессии;
    показ в шапке и отчёте; история сессий кандидата (переиспользовать session-resume по candidate_id).
-7. [ ] `report.ts`: интервьюер + позиция/грейд кандидата в шапке отчёта.
-8. [ ] Тесты: CRUD людей per-tenant, изоляция тенантов, сессия с people-ссылками, миграция старых сессий.
-9. [ ] Доки: ARCHITECTURE.md (раздел сущностей людей), FEATURE_IDEAS (отметить связь с team-workspace).
+7. [x] `report.ts`: интервьюер + позиция/грейд кандидата в шапке отчёта.
+8. [x] Тесты: CRUD людей per-tenant, изоляция тенантов, сессия с people-ссылками, миграция старых сессий.
+9. [~] Доки (спека обновлена; ARCHITECTURE.md — отдельно при необходимости): ARCHITECTURE.md (раздел сущностей людей), FEATURE_IDEAS (отметить связь с team-workspace).
 
 ## Тесты / приёмка
-- [ ] pytest: people CRUD + изоляция тенантов + миграция + история сессий — зелёные.
-- [ ] build + smoke: старт сессии через пикер кандидата работает; отчёт содержит интервьюера/кандидата.
-- [ ] Обратная совместимость: старые сессии (свободный candidate) открываются без ошибок.
+- [x] pytest: people CRUD + изоляция тенантов + миграция + история сессий — зелёные.
+- [x] build + smoke: старт сессии через пикер кандидата работает; отчёт содержит интервьюера/кандидата.
+- [x] Обратная совместимость: старые сессии (свободный candidate) открываются без ошибок.
 
 ## Риски / открытые вопросы
 - **ALTER на существующей prod-БД** — добавление nullable-столбцов безопасно; покрыть тестом «миграция старой БД».

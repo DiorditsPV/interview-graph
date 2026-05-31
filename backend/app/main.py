@@ -28,7 +28,7 @@ from .hub import SessionHub
 from .importer import parse_file
 from .models import Block, Difficulty, GraphResponse, Kind, Node
 from .sampler import build_interview, load_tracks, load_weights
-from .seed import seed_tenant_if_empty
+from .seed import seed_interviewer_if_empty, seed_tenant_if_empty
 from .tenancy import resolve_tenant
 
 log = logging.getLogger("interview")
@@ -59,11 +59,41 @@ if _seeded:
     log.info("seeded %d nodes from %s", _seeded, CONTENT_DIR)
 if _seed_errors:
     log.warning("content import errors during seed: %s", _seed_errors)
+# Сид интервьюера по умолчанию («Я») для тенанта default — у сессии всегда есть проводивший.
+if seed_interviewer_if_empty(db, resolve_tenant()):
+    log.info("seeded default interviewer")
 
 
 # ---------- request models ----------
 class SessionCreate(BaseModel):
     candidate: str = Field(min_length=1)
+    candidate_id: Optional[int] = Field(default=None, alias="candidateId")
+    interviewer_id: Optional[int] = Field(default=None, alias="interviewerId")
+    model_config = {"populate_by_name": True}
+
+
+class CandidateCreate(BaseModel):
+    name: str = Field(min_length=1)
+    position: Optional[str] = None
+    seniority: Optional[str] = None
+    contact: Optional[str] = None
+    note: Optional[str] = None
+
+
+class CandidateUpdate(BaseModel):
+    """Правка кандидата — только переданные поля (None = не менять)."""
+
+    name: Optional[str] = Field(default=None, min_length=1)
+    position: Optional[str] = None
+    seniority: Optional[str] = None
+    contact: Optional[str] = None
+    note: Optional[str] = None
+
+
+class InterviewerCreate(BaseModel):
+    name: str = Field(min_length=1)
+    email: Optional[str] = None
+    role: Optional[str] = None
 
 
 class ScoreIn(BaseModel):
@@ -255,10 +285,54 @@ def make_interview(req: InterviewRequest, request: Request) -> dict:
     return {"order": order}
 
 
+# ---------- people (interviewers + candidates) ----------
+@app.get("/api/candidates")
+def list_candidates(request: Request) -> list:
+    return db.list_candidates(resolve_tenant(request))
+
+
+@app.post("/api/candidates")
+def add_candidate(body: CandidateCreate, request: Request) -> dict:
+    return db.create_candidate(resolve_tenant(request), body.model_dump())
+
+
+@app.put("/api/candidates/{candidate_id}")
+def edit_candidate(candidate_id: int, body: CandidateUpdate, request: Request) -> dict:
+    tenant = resolve_tenant(request)
+    updated = db.update_candidate(tenant, candidate_id, body.model_dump(exclude_none=True))
+    if updated is None:
+        raise HTTPException(status_code=404, detail=f"candidate '{candidate_id}' not found")
+    return updated
+
+
+@app.get("/api/interviewers")
+def list_interviewers(request: Request) -> list:
+    return db.list_interviewers(resolve_tenant(request))
+
+
+@app.post("/api/interviewers")
+def add_interviewer(body: InterviewerCreate, request: Request) -> dict:
+    return db.create_interviewer(resolve_tenant(request), body.model_dump())
+
+
 # ---------- sessions ----------
 @app.post("/api/sessions")
-def create_session(body: SessionCreate) -> dict:
-    return db.create_session(body.candidate)
+def create_session(body: SessionCreate, request: Request) -> dict:
+    tenant = resolve_tenant(request)
+    # Если передан candidate_id — денормализуем имя в sessions.candidate (фиксация имени
+    # на момент интервью + быстрый показ без джойна). Иначе используем свободный текст.
+    candidate_name = body.candidate
+    if body.candidate_id is not None:
+        cand = db.get_candidate(tenant, body.candidate_id)
+        if cand is None:
+            raise HTTPException(status_code=404, detail=f"candidate '{body.candidate_id}' not found")
+        candidate_name = cand["name"]
+    return db.create_session(
+        candidate_name,
+        tenant_id=tenant,
+        candidate_id=body.candidate_id,
+        interviewer_id=body.interviewer_id,
+    )
 
 
 @app.get("/api/sessions")

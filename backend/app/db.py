@@ -43,6 +43,28 @@ CREATE TABLE IF NOT EXISTS nodes (
     updated_at   TEXT NOT NULL,
     PRIMARY KEY (tenant_id, id)
 );
+CREATE TABLE IF NOT EXISTS interviewers (
+    tenant_id   TEXT NOT NULL DEFAULT 'default' REFERENCES tenants(id),
+    id          INTEGER NOT NULL,            -- автоинкремент в пределах тенанта, уник. (tenant_id,id)
+    name        TEXT NOT NULL,
+    email       TEXT,
+    role        TEXT,                         -- напр. «Tech Lead», «HR»
+    user_id     TEXT,                         -- ШОВ: связь с auth-пользователем (пока NULL)
+    created_at  TEXT NOT NULL,
+    PRIMARY KEY (tenant_id, id)
+);
+CREATE TABLE IF NOT EXISTS candidates (
+    tenant_id   TEXT NOT NULL DEFAULT 'default' REFERENCES tenants(id),
+    id          INTEGER NOT NULL,
+    name        TEXT NOT NULL,
+    position    TEXT,                         -- на какую позицию
+    seniority   TEXT,                         -- грейд (junior/middle/senior/…) — НЕ difficulty вопроса
+    contact     TEXT,                         -- email/телефон/ссылка (свободно)
+    note        TEXT,                         -- заметка рекрутера
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL,
+    PRIMARY KEY (tenant_id, id)
+);
 CREATE TABLE IF NOT EXISTS sessions (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     candidate  TEXT NOT NULL,
@@ -83,6 +105,27 @@ class Database:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self._conn() as conn:
             conn.executescript(_SCHEMA)
+            self._migrate_sessions(conn)
+
+    @staticmethod
+    def _migrate_sessions(conn: sqlite3.Connection) -> None:
+        """Мягкая миграция существующей БД: добавить новые столбцы в sessions, если их нет.
+
+        Старые БД содержат sessions только с (id, candidate, created_at). Новые столбцы —
+        nullable (или с DEFAULT), поэтому ALTER ... ADD COLUMN безопасен и не теряет данные:
+        старые строки получают NULL/'default'. PRAGMA table_info защищает от повторного ALTER
+        (идемпотентность при каждом старте).
+        """
+        cols = {r["name"] for r in conn.execute("PRAGMA table_info(sessions)").fetchall()}
+        # tenant_id без DEFAULT в ALTER → NOT NULL невозможен на готовых строках; даём DEFAULT.
+        if "tenant_id" not in cols:
+            conn.execute(
+                "ALTER TABLE sessions ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default'"
+            )
+        if "candidate_id" not in cols:
+            conn.execute("ALTER TABLE sessions ADD COLUMN candidate_id INTEGER")
+        if "interviewer_id" not in cols:
+            conn.execute("ALTER TABLE sessions ADD COLUMN interviewer_id INTEGER")
 
     def _conn(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.path)
@@ -199,15 +242,137 @@ class Database:
                 inserted += cur.rowcount
         return inserted
 
-    # --- sessions ---
-    def create_session(self, candidate: str) -> Dict:
+    # --- interviewers (per-tenant) ---
+    def list_interviewers(self, tenant_id: str) -> List[Dict]:
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM interviewers WHERE tenant_id = ? ORDER BY id",
+                (tenant_id,),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def count_interviewers(self, tenant_id: str) -> int:
+        with self._conn() as conn:
+            return conn.execute(
+                "SELECT COUNT(*) FROM interviewers WHERE tenant_id = ?", (tenant_id,)
+            ).fetchone()[0]
+
+    def get_interviewer(self, tenant_id: str, interviewer_id: int) -> Optional[Dict]:
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM interviewers WHERE tenant_id = ? AND id = ?",
+                (tenant_id, interviewer_id),
+            ).fetchone()
+        return dict(row) if row else None
+
+    def create_interviewer(self, tenant_id: str, data: Dict) -> Dict:
+        """Создать интервьюера. id — автоинкремент в пределах тенанта (MAX(id)+1)."""
+        now = _now()
+        with self._conn() as conn:
+            nid = conn.execute(
+                "SELECT COALESCE(MAX(id), 0) + 1 FROM interviewers WHERE tenant_id = ?",
+                (tenant_id,),
+            ).fetchone()[0]
+            conn.execute(
+                """
+                INSERT INTO interviewers (tenant_id, id, name, email, role, user_id, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    tenant_id, nid, data["name"], data.get("email"),
+                    data.get("role"), data.get("user_id"), now,
+                ),
+            )
+        return self.get_interviewer(tenant_id, nid)
+
+    # --- candidates (per-tenant) ---
+    def list_candidates(self, tenant_id: str) -> List[Dict]:
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM candidates WHERE tenant_id = ? ORDER BY id",
+                (tenant_id,),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def get_candidate(self, tenant_id: str, candidate_id: int) -> Optional[Dict]:
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM candidates WHERE tenant_id = ? AND id = ?",
+                (tenant_id, candidate_id),
+            ).fetchone()
+        return dict(row) if row else None
+
+    def create_candidate(self, tenant_id: str, data: Dict) -> Dict:
+        """Создать кандидата. id — автоинкремент в пределах тенанта (MAX(id)+1)."""
+        now = _now()
+        with self._conn() as conn:
+            cid = conn.execute(
+                "SELECT COALESCE(MAX(id), 0) + 1 FROM candidates WHERE tenant_id = ?",
+                (tenant_id,),
+            ).fetchone()[0]
+            conn.execute(
+                """
+                INSERT INTO candidates (
+                    tenant_id, id, name, position, seniority, contact, note,
+                    created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    tenant_id, cid, data["name"], data.get("position"),
+                    data.get("seniority"), data.get("contact"), data.get("note"),
+                    now, now,
+                ),
+            )
+        return self.get_candidate(tenant_id, cid)
+
+    def update_candidate(self, tenant_id: str, candidate_id: int, fields: Dict) -> Optional[Dict]:
+        """Обновить переданные поля кандидата (None-поля не передаются вызывающим)."""
+        allowed = ("name", "position", "seniority", "contact", "note")
+        sets = {k: v for k, v in fields.items() if k in allowed}
+        if not sets:
+            return self.get_candidate(tenant_id, candidate_id)
+        cols = ", ".join(f"{k} = ?" for k in sets)
+        params = list(sets.values()) + [_now(), tenant_id, candidate_id]
         with self._conn() as conn:
             cur = conn.execute(
-                "INSERT INTO sessions (candidate, created_at) VALUES (?, ?)",
-                (candidate, _now()),
+                f"UPDATE candidates SET {cols}, updated_at = ? WHERE tenant_id = ? AND id = ?",
+                params,
+            )
+            if cur.rowcount == 0:
+                return None
+        return self.get_candidate(tenant_id, candidate_id)
+
+    # --- sessions ---
+    def create_session(
+        self,
+        candidate: str,
+        tenant_id: str = "default",
+        candidate_id: Optional[int] = None,
+        interviewer_id: Optional[int] = None,
+    ) -> Dict:
+        with self._conn() as conn:
+            cur = conn.execute(
+                """
+                INSERT INTO sessions (candidate, tenant_id, candidate_id, interviewer_id, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (candidate, tenant_id, candidate_id, interviewer_id, _now()),
             )
             sid = cur.lastrowid
         return self.get_session(sid)
+
+    def sessions_by_candidate(self, tenant_id: str, candidate_id: int) -> List[Dict]:
+        """Все сессии кандидата в тенанте (история), без оценок — для списка."""
+        with self._conn() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM sessions
+                WHERE tenant_id = ? AND candidate_id = ?
+                ORDER BY created_at DESC
+                """,
+                (tenant_id, candidate_id),
+            ).fetchall()
+        return [dict(r) for r in rows]
 
     def list_sessions(self) -> List[Dict]:
         with self._conn() as conn:
