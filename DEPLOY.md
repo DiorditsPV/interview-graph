@@ -27,14 +27,14 @@ push в dev ─▶ GitHub Actions (.github/workflows/deploy-dev.yml)
                          └─ /opt/interview-dev · /var/lib/interview-dev (БД) · systemd · ufw
 ```
 
-| | prod | dev |
-|---|---|---|
-| URL | http://45.114.62.236:**8800** | http://45.114.62.236:**8801** |
-| Триггер | push в `main` | push в `dev` / ручной запуск |
-| systemd-юнит | `interview.service` | `interview-dev.service` |
-| Код + контент | `/opt/interview` | `/opt/interview-dev` |
-| БД (SQLite) | `/var/lib/interview/interview.db` | `/var/lib/interview-dev/interview.db` |
-| Staging на сервере | `~/interview-src` | `~/interview-src-dev` |
+|                    | prod                              | dev                                   |
+| ------------------ | --------------------------------- | ------------------------------------- |
+| URL                | http://45.114.62.236:**8800**     | http://45.114.62.236:**8801**         |
+| Триггер            | push в `main`                     | push в `dev` / ручной запуск          |
+| systemd-юнит       | `interview.service`               | `interview-dev.service`               |
+| Код + контент      | `/opt/interview`                  | `/opt/interview-dev`                  |
+| БД (SQLite)        | `/var/lib/interview/interview.db` | `/var/lib/interview-dev/interview.db` |
+| Staging на сервере | `~/interview-src`                 | `~/interview-src-dev`                 |
 
 У dev — **своя БД**, поэтому эксперименты в dev не затрагивают сессии и оценки прода.
 Никаких дополнительных секретов заводить не нужно: dev переиспользует те же
@@ -45,11 +45,11 @@ push в dev ─▶ GitHub Actions (.github/workflows/deploy-dev.yml)
 
 ## Что куда кладётся на сервере
 
-| Путь | Назначение | Переживает деплой? |
-|---|---|---|
-| `/opt/interview` | код + контент (`content/*.md`), venv, собранный `frontend/dist` | нет — перезаписывается |
-| `/var/lib/interview/interview.db` | SQLite: сессии кандидатов и оценки | **да** — данные сохраняются |
-| `/etc/systemd/system/interview.service` | автозапуск/рестарт uvicorn на :8800 | — |
+| Путь                                    | Назначение                                                      | Переживает деплой?          |
+| --------------------------------------- | --------------------------------------------------------------- | --------------------------- |
+| `/opt/interview`                        | код + контент (`content/*.md`), venv, собранный `frontend/dist` | нет — перезаписывается      |
+| `/var/lib/interview/interview.db`       | SQLite: сессии кандидатов и оценки                              | **да** — данные сохраняются |
+| `/etc/systemd/system/interview.service` | автозапуск/рестарт uvicorn на :8800                             | —                           |
 
 БД вынесена из дерева кода через `INTERVIEW_DB_PATH`, поэтому деплой обновляет код и вопросы,
 но **не затирает** накопленные оценки.
@@ -78,13 +78,13 @@ chmod 600 ~/.ssh/authorized_keys
 
 ### 2. GitHub Secrets (репозиторий → Settings → Secrets and variables → Actions)
 
-| Secret | Значение |
-|---|---|
-| `SSH_HOST` | `45.114.62.236` |
-| `SSH_USER` | имя пользователя на сервере (с sudo) |
-| `SSH_PRIVATE_KEY` | содержимое `.deploy/deploy_key` (весь приватный ключ) |
+| Secret            | Значение                                                  |
+| ----------------- | --------------------------------------------------------- |
+| `SSH_HOST`        | `45.114.62.236`                                           |
+| `SSH_USER`        | имя пользователя на сервере (с sudo)                      |
+| `SSH_PRIVATE_KEY` | содержимое `.deploy/deploy_key` (весь приватный ключ)     |
 | `SSH_KNOWN_HOSTS` | host-ключ сервера (фиксирует отпечаток, защищает от MITM) |
-| `SSH_PORT` | *(опционально)* нестандартный порт SSH; по умолчанию `22` |
+| `SSH_PORT`        | *(опционально)* нестандартный порт SSH; по умолчанию `22` |
 
 Эти секреты проставляются автоматически скриптом `gh secret set` при настройке (см. ниже),
 кроме `SSH_USER`, который нужно указать.
