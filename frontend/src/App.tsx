@@ -170,6 +170,9 @@ function buildNodes(
       id: n.id,
       type: "question",
       position: pos,
+      // Явные размеры (= размер карточки) нужны минимапе React Flow, иначе ноды не рисуются.
+      width: CARD_W,
+      height: CARD_H,
       data: { node: n, score: scores[n.id], current: n.id === currentId, dimmed, hidden: hidden && showHidden },
       selected: n.id === selectedId,
       draggable: false,
