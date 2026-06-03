@@ -820,35 +820,35 @@ export default function App() {
                 : "Точки на фоне выключены — нажмите, чтобы показать"
             }
           >
-            ⠿ Точки
+            Точки
           </button>
           <button
             className={`tb__toggle ${guidesV ? "tb__toggle--on" : ""}`}
             onClick={() => setGuidesV((v) => !v)}
             title="Вертикальные направляющие (границы блоков)"
           >
-            ⫿ Верт.
+            Верт.
           </button>
           <button
             className={`tb__toggle ${guidesH ? "tb__toggle--on" : ""}`}
             onClick={() => setGuidesH((v) => !v)}
             title="Горизонтальные направляющие (уровни Base/Junior/Middle/Senior)"
           >
-            ☰ Гор.
+            Гор.
           </button>
           <button
             className={`tb__toggle ${agendaOpen ? "tb__toggle--on" : ""}`}
             onClick={() => setAgendaOpen((v) => !v)}
             title="Сайдбар-агенда: список вопросов с переходом"
           >
-            ☰ Агенда
+            Агенда
           </button>
           <button
             className={`tb__toggle ${showHidden ? "tb__toggle--on" : ""}`}
             onClick={() => setShowHidden((v) => !v)}
             title={`Скрытые вопросы (${hiddenIds.size}) — показать/спрятать`}
           >
-            🙈 Скрытые{hiddenIds.size ? ` (${hiddenIds.size})` : ""}
+            Скрытые{hiddenIds.size ? ` (${hiddenIds.size})` : ""}
           </button>
         </div>
 
@@ -972,14 +972,14 @@ export default function App() {
             onClick={() => setAddOpen(true)}
             title="Добавить вопрос в банк"
           >
-            ＋ Вопрос
+            Добавить вопрос
           </button>
           <button
             className="iconbtn uploadbtn"
             onClick={() => setUploadOpen(true)}
             title="Загрузить вопросы (.md/.json)"
           >
-            ⬆ Загрузить
+            Загрузить
           </button>
           <button
             className="iconbtn"
@@ -987,7 +987,7 @@ export default function App() {
             disabled={graph.length === 0}
             title="Открыть экран со всеми вопросами банка"
           >
-            📋 Все вопросы
+            Все вопросы
           </button>
           <button
             className="iconbtn dlbtn"
@@ -995,7 +995,7 @@ export default function App() {
             disabled={scored === 0}
             title={scored === 0 ? "Сначала выставьте оценки" : "Скачать результаты (HTML)"}
           >
-            📥 Скачать
+            Скачать
           </button>
           {graph.length > 0 && scored === graph.length && (
             <button
@@ -1003,7 +1003,7 @@ export default function App() {
               onClick={() => downloadReport(session?.candidate ?? candidate, graph, scores, trackLabel, notes, reportPeople)}
               title="Все вопросы оценены — скачать итоговый отчёт"
             >
-              ✓ Завершить · Скачать отчёт
+              Завершить · Скачать отчёт
             </button>
           )}
           <button
@@ -1011,7 +1011,7 @@ export default function App() {
             onClick={() => setCompareOpen(true)}
             title="Сравнить кандидатов по блокам"
           >
-            📊 Сравнить
+            Сравнить
           </button>
           <button
             className="iconbtn bankbtn"
@@ -1019,7 +1019,7 @@ export default function App() {
             disabled={graph.length === 0}
             title="Скачать весь банк вопросов (HTML)"
           >
-            🗂 Банк
+            Банк
           </button>
           <button
             className="iconbtn helpbtn"
