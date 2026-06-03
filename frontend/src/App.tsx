@@ -778,7 +778,7 @@ export default function App() {
       <header className="topbar">
         {/* topbar-redeclutter, ряд 1 — поток интервью: направление, прогресс, сессия */}
         <div className="topbar__row topbar__row--flow">
-        <strong>Интервью · граф вопросов</strong>
+        <h1 className="appname">Интервью · граф вопросов</h1>
         <span className="muted">{graph.length} нод</span>
 
         <div className="tb__field">
@@ -1112,15 +1112,16 @@ export default function App() {
               />
 
               <Panel position="top-right">
-                <div className="filterpanel">
+                <div className="filterpanel" role="region" aria-label="Фильтры вопросов">
                   <input
                     className="fp__search"
                     placeholder="Поиск по вопросам…"
+                    aria-label="Поиск по вопросам"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                   />
                   <div className="fp__group">
-                    <div className="fp__title">Направления</div>
+                    <h2 className="fp__title">Направления</h2>
                     {BLOCK_ORDER.map((b) => (
                       <button
                         key={b}
@@ -1137,7 +1138,7 @@ export default function App() {
                     ))}
                   </div>
                   <div className="fp__group">
-                    <div className="fp__title">Сложность</div>
+                    <h2 className="fp__title">Сложность</h2>
                     {DIFFS.map((d) => (
                       <button
                         key={d}
@@ -1154,7 +1155,7 @@ export default function App() {
                     ))}
                   </div>
                   <div className="fp__group">
-                    <div className="fp__title">Тип</div>
+                    <h2 className="fp__title">Тип</h2>
                     {KINDS.map((k) => (
                       <button
                         key={k}
@@ -1171,7 +1172,7 @@ export default function App() {
                     ))}
                   </div>
                   <div className="fp__group">
-                    <div className="fp__title">Прогресс</div>
+                    <h2 className="fp__title">Прогресс</h2>
                     <button
                       className={`fp__chip ${unscoredOnly ? "" : "fp__chip--off"}`}
                       style={{
