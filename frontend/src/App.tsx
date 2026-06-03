@@ -1105,7 +1105,7 @@ export default function App() {
                 nodeColor={(n) =>
                   n.type === "question"
                     ? BLOCK_COLOR[(n.data as any)?.node?.block as Block] ?? "#999"
-                    : "rgba(0,0,0,0.03)"
+                    : "rgba(100,116,139,0.18)"
                 }
                 pannable
                 zoomable
