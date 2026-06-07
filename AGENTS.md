@@ -9,7 +9,8 @@ Python / Платформа), внутри — карточки, ранжиро�
 Каждая карточка = вопрос/задача + ответ + оценка 1–5. Контент импортируется из Markdown/JSON.
 Только локально. Бэкенд: **FastAPI + SQLite**. Фронт: **React + Vite + React Flow**.
 
-Текущий размер банка: ~61 нода (frameworks 29, databases 22, python 5, platform 5).
+Размер банка считается на лету через `GET /api/graph` (на момент написания ~60 нод:
+frameworks 29, databases 22, python 5, platform 4) — точные числа не держим в доке, они дрейфуют.
 
 ## Быстрый старт
 ```bash
@@ -24,17 +25,23 @@ Dev (hot reload): `uvicorn app.main:app --reload --port 8000` (из `backend/`, 
 - `backend/app/` — `models.py` (pydantic `Node`, `extra="forbid"`), `importer.py` (.md+.json через
   python-frontmatter), `sampler.py` (веса блоков), `db.py` (SQLite сессии/оценки), `main.py` (FastAPI).
 - `frontend/src/` — `App.tsx` (состояние, `buildNodes`, панели/HUD, клавиатура, тема, реестр `nodeTypes`),
-  `layout.ts` (`swimlaneLayout`, `PREFERRED_SUB`, `SUB_LABEL`, `DIFFS`, константы), `types.ts`
-  (`QNode`, `Block/Difficulty/Kind`, `BLOCK_COLOR/LABEL`, `DIFF_COLOR`), `components/` (QuestionNode,
-  BlockGroupNode, SubHeadNode, BandsNode, GuidesNode, DetailDrawer), `report.ts` (HTML-отчёт),
-  `styles.css` (CSS-переменные тем), `main.tsx`. Тесты: `frontend/smoke.mjs`, `frontend/screenshot.mjs`.
+  `api.ts` (обёртки над `/api`), `layout.ts` (`swimlaneLayout`, `PREFERRED_SUB`, `SUB_LABEL`, `DIFFS`,
+  константы), `types.ts` (`QNode`, `Block/Difficulty/Kind`, `BLOCK_COLOR/LABEL`, `DIFF_COLOR`),
+  `report.ts` (HTML-отчёт), `styles.css` (CSS-переменные тем), `main.tsx`.
+  `components/` — узлы канвы (QuestionNode, BlockGroupNode, SubHeadNode, BandsNode, GuidesNode) и
+  оверлеи/панели (DetailDrawer, BankBrowser, UploadModal, CompareModal, ShortcutsHelp).
+  Тесты: `frontend/smoke.mjs`, `frontend/screenshot.mjs`.
 - `content/<block>/*.md|*.json` — банк вопросов; `content/weights.yaml` — веса блоков.
-- `backend/tests/test_app.py` — pytest. `Q_IDEAS.txt` — реестр вопросов + идеи (`[x]` сделано / `[ ]` идея).
+- `backend/tests/` — pytest (`test_app.py` импорт/sampler/API/сессии, `test_nodes.py` CRUD нод,
+  `test_people.py` кандидаты/интервьюеры/тенант-изоляция). `Q_IDEAS.txt` — реестр вопросов + идеи (`[x]`/`[ ]`).
 - `REPORT.md` — отчёт-исследование и архитектурные решения. `.claude/skills/` — скиллы (ниже).
 
 ## API (FastAPI)
-`GET /api/graph` (ноды + ошибки импорта), `GET /api/weights`, `POST /api/interview`,
-`POST /api/sessions`, `GET /api/sessions/{id}`, `POST /api/sessions/{id}/score`, `GET /api/health`.
+Граф/контент: `GET /api/graph` (ноды + ошибки импорта), `GET /api/weights`, `GET /api/tracks`,
+`POST /api/import`, `POST/PUT/DELETE /api/nodes`. Интервью/сессии: `POST /api/interview`,
+`POST /api/sessions`, `GET /api/sessions`, `GET /api/sessions/{id}`, `POST /api/sessions/{id}/score`,
+`GET /api/sessions/compare`, `GET /api/sessions/{id}/events` (SSE). Люди: `GET/POST/PUT /api/candidates`,
+`GET/POST /api/interviewers`. Служебное: `GET /api/health`. Полные схемы — Swagger UI на `/docs`.
 
 ## Модель ноды и формат контента
 Frontmatter (ключи алфавитные, `tags` — block-style): `id`, `kind` (question|task), `block`

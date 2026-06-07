@@ -32,7 +32,7 @@ cd frontend && npm run dev      # http://localhost:5173
 
 Раскладка — **swimlanes**: вертикальная колонка на каждое направление (Фреймворки /
 Базы данных / Python / Платформа) с заголовком и цветным полупрозрачным фоном; внутри
-колонки вопросы ранжированы сверху вниз по сложности (junior → middle → senior, левая ось).
+колонки вопросы ранжированы сверху вниз по сложности (base → junior → middle → senior, левая ось).
 
 Блок можно делить на **под-колонки по технологиям** через поле `subblock` во frontmatter
 (напр. Фреймворки → Airflow / PySpark / dbt / Streaming): под общим заголовком блока
@@ -70,7 +70,7 @@ block: frameworks         # frameworks | databases | python | platform
 subblock: pyspark         # (опц.) под-колонка внутри блока
 title: Shuffle в Spark    # короткий заголовок для карточки
 topic: distributed-batch
-difficulty: middle        # junior | middle | senior
+difficulty: middle        # base | junior | middle | senior
 weight: 13
 tags: [spark, optimization]
 ---
@@ -101,16 +101,20 @@ tags: [spark, optimization]
 | POST  | `/api/sessions/{id}/score` | выставить оценку (`{nodeId, score}`)                                    |
 | GET   | `/api/sessions/{id}`       | сессия с оценками                                                       |
 
+Это ядро. Полный список ручек (кандидаты/интервьюеры, CRUD нод `/api/nodes`, импорт `/api/import`,
+сравнение сессий `/api/sessions/compare`, live-обновления по SSE `/api/sessions/{id}/events`) и схемы —
+в Swagger UI на `/docs`.
+
 ## Тесты
 
-Бэкенд (11 тестов: импорт MD/JSON, ветвление по оценке, sampler, API, сессии):
+Бэкенд (54 теста — `test_app.py` импорт MD/JSON, sampler, API, сессии; `test_nodes.py` CRUD нод; `test_people.py` кандидаты/интервьюеры, изоляция тенантов):
 
 ```bash
 cd backend && . .venv/bin/activate && pytest -q
 ```
 
 Фронтенд — headless smoke-тест реального рантайма (граф рендерится, нода → drawer,
-оценка → подсветка условного ребра). Требует запущенного сервера на :8000:
+оценка проставляется и отражается в HUD/прогрессе). Требует запущенного сервера на :8000:
 
 ```bash
 cd frontend && npm run smoke

@@ -170,6 +170,9 @@ function buildNodes(
       id: n.id,
       type: "question",
       position: pos,
+      // Явные размеры (= размер карточки) нужны минимапе React Flow, иначе ноды не рисуются.
+      width: CARD_W,
+      height: CARD_H,
       data: { node: n, score: scores[n.id], current: n.id === currentId, dimmed, hidden: hidden && showHidden },
       selected: n.id === selectedId,
       draggable: false,
@@ -778,7 +781,7 @@ export default function App() {
       <header className="topbar">
         {/* topbar-redeclutter, ряд 1 — поток интервью: направление, прогресс, сессия */}
         <div className="topbar__row topbar__row--flow">
-        <strong>Интервью · граф вопросов</strong>
+        <h1 className="appname">Интервью · граф вопросов</h1>
         <span className="muted">{graph.length} нод</span>
 
         <div className="tb__field">
@@ -820,35 +823,35 @@ export default function App() {
                 : "Точки на фоне выключены — нажмите, чтобы показать"
             }
           >
-            ⠿ Точки
+            Точки
           </button>
           <button
             className={`tb__toggle ${guidesV ? "tb__toggle--on" : ""}`}
             onClick={() => setGuidesV((v) => !v)}
             title="Вертикальные направляющие (границы блоков)"
           >
-            ⫿ Верт.
+            Верт.
           </button>
           <button
             className={`tb__toggle ${guidesH ? "tb__toggle--on" : ""}`}
             onClick={() => setGuidesH((v) => !v)}
             title="Горизонтальные направляющие (уровни Base/Junior/Middle/Senior)"
           >
-            ☰ Гор.
+            Гор.
           </button>
           <button
             className={`tb__toggle ${agendaOpen ? "tb__toggle--on" : ""}`}
             onClick={() => setAgendaOpen((v) => !v)}
             title="Сайдбар-агенда: список вопросов с переходом"
           >
-            ☰ Агенда
+            Агенда
           </button>
           <button
             className={`tb__toggle ${showHidden ? "tb__toggle--on" : ""}`}
             onClick={() => setShowHidden((v) => !v)}
             title={`Скрытые вопросы (${hiddenIds.size}) — показать/спрятать`}
           >
-            🙈 Скрытые{hiddenIds.size ? ` (${hiddenIds.size})` : ""}
+            Скрытые{hiddenIds.size ? ` (${hiddenIds.size})` : ""}
           </button>
         </div>
 
@@ -972,14 +975,14 @@ export default function App() {
             onClick={() => setAddOpen(true)}
             title="Добавить вопрос в банк"
           >
-            ＋ Вопрос
+            Добавить вопрос
           </button>
           <button
             className="iconbtn uploadbtn"
             onClick={() => setUploadOpen(true)}
             title="Загрузить вопросы (.md/.json)"
           >
-            ⬆ Загрузить
+            Загрузить
           </button>
           <button
             className="iconbtn"
@@ -987,7 +990,7 @@ export default function App() {
             disabled={graph.length === 0}
             title="Открыть экран со всеми вопросами банка"
           >
-            📋 Все вопросы
+            Все вопросы
           </button>
           <button
             className="iconbtn dlbtn"
@@ -995,7 +998,7 @@ export default function App() {
             disabled={scored === 0}
             title={scored === 0 ? "Сначала выставьте оценки" : "Скачать результаты (HTML)"}
           >
-            📥 Скачать
+            Скачать
           </button>
           {graph.length > 0 && scored === graph.length && (
             <button
@@ -1003,7 +1006,7 @@ export default function App() {
               onClick={() => downloadReport(session?.candidate ?? candidate, graph, scores, trackLabel, notes, reportPeople)}
               title="Все вопросы оценены — скачать итоговый отчёт"
             >
-              ✓ Завершить · Скачать отчёт
+              Завершить · Скачать отчёт
             </button>
           )}
           <button
@@ -1011,7 +1014,7 @@ export default function App() {
             onClick={() => setCompareOpen(true)}
             title="Сравнить кандидатов по блокам"
           >
-            📊 Сравнить
+            Сравнить
           </button>
           <button
             className="iconbtn bankbtn"
@@ -1019,7 +1022,7 @@ export default function App() {
             disabled={graph.length === 0}
             title="Скачать весь банк вопросов (HTML)"
           >
-            🗂 Банк
+            Банк
           </button>
           <button
             className="iconbtn helpbtn"
@@ -1105,22 +1108,23 @@ export default function App() {
                 nodeColor={(n) =>
                   n.type === "question"
                     ? BLOCK_COLOR[(n.data as any)?.node?.block as Block] ?? "#999"
-                    : "rgba(0,0,0,0.03)"
+                    : "rgba(100,116,139,0.18)"
                 }
                 pannable
                 zoomable
               />
 
               <Panel position="top-right">
-                <div className="filterpanel">
+                <div className="filterpanel" role="region" aria-label="Фильтры вопросов">
                   <input
                     className="fp__search"
                     placeholder="Поиск по вопросам…"
+                    aria-label="Поиск по вопросам"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                   />
                   <div className="fp__group">
-                    <div className="fp__title">Направления</div>
+                    <h2 className="fp__title">Направления</h2>
                     {BLOCK_ORDER.map((b) => (
                       <button
                         key={b}
@@ -1137,7 +1141,7 @@ export default function App() {
                     ))}
                   </div>
                   <div className="fp__group">
-                    <div className="fp__title">Сложность</div>
+                    <h2 className="fp__title">Сложность</h2>
                     {DIFFS.map((d) => (
                       <button
                         key={d}
@@ -1154,7 +1158,7 @@ export default function App() {
                     ))}
                   </div>
                   <div className="fp__group">
-                    <div className="fp__title">Тип</div>
+                    <h2 className="fp__title">Тип</h2>
                     {KINDS.map((k) => (
                       <button
                         key={k}
@@ -1171,7 +1175,7 @@ export default function App() {
                     ))}
                   </div>
                   <div className="fp__group">
-                    <div className="fp__title">Прогресс</div>
+                    <h2 className="fp__title">Прогресс</h2>
                     <button
                       className={`fp__chip ${unscoredOnly ? "" : "fp__chip--off"}`}
                       style={{
