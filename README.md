@@ -70,7 +70,7 @@ block: frameworks         # frameworks | databases | python | platform
 subblock: pyspark         # (опц.) под-колонка внутри блока
 title: Shuffle в Spark    # короткий заголовок для карточки
 topic: distributed-batch
-difficulty: middle        # junior | middle | senior
+difficulty: middle        # base | junior | middle | senior
 weight: 13
 tags: [spark, optimization]
 ---
