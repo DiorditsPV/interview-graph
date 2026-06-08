@@ -46,6 +46,7 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   color: var(--text);
   background: var(--bg);
+  overflow-x: hidden; /* страничный гориз-скролл не нужен: канва панорамируется внутри React Flow */
 }
 
 .app { display: flex; flex-direction: column; height: 100vh; }
@@ -73,7 +74,7 @@ body {
 .progress__label {
   color: var(--text-muted); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap;
 }
-.session { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.session { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .session input {
   padding: 6px 10px; border: 1px solid var(--border-strong); border-radius: 6px; font-size: 14px;
   background: var(--surface); color: var(--text);
@@ -106,7 +107,7 @@ button:disabled:hover { background: var(--surface); }
 
 /* ---- панель отображения холста (левая часть шапки) ---- */
 .toolbar {
-  display: flex; align-items: center; gap: 8px;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   margin-left: 14px; padding-left: 14px; border-left: 1px solid var(--border);
 }
 .tb__field { display: flex; align-items: center; gap: 6px; }
@@ -303,7 +304,7 @@ button:disabled:hover { background: var(--surface); }
   background: var(--surface); color: var(--text);
 }
 .fp__group { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; max-width: 320px; }
-.fp__title { width: 100%; margin: 0; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--text-faint); }
+.fp__title { width: 100%; margin: 0; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--text-faint); }
 .fp__chip {
   display: inline-flex; align-items: center; min-height: 26px;
   font-size: 11px; padding: 4px 10px; border: 1.5px solid; border-radius: 999px; font-weight: 600;
