@@ -18,21 +18,28 @@ from __future__ import annotations
 
 from typing import Callable
 
+import bcrypt
 from fastapi import Depends, HTTPException, Request
-from passlib.context import CryptContext
 
 COOKIE_NAME = "session"
 ROLE_RANK = {"viewer": 0, "member": 1, "owner": 2}
 
-_pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# bcrypt использует только первые 72 байта пароля и в 5.x жёстко отвергает длиннее —
+# усекаем явно. Работаем с bcrypt напрямую: passlib 1.7.4 несовместим с bcrypt 5.x.
+def _pw_bytes(password: str) -> bytes:
+    return password.encode("utf-8")[:72]
 
 
 def hash_password(password: str) -> str:
-    return _pwd.hash(password)
+    return bcrypt.hashpw(_pw_bytes(password), bcrypt.gensalt()).decode("utf-8")
 
 
 def verify_password(password: str, password_hash: str) -> bool:
-    return _pwd.verify(password, password_hash)
+    try:
+        return bcrypt.checkpw(_pw_bytes(password), password_hash.encode("utf-8"))
+    except ValueError:
+        return False
 
 
 def current_user(request: Request) -> dict:
