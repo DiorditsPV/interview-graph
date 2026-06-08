@@ -23,8 +23,8 @@ eligible_issues() {
   while read -r n; do
     [ -z "$n" ] && continue
     git branch --list "feature/$n-*" | grep -q . || c=$((c + 1))
-  done < <(gh issue list --state open --json number,title \
-            -q '.[] | select(.title | startswith("[epic]") | not) | .number' 2>/dev/null)
+  done < <(gh issue list --state open --label autodev-ready --json number \
+            -q '.[].number' 2>/dev/null)
   echo "$c"
 }
 open_branches() { git branch --list 'feature/*' | wc -l | tr -d ' '; }
@@ -35,9 +35,9 @@ PROMPT='Ты ведёшь ОДИН автономный цикл разрабо�
 
 Шаги:
 1. git switch dev; дерево чистое (если dirty — STOP с отчётом).
-2. Возьми следующую задачу: gh issue list --state open. Выбери первый открытый issue, у которого
-   заголовок НЕ начинается с "[epic]" И нет ветки feature/<номер>-* (git branch --list). Если таких нет —
-   выведи ровно: AUTODEV_STOP: no-tasks и заверши. slug = "<номер>-<краткий-kebab-тайтл>".
+2. Возьми задачу: gh issue list --state open --label autodev-ready. Выбери первый такой issue без ветки
+   feature/<номер>-* (git branch --list). Если таких нет — выведи ровно: AUTODEV_STOP: no-tasks и заверши.
+   slug = "<номер>-<краткий-kebab-тайтл>".
 3. Создай ветку feature/<slug> от dev. Отметь взятие: gh issue comment <номер> "autodev: взято в работу, ветка feature/<slug>".
 4. Спроектируй план реализации фичи через /autoplan (без интерактивных /plan-*-review, /office-hours).
 5. Реализуй фичу по issue: код backend (FastAPI/Pydantic/SQLite) и/или frontend (React/TS/Vite).
