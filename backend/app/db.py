@@ -13,9 +13,12 @@ from __future__ import annotations
 import json
 import secrets
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Dict, List, Optional
+
+# TTL сессии аутентификации: время жизни server-side auth-session и max_age cookie (см. main.py).
+SESSION_MAX_AGE = 30 * 24 * 3600  # 30 дней, секунды
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS tenants (
@@ -211,6 +214,12 @@ class Database:
     def create_auth_session(self, tenant_id: str, user_id: str) -> str:
         token = secrets.token_urlsafe(32)
         with self._conn() as conn:
+            # Повторный логин инвалидирует прежние сессии того же пользователя:
+            # один активный токен на аккаунт (старые cookie перестают работать).
+            conn.execute(
+                "DELETE FROM auth_sessions WHERE tenant_id = ? AND user_id = ?",
+                (tenant_id, user_id),
+            )
             conn.execute(
                 "INSERT INTO auth_sessions (token, tenant_id, user_id, created_at) "
                 "VALUES (?, ?, ?, ?)",
@@ -219,11 +228,18 @@ class Database:
         return token
 
     def get_auth_session(self, token: str) -> Optional[Dict]:
+        """Вернуть сессию по токену или None. Протухшую (старше SESSION_MAX_AGE) удалить и вернуть None."""
         with self._conn() as conn:
             row = conn.execute(
                 "SELECT * FROM auth_sessions WHERE token = ?", (token,)
             ).fetchone()
-        return dict(row) if row else None
+            if row is None:
+                return None
+            created = datetime.fromisoformat(row["created_at"])
+            if datetime.now(timezone.utc) - created > timedelta(seconds=SESSION_MAX_AGE):
+                conn.execute("DELETE FROM auth_sessions WHERE token = ?", (token,))
+                return None
+        return dict(row)
 
     def delete_auth_session(self, token: str) -> None:
         with self._conn() as conn:
@@ -446,7 +462,7 @@ class Database:
                 (candidate, tenant_id, candidate_id, interviewer_id, _now()),
             )
             sid = cur.lastrowid
-        return self.get_session(sid)
+        return self.get_session(sid, tenant_id)
 
     def sessions_by_candidate(self, tenant_id: str, candidate_id: int) -> List[Dict]:
         """Все сессии кандидата в тенанте (история), без оценок — для списка."""
@@ -461,17 +477,20 @@ class Database:
             ).fetchall()
         return [dict(r) for r in rows]
 
-    def list_sessions(self) -> List[Dict]:
+    def list_sessions(self, tenant_id: str) -> List[Dict]:
         with self._conn() as conn:
             rows = conn.execute(
-                "SELECT * FROM sessions ORDER BY created_at DESC"
+                "SELECT * FROM sessions WHERE tenant_id = ? ORDER BY created_at DESC",
+                (tenant_id,),
             ).fetchall()
         return [dict(r) for r in rows]
 
-    def get_session(self, session_id: int) -> Optional[Dict]:
+    def get_session(self, session_id: int, tenant_id: str) -> Optional[Dict]:
+        """Сессия по id в пределах тенанта (изоляция: чужой тенант → None)."""
         with self._conn() as conn:
             row = conn.execute(
-                "SELECT * FROM sessions WHERE id = ?", (session_id,)
+                "SELECT * FROM sessions WHERE id = ? AND tenant_id = ?",
+                (session_id, tenant_id),
             ).fetchone()
             if row is None:
                 return None
@@ -485,7 +504,13 @@ class Database:
 
     # --- scores ---
     def set_score(
-        self, session_id: int, node_id: str, score: int, note: Optional[str] = None
+        self,
+        session_id: int,
+        node_id: str,
+        score: int,
+        note: Optional[str] = None,
+        *,
+        tenant_id: str,
     ) -> Dict:
         with self._conn() as conn:
             conn.execute(
@@ -499,4 +524,4 @@ class Database:
                 """,
                 (session_id, node_id, score, note, _now()),
             )
-        return self.get_session(session_id)
+        return self.get_session(session_id, tenant_id)

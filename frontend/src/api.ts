@@ -41,7 +41,14 @@ export interface AuthUser {
 // В dev /api проксируется Vite на :8000; в прод тот же origin (раздаёт FastAPI).
 const BASE = "/api";
 
-async function json<T>(res: Response): Promise<T> {
+// auth-hardening (#40): 401 в середине сессии (протухла/инвалидирована) → перезагрузка,
+// AuthGate заново покажет логин. skipAuthReload — для auth-проб (login/me), которые сами
+// штатно отдают 401 (неверный пароль / нет сессии): без исключения была бы петля релоадов.
+async function json<T>(res: Response, opts?: { skipAuthReload?: boolean }): Promise<T> {
+  if (res.status === 401 && !opts?.skipAuthReload) {
+    window.location.reload();
+    throw new Error("session expired");
+  }
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
   return res.json() as Promise<T>;
 }
@@ -126,10 +133,13 @@ export const api = {
       credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
-    }).then(json<AuthUser>),
+    }).then((res) => json<AuthUser>(res, { skipAuthReload: true })),
   logout: () =>
     fetch(`${BASE}/auth/logout`, { method: "POST", credentials: "include" }).then(
       json<{ ok: boolean }>,
     ),
-  me: () => fetch(`${BASE}/auth/me`, { credentials: "include" }).then(json<AuthUser>),
+  me: () =>
+    fetch(`${BASE}/auth/me`, { credentials: "include" }).then((res) =>
+      json<AuthUser>(res, { skipAuthReload: true }),
+    ),
 };

@@ -13,6 +13,7 @@ import asyncio
 import json
 import logging
 import os
+import secrets
 import tempfile
 from pathlib import Path
 from typing import List, Optional
@@ -31,7 +32,7 @@ from .auth import (
     require_owner,
     verify_password,
 )
-from .db import Database
+from .db import SESSION_MAX_AGE, Database
 from .hub import SessionHub
 from .importer import parse_file
 from .models import Block, Difficulty, GraphResponse, Kind, Node
@@ -48,7 +49,22 @@ DB_PATH = Path(os.environ.get("INTERVIEW_DB_PATH", BASE_DIR / "interview.db"))
 FRONTEND_DIR = Path(os.environ.get("INTERVIEW_FRONTEND_DIR", PROJECT_DIR / "frontend" / "dist"))
 # Креды первого owner-аккаунта для тенанта default (сид при первом старте, см. ниже).
 OWNER_EMAIL = os.environ.get("INTERVIEW_OWNER_EMAIL", "owner@interview.local")
-OWNER_PASSWORD = os.environ.get("INTERVIEW_OWNER_PASSWORD", "interview-dev")
+
+
+def _resolve_owner_password() -> tuple[str, bool]:
+    """Пароль owner-аккаунта: из env или случайный.
+
+    Если `INTERVIEW_OWNER_PASSWORD` не задан — НЕ используем известный дефолт (иначе
+    публичный логин-барьер бутафорский), а генерим случайный и сигналим, что он
+    сгенерирован (залогируется один раз при сиде). Возвращает (пароль, сгенерирован_ли).
+    """
+    env = os.environ.get("INTERVIEW_OWNER_PASSWORD")
+    if env:
+        return env, False
+    return secrets.token_urlsafe(24), True
+
+
+OWNER_PASSWORD, _OWNER_PASSWORD_GENERATED = _resolve_owner_password()
 
 app = FastAPI(title="Interview Graph", version="0.1.0")
 
@@ -79,6 +95,14 @@ if seed_interviewer_if_empty(db, resolve_tenant()):
 # Сид первого owner-аккаунта для тенанта default — иначе после включения auth некому войти.
 if seed_owner_if_empty(db, resolve_tenant(), OWNER_EMAIL, OWNER_PASSWORD):
     log.info("seeded owner account %s", OWNER_EMAIL)
+    if _OWNER_PASSWORD_GENERATED:
+        # Пароль не задан через env — показываем сгенерированный ОДИН раз, иначе войти нельзя.
+        log.warning(
+            "INTERVIEW_OWNER_PASSWORD не задан — сгенерирован случайный пароль owner-аккаунта "
+            "%s: %s  (задайте INTERVIEW_OWNER_PASSWORD, чтобы управлять им)",
+            OWNER_EMAIL,
+            OWNER_PASSWORD,
+        )
 
 
 # ---------- request models ----------
@@ -187,8 +211,9 @@ def login(body: LoginIn, request: Request, response: Response) -> dict:
         raise HTTPException(status_code=401, detail="invalid credentials")
     token = db.create_auth_session(tenant, user["id"])
     # Без Secure: сервис локальный (http) — Secure-cookie не пересылалась бы по http.
+    # max_age = TTL сессии (см. SESSION_MAX_AGE): cookie протухает синхронно с server-side.
     response.set_cookie(
-        COOKIE_NAME, token, httponly=True, samesite="lax", path="/"
+        COOKIE_NAME, token, httponly=True, samesite="lax", path="/", max_age=SESSION_MAX_AGE
     )
     return _public_user(user)
 
@@ -440,8 +465,8 @@ def create_session(
 
 
 @app.get("/api/sessions")
-def list_sessions(_user: dict = Depends(current_user)) -> list:
-    return db.list_sessions()
+def list_sessions(request: Request, _user: dict = Depends(current_user)) -> list:
+    return db.list_sessions(resolve_tenant(request))
 
 
 BLOCK_ORDER = ["frameworks", "databases", "python", "platform"]
@@ -462,12 +487,13 @@ def compare_sessions(ids: str, request: Request, _user: dict = Depends(current_u
     if not id_list:
         raise HTTPException(status_code=400, detail="ids is required")
 
+    tenant = resolve_tenant(request)
     node_block = {n.id: n.block for n in _db_nodes(request)}
     present = [b for b in BLOCK_ORDER if b in set(node_block.values())]
 
     sessions_out = []
     for sid in id_list:
-        sess = db.get_session(sid)
+        sess = db.get_session(sid, tenant)
         if sess is None:
             continue
         by_block: dict = {b: [] for b in present}
@@ -489,18 +515,21 @@ def compare_sessions(ids: str, request: Request, _user: dict = Depends(current_u
 
 
 @app.get("/api/sessions/{session_id}")
-def get_session(session_id: int, _user: dict = Depends(current_user)) -> dict:
-    session = db.get_session(session_id)
+def get_session(session_id: int, request: Request, _user: dict = Depends(current_user)) -> dict:
+    session = db.get_session(session_id, resolve_tenant(request))
     if session is None:
         raise HTTPException(status_code=404, detail="session not found")
     return session
 
 
 @app.post("/api/sessions/{session_id}/score")
-async def set_score(session_id: int, body: ScoreIn, _user: dict = Depends(require_member)) -> dict:
-    if db.get_session(session_id) is None:
+async def set_score(
+    session_id: int, body: ScoreIn, request: Request, _user: dict = Depends(require_member)
+) -> dict:
+    tenant = resolve_tenant(request)
+    if db.get_session(session_id, tenant) is None:
         raise HTTPException(status_code=404, detail="session not found")
-    session = db.set_score(session_id, body.node_id, body.score, body.note)
+    session = db.set_score(session_id, body.node_id, body.score, body.note, tenant_id=tenant)
     hub.publish(session_id, session)
     return session
 
@@ -517,7 +546,7 @@ async def session_events(
 
     Позволяет интервьюеру и HR одновременно видеть изменения по одному кандидату.
     """
-    session = db.get_session(session_id)
+    session = db.get_session(session_id, resolve_tenant(request))
     if session is None:
         raise HTTPException(status_code=404, detail="session not found")
     queue = hub.subscribe(session_id)
