@@ -14,8 +14,16 @@ DEFAULT_TENANT = "default"
 def resolve_tenant(request=None) -> str:
     """Вернуть id тенанта для запроса.
 
-    Single-tenant: всегда `default`. Шов для мультитенанта: здесь будет чтение
-    tenant_id из аутентифицированного пользователя (JWT/сессия). Сигнатура принимает
-    request заранее, чтобы вызовы в main.py не пришлось менять при включении auth.
+    Тенант берётся из аутентифицированного пользователя: зависимость `auth.current_user`
+    (висит на защищённых ручках) кладёт его в `request.state.tenant`. Если состояние не
+    проставлено (нет request, либо ручка вне auth — login/seed) — `default`.
+
+    ВНИМАНИЕ (fail-open): ручка, зовущая `resolve_tenant(request)` без зависимости
+    `current_user`/`require_*`, молча получит `default` вместо 401. Каждый вызов в main.py
+    обязан идти в паре с auth-зависимостью — иначе аутентификация обходится.
     """
+    if request is not None:
+        tenant = getattr(request.state, "tenant", None)
+        if tenant:
+            return tenant
     return DEFAULT_TENANT

@@ -1,0 +1,71 @@
+"""Аутентификация и авторизация: хеши паролей, server-side сессии, RBAC.
+
+Механизм — HttpOnly session-cookie + локальные аккаунты (email+пароль). Токен сессии
+хранится server-side (таблица `auth_sessions`), в cookie уходит только непредсказуемое
+значение. Cookie без флага `Secure`: сервис работает только локально по http (см. CLAUDE.md),
+а `Secure`-cookie не пересылалась бы по http (TestClient/smoke сломались бы).
+
+Роли (RBAC): owner > member > viewer.
+- viewer — только чтение (доска, сессии);
+- member — правки банка/кандидатов/сессий/оценок;
+- owner — всё member + управление пользователями.
+
+Зависимости читают `db` из `request.app.state.db` (его кладёт main.py при старте) и
+проставляют `request.state.tenant`/`request.state.user`, откуда их берёт `resolve_tenant`.
+"""
+
+from __future__ import annotations
+
+from typing import Callable
+
+from fastapi import Depends, HTTPException, Request
+from passlib.context import CryptContext
+
+COOKIE_NAME = "session"
+ROLE_RANK = {"viewer": 0, "member": 1, "owner": 2}
+
+_pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+def hash_password(password: str) -> str:
+    return _pwd.hash(password)
+
+
+def verify_password(password: str, password_hash: str) -> bool:
+    return _pwd.verify(password, password_hash)
+
+
+def current_user(request: Request) -> dict:
+    """FastAPI-зависимость: вернуть аутентифицированного пользователя или бросить 401.
+
+    Побочно проставляет `request.state.tenant`/`request.state.user`, чтобы
+    `resolve_tenant(request)` в теле ручки отдавал тенант залогиненного юзера.
+    """
+    db = request.app.state.db
+    token = request.cookies.get(COOKIE_NAME)
+    if not token:
+        raise HTTPException(status_code=401, detail="not authenticated")
+    sess = db.get_auth_session(token)
+    if sess is None:
+        raise HTTPException(status_code=401, detail="not authenticated")
+    user = db.get_user_by_id(sess["tenant_id"], sess["user_id"])
+    if user is None:
+        raise HTTPException(status_code=401, detail="not authenticated")
+    request.state.tenant = user["tenant_id"]
+    request.state.user = user
+    return user
+
+
+def require_role(min_role: str) -> Callable[..., dict]:
+    """Фабрика зависимости, требующей роль не ниже `min_role` (иначе 403)."""
+
+    def dep(user: dict = Depends(current_user)) -> dict:
+        if ROLE_RANK.get(user["role"], -1) < ROLE_RANK[min_role]:
+            raise HTTPException(status_code=403, detail="insufficient role")
+        return user
+
+    return dep
+
+
+require_member = require_role("member")
+require_owner = require_role("owner")

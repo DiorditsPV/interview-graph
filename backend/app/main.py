@@ -17,18 +17,26 @@ import tempfile
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from .auth import (
+    COOKIE_NAME,
+    current_user,
+    hash_password,
+    require_member,
+    require_owner,
+    verify_password,
+)
 from .db import Database
 from .hub import SessionHub
 from .importer import parse_file
 from .models import Block, Difficulty, GraphResponse, Kind, Node
 from .sampler import build_interview, load_tracks, load_weights
-from .seed import seed_interviewer_if_empty, seed_tenant_if_empty
+from .seed import seed_interviewer_if_empty, seed_owner_if_empty, seed_tenant_if_empty
 from .tenancy import resolve_tenant
 
 log = logging.getLogger("interview")
@@ -38,18 +46,24 @@ PROJECT_DIR = BASE_DIR.parent                              # interview/
 CONTENT_DIR = Path(os.environ.get("INTERVIEW_CONTENT_DIR", PROJECT_DIR / "content"))
 DB_PATH = Path(os.environ.get("INTERVIEW_DB_PATH", BASE_DIR / "interview.db"))
 FRONTEND_DIR = Path(os.environ.get("INTERVIEW_FRONTEND_DIR", PROJECT_DIR / "frontend" / "dist"))
+# Креды первого owner-аккаунта для тенанта default (сид при первом старте, см. ниже).
+OWNER_EMAIL = os.environ.get("INTERVIEW_OWNER_EMAIL", "owner@interview.local")
+OWNER_PASSWORD = os.environ.get("INTERVIEW_OWNER_PASSWORD", "interview-dev")
 
 app = FastAPI(title="Interview Graph", version="0.1.0")
 
-# CORS для dev-режима Vite (localhost:5173).
+# CORS для dev-режима Vite (localhost:5173). allow_credentials=True — фронт шлёт session-cookie
+# (credentials:'include'); со списком явных origin это валидно (с "*" — нет).
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 db = Database(DB_PATH)
+app.state.db = db  # auth-зависимости берут db отсюда (request.app.state.db)
 hub = SessionHub()
 
 # Сид банка вопросов в БД при первом старте (пустая таблица nodes у тенанта default).
@@ -62,9 +76,25 @@ if _seed_errors:
 # Сид интервьюера по умолчанию («Я») для тенанта default — у сессии всегда есть проводивший.
 if seed_interviewer_if_empty(db, resolve_tenant()):
     log.info("seeded default interviewer")
+# Сид первого owner-аккаунта для тенанта default — иначе после включения auth некому войти.
+if seed_owner_if_empty(db, resolve_tenant(), OWNER_EMAIL, OWNER_PASSWORD):
+    log.info("seeded owner account %s", OWNER_EMAIL)
 
 
 # ---------- request models ----------
+class LoginIn(BaseModel):
+    email: str = Field(min_length=1)
+    password: str = Field(min_length=1)
+
+
+class UserCreate(BaseModel):
+    """Создание пользователя owner'ом: email + пароль + роль."""
+
+    email: str = Field(min_length=3)
+    password: str = Field(min_length=6)
+    role: str = Field(default="member", pattern="^(owner|member|viewer)$")
+
+
 class SessionCreate(BaseModel):
     candidate: str = Field(min_length=1)
     candidate_id: Optional[int] = Field(default=None, alias="candidateId")
@@ -137,6 +167,67 @@ class NodeUpdate(BaseModel):
     answer: Optional[str] = None
 
 
+# ---------- auth (login / logout / me) ----------
+def _public_user(user: dict) -> dict:
+    """Поля пользователя наружу — без password_hash."""
+    return {
+        "id": user["id"],
+        "email": user["email"],
+        "role": user["role"],
+        "tenant_id": user["tenant_id"],
+    }
+
+
+@app.post("/api/auth/login")
+def login(body: LoginIn, request: Request, response: Response) -> dict:
+    """Проверить email+пароль, выдать server-side сессию в HttpOnly-cookie."""
+    tenant = resolve_tenant(request)  # без сессии → default (single-workspace)
+    user = db.get_user_by_email(tenant, body.email)
+    if user is None or not verify_password(body.password, user["password_hash"]):
+        raise HTTPException(status_code=401, detail="invalid credentials")
+    token = db.create_auth_session(tenant, user["id"])
+    # Без Secure: сервис локальный (http) — Secure-cookie не пересылалась бы по http.
+    response.set_cookie(
+        COOKIE_NAME, token, httponly=True, samesite="lax", path="/"
+    )
+    return _public_user(user)
+
+
+@app.post("/api/auth/logout")
+def logout(request: Request, response: Response) -> dict:
+    token = request.cookies.get(COOKIE_NAME)
+    if token:
+        db.delete_auth_session(token)
+    response.delete_cookie(COOKIE_NAME, path="/")
+    return {"ok": True}
+
+
+@app.get("/api/auth/me")
+def auth_me(user: dict = Depends(current_user)) -> dict:
+    return _public_user(user)
+
+
+# ---------- users (управление пользователями — owner) ----------
+@app.get("/api/users")
+def list_users(request: Request, _owner: dict = Depends(require_owner)) -> list:
+    return db.list_users(resolve_tenant(request))
+
+
+@app.post("/api/users")
+def create_user(body: UserCreate, request: Request, _owner: dict = Depends(require_owner)) -> dict:
+    """Завести пользователя в тенанте owner'а. 409 при дубликате email."""
+    import sqlite3
+
+    tenant = resolve_tenant(request)
+    if db.get_user_by_email(tenant, body.email) is not None:
+        raise HTTPException(status_code=409, detail="email already exists")
+    try:
+        user = db.create_user(tenant, body.email, hash_password(body.password), body.role)
+    except sqlite3.IntegrityError:
+        raise HTTPException(status_code=409, detail="email already exists")
+    return _public_user(user)
+
+
 # ---------- graph & content ----------
 # Поля, которые понимает models.Node (остальные — tenant_id/source/hidden/таймстемпы —
 # живут только в БД-слое; Node их не принимает из-за extra="forbid").
@@ -153,23 +244,23 @@ def _db_nodes(request: Request = None) -> List[Node]:
 
 
 @app.get("/api/graph", response_model=GraphResponse)
-def get_graph(request: Request) -> GraphResponse:
+def get_graph(request: Request, _user: dict = Depends(current_user)) -> GraphResponse:
     # Вопросы читаются из БД (а не с диска) — рантайм-правки переживают деплой.
     return GraphResponse(nodes=_db_nodes(request), errors=[])
 
 
 @app.get("/api/weights")
-def get_weights() -> dict:
+def get_weights(_user: dict = Depends(current_user)) -> dict:
     return load_weights(CONTENT_DIR)
 
 
 @app.get("/api/tracks")
-def get_tracks() -> list:
+def get_tracks(_user: dict = Depends(current_user)) -> list:
     return load_tracks(CONTENT_DIR)
 
 
 @app.post("/api/import")
-def import_file(body: ImportFile, request: Request) -> dict:
+def import_file(body: ImportFile, request: Request, _user: dict = Depends(require_member)) -> dict:
     """Загрузить .md/.json: распарсить тем же импортёром, валидные новые ноды сохранить в БД.
 
     Пишем в БД (source='user'), а не на диск content/ — иначе деплой (rsync --delete)
@@ -228,7 +319,7 @@ def _unique_node_id(tenant: str, base: str) -> str:
 
 
 @app.post("/api/nodes")
-def add_node(body: NodeCreate, request: Request) -> dict:
+def add_node(body: NodeCreate, request: Request, _user: dict = Depends(require_member)) -> dict:
     """Создать новый вопрос в банке (БД, source='user'). id генерится из topic/title."""
     tenant = resolve_tenant(request)
     base = _slugify(body.topic or body.title or body.block)
@@ -240,7 +331,9 @@ def add_node(body: NodeCreate, request: Request) -> dict:
 
 
 @app.put("/api/nodes/{node_id}")
-def edit_node(node_id: str, body: NodeUpdate, request: Request) -> dict:
+def edit_node(
+    node_id: str, body: NodeUpdate, request: Request, _user: dict = Depends(require_member)
+) -> dict:
     """Обновить структурные поля вопроса. 404 если нет, 422 если результат невалиден."""
     tenant = resolve_tenant(request)
     existing = db.get_node(tenant, node_id)
@@ -259,7 +352,7 @@ def edit_node(node_id: str, body: NodeUpdate, request: Request) -> dict:
 
 
 @app.delete("/api/nodes/{node_id}")
-def remove_node(node_id: str, request: Request) -> dict:
+def remove_node(node_id: str, request: Request, _user: dict = Depends(require_member)) -> dict:
     """Безвозвратно удалить вопрос из банка (БД). 404, если нет."""
     tenant = resolve_tenant(request)
     if not db.delete_node(tenant, node_id):
@@ -268,7 +361,9 @@ def remove_node(node_id: str, request: Request) -> dict:
 
 
 @app.post("/api/interview")
-def make_interview(req: InterviewRequest, request: Request) -> dict:
+def make_interview(
+    req: InterviewRequest, request: Request, _user: dict = Depends(current_user)
+) -> dict:
     nodes = _db_nodes(request)
     track_include = None
     if req.track:
@@ -287,17 +382,22 @@ def make_interview(req: InterviewRequest, request: Request) -> dict:
 
 # ---------- people (interviewers + candidates) ----------
 @app.get("/api/candidates")
-def list_candidates(request: Request) -> list:
+def list_candidates(request: Request, _user: dict = Depends(current_user)) -> list:
     return db.list_candidates(resolve_tenant(request))
 
 
 @app.post("/api/candidates")
-def add_candidate(body: CandidateCreate, request: Request) -> dict:
+def add_candidate(
+    body: CandidateCreate, request: Request, _user: dict = Depends(require_member)
+) -> dict:
     return db.create_candidate(resolve_tenant(request), body.model_dump())
 
 
 @app.put("/api/candidates/{candidate_id}")
-def edit_candidate(candidate_id: int, body: CandidateUpdate, request: Request) -> dict:
+def edit_candidate(
+    candidate_id: int, body: CandidateUpdate, request: Request,
+    _user: dict = Depends(require_member),
+) -> dict:
     tenant = resolve_tenant(request)
     updated = db.update_candidate(tenant, candidate_id, body.model_dump(exclude_none=True))
     if updated is None:
@@ -306,18 +406,22 @@ def edit_candidate(candidate_id: int, body: CandidateUpdate, request: Request) -
 
 
 @app.get("/api/interviewers")
-def list_interviewers(request: Request) -> list:
+def list_interviewers(request: Request, _user: dict = Depends(current_user)) -> list:
     return db.list_interviewers(resolve_tenant(request))
 
 
 @app.post("/api/interviewers")
-def add_interviewer(body: InterviewerCreate, request: Request) -> dict:
+def add_interviewer(
+    body: InterviewerCreate, request: Request, _user: dict = Depends(require_member)
+) -> dict:
     return db.create_interviewer(resolve_tenant(request), body.model_dump())
 
 
 # ---------- sessions ----------
 @app.post("/api/sessions")
-def create_session(body: SessionCreate, request: Request) -> dict:
+def create_session(
+    body: SessionCreate, request: Request, _user: dict = Depends(require_member)
+) -> dict:
     tenant = resolve_tenant(request)
     # Если передан candidate_id — денормализуем имя в sessions.candidate (фиксация имени
     # на момент интервью + быстрый показ без джойна). Иначе используем свободный текст.
@@ -336,7 +440,7 @@ def create_session(body: SessionCreate, request: Request) -> dict:
 
 
 @app.get("/api/sessions")
-def list_sessions() -> list:
+def list_sessions(_user: dict = Depends(current_user)) -> list:
     return db.list_sessions()
 
 
@@ -350,7 +454,7 @@ def _agg(vals: List[int]) -> dict:
 # ВАЖНО: объявлено ДО "/api/sessions/{session_id}" — иначе FastAPI попытается распарсить
 # "compare" как session_id: int и вернёт 422 (роут станет недоступен).
 @app.get("/api/sessions/compare")
-def compare_sessions(ids: str, request: Request) -> dict:
+def compare_sessions(ids: str, request: Request, _user: dict = Depends(current_user)) -> dict:
     try:
         id_list = [int(x) for x in ids.split(",") if x.strip()]
     except ValueError:
@@ -385,7 +489,7 @@ def compare_sessions(ids: str, request: Request) -> dict:
 
 
 @app.get("/api/sessions/{session_id}")
-def get_session(session_id: int) -> dict:
+def get_session(session_id: int, _user: dict = Depends(current_user)) -> dict:
     session = db.get_session(session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="session not found")
@@ -393,7 +497,7 @@ def get_session(session_id: int) -> dict:
 
 
 @app.post("/api/sessions/{session_id}/score")
-async def set_score(session_id: int, body: ScoreIn) -> dict:
+async def set_score(session_id: int, body: ScoreIn, _user: dict = Depends(require_member)) -> dict:
     if db.get_session(session_id) is None:
         raise HTTPException(status_code=404, detail="session not found")
     session = db.set_score(session_id, body.node_id, body.score, body.note)
@@ -406,7 +510,9 @@ def _sse(event: str, data: dict) -> str:
 
 
 @app.get("/api/sessions/{session_id}/events")
-async def session_events(session_id: int, request: Request) -> StreamingResponse:
+async def session_events(
+    session_id: int, request: Request, _user: dict = Depends(current_user)
+) -> StreamingResponse:
     """SSE-поток: снимок сессии при подключении + обновления после каждой оценки.
 
     Позволяет интервьюеру и HR одновременно видеть изменения по одному кандидату.
