@@ -3,14 +3,16 @@
 # Фича (GitHub Issue) → /autoplan → реализация на feature-ветке → гейт → ветка-кандидат.
 # НЕ пушит, НЕ мёржит, НЕ деплоит, НЕ коммитит в dev/main. Полностью без вопросов пользователю.
 #
-# Использование: ./.claude/run-autodev.sh [N]   (N циклов, по умолчанию 1)
+# Использование: ./.claude/run-autodev.sh [N] [ISSUE]
+#   N=1 по умолчанию; ISSUE — конкретный issue (иначе берётся первый autodev-ready).
 set -euo pipefail
 
 REPO="/Users/pdiordits/dev/projects/work-tools/interview"
 cd "$REPO"
 
 CYCLES="${1:-1}"
-DELAY_SEC=10            # пауза между циклами
+TARGET_ISSUE="${2:-}"  # опционально: конкретный issue (иначе первый autodev-ready)
+DELAY_SEC=10           # пауза между циклами
 MAX_OPEN_BRANCHES=3     # STOP: накопились непромёрженные кандидаты
 
 # OPENCLAW_SESSION=1 — load-bearing: gstack-скиллы авто-пропускают интерактивные промпты
@@ -19,6 +21,11 @@ export OPENCLAW_SESSION=1
 
 # Доступные задачи = открытые issue (не эпики) без ветки feature/<номер>-*.
 eligible_issues() {
+  if [ -n "$TARGET_ISSUE" ]; then
+    if gh issue list --state open --label autodev-ready --json number -q '.[].number' 2>/dev/null | grep -qx "$TARGET_ISSUE" \
+       && ! git branch --list "feature/$TARGET_ISSUE-*" | grep -q .; then echo 1; else echo 0; fi
+    return
+  fi
   local c=0 n
   while read -r n; do
     [ -z "$n" ] && continue
@@ -35,9 +42,7 @@ PROMPT='Ты ведёшь ОДИН автономный цикл разрабо�
 
 Шаги:
 1. git switch dev; дерево чистое (если dirty — STOP с отчётом).
-2. Возьми задачу: gh issue list --state open --label autodev-ready. Выбери первый такой issue без ветки
-   feature/<номер>-* (git branch --list). Если таких нет — выведи ровно: AUTODEV_STOP: no-tasks и заверши.
-   slug = "<номер>-<краткий-kebab-тайтл>".
+2. __TASK__
 3. Создай ветку feature/<slug> от dev. Отметь взятие: gh issue comment <номер> "autodev: взято в работу, ветка feature/<slug>".
 4. Спроектируй план реализации фичи через /autoplan (без интерактивных /plan-*-review, /office-hours).
 5. Реализуй фичу по issue: код backend (FastAPI/Pydantic/SQLite) и/или frontend (React/TS/Vite).
@@ -51,6 +56,13 @@ PROMPT='Ты ведёшь ОДИН автономный цикл разрабо�
 
 Инварианты: НЕ пушить (ни dev, ни main — обе автодеплоят на push), НЕ мёржить, НЕ деплоить, НЕ коммитить в dev/main.
 Код фичи — только на feature/<slug>. Идемпотентность — по существованию ветки feature/<номер>-*. STOP — в feature-flow.md.'
+
+if [ -n "$TARGET_ISSUE" ]; then
+  TASK="Возьми РОВНО issue #$TARGET_ISSUE (он помечен autodev-ready). Если у него уже есть ветка feature/$TARGET_ISSUE-* — выведи AUTODEV_STOP: no-tasks. slug = \"$TARGET_ISSUE-<краткий-kebab-тайтл>\"."
+else
+  TASK="Возьми задачу: gh issue list --state open --label autodev-ready. Выбери первый такой issue без ветки feature/<номер>-* (git branch --list). Если таких нет — выведи ровно: AUTODEV_STOP: no-tasks. slug = \"<номер>-<краткий-kebab-тайтл>\"."
+fi
+PROMPT="${PROMPT//__TASK__/$TASK}"
 
 for ((i = 1; i <= CYCLES; i++)); do
   echo "=== autodev cycle $i/$CYCLES ==="
