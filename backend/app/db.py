@@ -11,10 +11,14 @@ INTERVIEW_DB_PATH). content/*.md остаются сидом при первом
 from __future__ import annotations
 
 import json
+import secrets
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Dict, List, Optional
+
+# TTL сессии аутентификации: время жизни server-side auth-session и max_age cookie (см. main.py).
+SESSION_MAX_AGE = 30 * 24 * 3600  # 30 дней, секунды
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS tenants (
@@ -42,6 +46,22 @@ CREATE TABLE IF NOT EXISTS nodes (
     created_at   TEXT NOT NULL,
     updated_at   TEXT NOT NULL,
     PRIMARY KEY (tenant_id, id)
+);
+CREATE TABLE IF NOT EXISTS users (
+    tenant_id     TEXT NOT NULL DEFAULT 'default' REFERENCES tenants(id),
+    id            TEXT NOT NULL,                -- генерится сервером (token_hex); TEXT — под шов interviewers.user_id
+    email         TEXT NOT NULL,
+    password_hash TEXT NOT NULL,                -- bcrypt; пароль в открытом виде не хранится
+    role          TEXT NOT NULL DEFAULT 'member', -- owner | member | viewer
+    created_at    TEXT NOT NULL,
+    PRIMARY KEY (tenant_id, id),
+    UNIQUE (tenant_id, email)
+);
+CREATE TABLE IF NOT EXISTS auth_sessions (
+    token      TEXT PRIMARY KEY,                -- значение HttpOnly-cookie (server-side session)
+    tenant_id  TEXT NOT NULL,
+    user_id    TEXT NOT NULL,
+    created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS interviewers (
     tenant_id   TEXT NOT NULL DEFAULT 'default' REFERENCES tenants(id),
@@ -141,6 +161,89 @@ class Database:
                 "INSERT OR IGNORE INTO tenants (id, name, created_at) VALUES (?, ?, ?)",
                 (tenant_id, name or tenant_id, _now()),
             )
+
+    # --- users (auth, per-tenant) ---
+    def count_users(self, tenant_id: str) -> int:
+        with self._conn() as conn:
+            return conn.execute(
+                "SELECT COUNT(*) FROM users WHERE tenant_id = ?", (tenant_id,)
+            ).fetchone()[0]
+
+    def list_users(self, tenant_id: str) -> List[Dict]:
+        """Пользователи тенанта без password_hash (хеш наружу не отдаём)."""
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT tenant_id, id, email, role, created_at FROM users "
+                "WHERE tenant_id = ? ORDER BY created_at",
+                (tenant_id,),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def get_user_by_id(self, tenant_id: str, user_id: str) -> Optional[Dict]:
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM users WHERE tenant_id = ? AND id = ?",
+                (tenant_id, user_id),
+            ).fetchone()
+        return dict(row) if row else None
+
+    def get_user_by_email(self, tenant_id: str, email: str) -> Optional[Dict]:
+        """Полная строка (с password_hash) — для проверки пароля при логине."""
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM users WHERE tenant_id = ? AND email = ?",
+                (tenant_id, email),
+            ).fetchone()
+        return dict(row) if row else None
+
+    def create_user(
+        self, tenant_id: str, email: str, password_hash: str, role: str = "member"
+    ) -> Dict:
+        """Создать пользователя (id — случайный token_hex). Бросает sqlite3.IntegrityError
+        при дубликате email в тенанте (UNIQUE(tenant_id, email))."""
+        uid = secrets.token_hex(8)
+        with self._conn() as conn:
+            conn.execute(
+                "INSERT INTO users (tenant_id, id, email, password_hash, role, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (tenant_id, uid, email, password_hash, role, _now()),
+            )
+        return self.get_user_by_id(tenant_id, uid)
+
+    # --- auth sessions (server-side, токен = значение cookie) ---
+    def create_auth_session(self, tenant_id: str, user_id: str) -> str:
+        token = secrets.token_urlsafe(32)
+        with self._conn() as conn:
+            # Повторный логин инвалидирует прежние сессии того же пользователя:
+            # один активный токен на аккаунт (старые cookie перестают работать).
+            conn.execute(
+                "DELETE FROM auth_sessions WHERE tenant_id = ? AND user_id = ?",
+                (tenant_id, user_id),
+            )
+            conn.execute(
+                "INSERT INTO auth_sessions (token, tenant_id, user_id, created_at) "
+                "VALUES (?, ?, ?, ?)",
+                (token, tenant_id, user_id, _now()),
+            )
+        return token
+
+    def get_auth_session(self, token: str) -> Optional[Dict]:
+        """Вернуть сессию по токену или None. Протухшую (старше SESSION_MAX_AGE) удалить и вернуть None."""
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM auth_sessions WHERE token = ?", (token,)
+            ).fetchone()
+            if row is None:
+                return None
+            created = datetime.fromisoformat(row["created_at"])
+            if datetime.now(timezone.utc) - created > timedelta(seconds=SESSION_MAX_AGE):
+                conn.execute("DELETE FROM auth_sessions WHERE token = ?", (token,))
+                return None
+        return dict(row)
+
+    def delete_auth_session(self, token: str) -> None:
+        with self._conn() as conn:
+            conn.execute("DELETE FROM auth_sessions WHERE token = ?", (token,))
 
     # --- nodes (банк вопросов, per-tenant) ---
     def count_nodes(self, tenant_id: str) -> int:
@@ -359,7 +462,7 @@ class Database:
                 (candidate, tenant_id, candidate_id, interviewer_id, _now()),
             )
             sid = cur.lastrowid
-        return self.get_session(sid)
+        return self.get_session(sid, tenant_id)
 
     def sessions_by_candidate(self, tenant_id: str, candidate_id: int) -> List[Dict]:
         """Все сессии кандидата в тенанте (история), без оценок — для списка."""
@@ -374,17 +477,20 @@ class Database:
             ).fetchall()
         return [dict(r) for r in rows]
 
-    def list_sessions(self) -> List[Dict]:
+    def list_sessions(self, tenant_id: str) -> List[Dict]:
         with self._conn() as conn:
             rows = conn.execute(
-                "SELECT * FROM sessions ORDER BY created_at DESC"
+                "SELECT * FROM sessions WHERE tenant_id = ? ORDER BY created_at DESC",
+                (tenant_id,),
             ).fetchall()
         return [dict(r) for r in rows]
 
-    def get_session(self, session_id: int) -> Optional[Dict]:
+    def get_session(self, session_id: int, tenant_id: str) -> Optional[Dict]:
+        """Сессия по id в пределах тенанта (изоляция: чужой тенант → None)."""
         with self._conn() as conn:
             row = conn.execute(
-                "SELECT * FROM sessions WHERE id = ?", (session_id,)
+                "SELECT * FROM sessions WHERE id = ? AND tenant_id = ?",
+                (session_id, tenant_id),
             ).fetchone()
             if row is None:
                 return None
@@ -398,7 +504,13 @@ class Database:
 
     # --- scores ---
     def set_score(
-        self, session_id: int, node_id: str, score: int, note: Optional[str] = None
+        self,
+        session_id: int,
+        node_id: str,
+        score: int,
+        note: Optional[str] = None,
+        *,
+        tenant_id: str,
     ) -> Dict:
         with self._conn() as conn:
             conn.execute(
@@ -412,4 +524,4 @@ class Database:
                 """,
                 (session_id, node_id, score, note, _now()),
             )
-        return self.get_session(session_id)
+        return self.get_session(session_id, tenant_id)
