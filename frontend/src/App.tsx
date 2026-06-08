@@ -937,7 +937,7 @@ export default function App() {
                   ))}
                 </select>
               )}
-              <button onClick={startSession}>Начать сессию</button>
+              <button className="btn--primary" onClick={startSession}>Начать сессию</button>
               {pastSessions.length > 0 && (
                 <select
                   className="loadsess"
@@ -1093,12 +1093,13 @@ export default function App() {
               onNodeClick={onNodeClick}
               onInit={(inst) => {
                 instance.current = inst;
-                inst.fitView({ padding: 0.12 });
               }}
               nodesDraggable={false}
               nodesConnectable={false}
-              fitView
-              fitViewOptions={{ padding: 0.12 }}
+              // Читаемый дефолт: верхний-левый угол доски при зуме 0.5 (карточки ~140px,
+              // читаются при открытии). Не fitView — тот ужимает все 61 карту до ~62px.
+              // Все board-координаты ≥10 → первый .qnode остаётся в кадре (x,y ≥ 0).
+              defaultViewport={{ x: 20, y: 20, zoom: 0.5 }}
               minZoom={0.1}
               proOptions={{ hideAttribution: true }}
             >
