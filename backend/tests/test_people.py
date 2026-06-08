@@ -14,9 +14,12 @@ from app.db import Database
 
 
 def _client() -> TestClient:
-    from app.main import app
+    from app.main import OWNER_EMAIL, OWNER_PASSWORD, app
 
-    return TestClient(app)
+    c = TestClient(app)
+    # auth-identity (#36): логинимся owner'ом — ручки гейтятся.
+    c.post("/api/auth/login", json={"email": OWNER_EMAIL, "password": OWNER_PASSWORD})
+    return c
 
 
 # --- API: CRUD кандидатов ---

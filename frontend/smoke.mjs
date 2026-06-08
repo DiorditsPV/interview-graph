@@ -13,6 +13,16 @@ page.on("pageerror", (e) => errors.push(String(e)));
 
 await page.goto(URL, { waitUntil: "networkidle" });
 
+// 0. auth-identity (#36): доска за гейтом — логинимся owner'ом (дефолтные сид-креды).
+await page.waitForSelector(".login__card", { timeout: 10000 });
+await page.fill('.login__input[type="email"]', process.env.SMOKE_OWNER_EMAIL || "owner@interview.local");
+await page.fill('.login__input[type="password"]', process.env.SMOKE_OWNER_PASSWORD || "interview-dev");
+await page.click(".login__card button[type=submit]");
+console.log("OK: logged in as owner");
+// AuthGate проверяет сессию через /api/auth/me ДО логина → ожидаемый 401 в консоли.
+// Сбрасываем накопленное, чтобы он не считался ошибкой; пост-логин запросы идут с cookie.
+errors.length = 0;
+
 // 1. Граф отрисовался: есть кастомные ноды.
 await page.waitForSelector(".qnode", { timeout: 10000 });
 const nodeCount = await page.locator(".qnode").count();

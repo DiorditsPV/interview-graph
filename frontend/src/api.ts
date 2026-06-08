@@ -30,6 +30,14 @@ export interface NodeCreate {
   tags: string[];
 }
 
+// auth-identity (#36): пользователь сессии (без password_hash).
+export interface AuthUser {
+  id: string;
+  email: string;
+  role: "owner" | "member" | "viewer";
+  tenant_id: string;
+}
+
 // В dev /api проксируется Vite на :8000; в прод тот же origin (раздаёт FastAPI).
 const BASE = "/api";
 
@@ -110,4 +118,18 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     }).then(json<Interviewer>),
+  // auth-identity (#36): server-side сессия в HttpOnly-cookie. credentials:"include" —
+  // чтобы cookie слалась и в dev (Vite-прокси), и в прод (тот же origin).
+  login: (email: string, password: string) =>
+    fetch(`${BASE}/auth/login`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    }).then(json<AuthUser>),
+  logout: () =>
+    fetch(`${BASE}/auth/logout`, { method: "POST", credentials: "include" }).then(
+      json<{ ok: boolean }>,
+    ),
+  me: () => fetch(`${BASE}/auth/me`, { credentials: "include" }).then(json<AuthUser>),
 };
