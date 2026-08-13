@@ -51,4 +51,6 @@ fi
 # --- run ---
 echo "→ [$PROFILE] http://localhost:$PORT"
 cd backend
-exec python -m uvicorn app.main:app --port "$PORT" "${RELOAD[@]}"
+# ${RELOAD[@]+…} обязателен: в bash 3.2 (системный на macOS) под `set -u` раскрытие
+# пустого массива считается обращением к неустановленной переменной, и prod-профиль падал.
+exec python -m uvicorn app.main:app --port "$PORT" ${RELOAD[@]+"${RELOAD[@]}"}

@@ -54,6 +54,16 @@ function scoresOf(s: { scores: Session["scores"] }): Record<string, number> {
   return Object.fromEntries(Object.entries(s.scores).map(([id, v]) => [id, v.score]));
 }
 
+// То же для заметок: они лежат в схеме оценок (score+note) и должны переживать
+// перезагрузку/подключение к сессии, иначе выглядят как потерянные.
+function notesOf(s: { scores: Session["scores"] }): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(s.scores)
+      .filter(([, v]) => v.note)
+      .map(([id, v]) => [id, v.note as string]),
+  );
+}
+
 const nodeTypes = {
   question: QuestionNode,
   blockGroup: BlockGroupNode,
@@ -665,6 +675,7 @@ export default function App() {
         const s = await api.getSession(id);
         setSession(s);
         setScores(scoresOf(s));
+        setNotes(notesOf(s));
         setSessionParam(id);
       } catch {
         setSessionParam(null);
@@ -707,6 +718,7 @@ export default function App() {
       try {
         const snap = JSON.parse(e.data) as Session;
         setScores((prev) => ({ ...prev, ...scoresOf(snap) }));
+        setNotes((prev) => ({ ...prev, ...notesOf(snap) }));
       } catch {
         /* ignore malformed frame */
       }
@@ -726,7 +738,8 @@ export default function App() {
     if (!id) return;
     const s = await api.getSession(id);
     setSession(s);
-    setScores(Object.fromEntries(Object.entries(s.scores).map(([nid, v]) => [nid, v.score])));
+    setScores(scoresOf(s));
+    setNotes(notesOf(s));
   }, []);
 
   const toggleBlock = (b: Block) => setActiveBlocks((s) => ({ ...s, [b]: !s[b] }));
