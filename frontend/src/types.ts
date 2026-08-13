@@ -147,6 +147,17 @@ export const DIFF_COLOR: Record<Difficulty, string> = {
 };
 
 // rgba из hex-цвета с заданной прозрачностью (для полупрозрачных дорожек).
+// Осветлить цвет блока для тёмной темы: синий/фиолетовый на тёмном фоне иначе
+// сливаются с подложкой, и заголовки колонок перестают читаться.
+export function lighten(hex: string, amount: number): string {
+  const h = hex.replace("#", "");
+  const mix = (c: number) => Math.round(c + (255 - c) * amount);
+  const r = mix(parseInt(h.slice(0, 2), 16));
+  const g = mix(parseInt(h.slice(2, 4), 16));
+  const b = mix(parseInt(h.slice(4, 6), 16));
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
 export function hexA(hex: string, alpha: number): string {
   const h = hex.replace("#", "");
   const r = parseInt(h.slice(0, 2), 16);

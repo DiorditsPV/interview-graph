@@ -210,6 +210,12 @@ async function main() {
     await page.mouse.wheel(0, -240);
     await settle(page, 200);
   }
+  // Сдвиг вправо: после зума левая колонка иначе обрезается по краю кадра.
+  const pane2 = await page.locator(".react-flow__pane").boundingBox();
+  await page.mouse.move(pane2.x + pane2.width / 2, pane2.y + pane2.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(pane2.x + pane2.width / 2 + 90, pane2.y + pane2.height / 2, { steps: 10 });
+  await page.mouse.up();
   await settle(page, 500);
   await shot(page, "02-scoring.png");
 
