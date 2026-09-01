@@ -67,8 +67,12 @@ def test_invalid_node_rejected():
 
 # --- API ---
 def _client():
-    from app.main import app
-    return TestClient(app)
+    from app.main import OWNER_EMAIL, OWNER_PASSWORD, app
+
+    c = TestClient(app)
+    # auth-identity (#36): логинимся owner'ом — ручки гейтятся.
+    c.post("/api/auth/login", json={"email": OWNER_EMAIL, "password": OWNER_PASSWORD})
+    return c
 
 
 def test_api_graph():

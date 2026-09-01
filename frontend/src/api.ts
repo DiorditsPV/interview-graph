@@ -30,10 +30,25 @@ export interface NodeCreate {
   tags: string[];
 }
 
+// auth-identity (#36): пользователь сессии (без password_hash).
+export interface AuthUser {
+  id: string;
+  email: string;
+  role: "owner" | "member" | "viewer";
+  tenant_id: string;
+}
+
 // В dev /api проксируется Vite на :8000; в прод тот же origin (раздаёт FastAPI).
 const BASE = "/api";
 
-async function json<T>(res: Response): Promise<T> {
+// auth-hardening (#40): 401 в середине сессии (протухла/инвалидирована) → перезагрузка,
+// AuthGate заново покажет логин. skipAuthReload — для auth-проб (login/me), которые сами
+// штатно отдают 401 (неверный пароль / нет сессии): без исключения была бы петля релоадов.
+async function json<T>(res: Response, opts?: { skipAuthReload?: boolean }): Promise<T> {
+  if (res.status === 401 && !opts?.skipAuthReload) {
+    window.location.reload();
+    throw new Error("session expired");
+  }
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
   return res.json() as Promise<T>;
 }
@@ -110,4 +125,21 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     }).then(json<Interviewer>),
+  // auth-identity (#36): server-side сессия в HttpOnly-cookie. credentials:"include" —
+  // чтобы cookie слалась и в dev (Vite-прокси), и в прод (тот же origin).
+  login: (email: string, password: string) =>
+    fetch(`${BASE}/auth/login`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    }).then((res) => json<AuthUser>(res, { skipAuthReload: true })),
+  logout: () =>
+    fetch(`${BASE}/auth/logout`, { method: "POST", credentials: "include" }).then(
+      json<{ ok: boolean }>,
+    ),
+  me: () =>
+    fetch(`${BASE}/auth/me`, { credentials: "include" }).then((res) =>
+      json<AuthUser>(res, { skipAuthReload: true }),
+    ),
 };

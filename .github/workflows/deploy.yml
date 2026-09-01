@@ -61,7 +61,10 @@ jobs:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
           SSH_PORT: ${{ secrets.SSH_PORT }}
+          OWNER_PASSWORD: ${{ secrets.OWNER_PASSWORD }}
         run: |
           PORT="${SSH_PORT:-22}"
+          # base64 — безопасно к спецсимволам пароля в ssh-команде (если секрет пуст — пустой b64).
+          OWNER_PW_B64=$(printf '%s' "$OWNER_PASSWORD" | base64 | tr -d '\n')
           ssh -i ~/.ssh/deploy_key -p "${PORT}" "${SSH_USER}@${SSH_HOST}" \
-            'sudo bash ~/interview-src/deploy/bootstrap.sh ~/interview-src prod'
+            "sudo INTERVIEW_OWNER_PASSWORD_B64='${OWNER_PW_B64}' bash ~/interview-src/deploy/bootstrap.sh ~/interview-src prod"

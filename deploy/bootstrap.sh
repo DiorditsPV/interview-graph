@@ -82,6 +82,19 @@ sudo -u "$SVC_USER" python3 -m venv "$APP_DIR/backend/.venv"
 sudo -u "$SVC_USER" "$APP_DIR/backend/.venv/bin/python" -m pip install -q --upgrade pip
 sudo -u "$SVC_USER" "$APP_DIR/backend/.venv/bin/pip" install -q -r "$APP_DIR/backend/requirements.txt"
 
+# 4b) секрет owner-пароля (необяз.) — из деплоя приходит base64-кодированным.
+# Кладём в root-only env-файл (mode 600), а НЕ в Environment= юнита (тот world-readable).
+OWNER_ENV_FILE="$DATA_DIR/owner.env"
+if [ -n "${INTERVIEW_OWNER_PASSWORD_B64:-}" ]; then
+  _owner_pw=$(printf '%s' "$INTERVIEW_OWNER_PASSWORD_B64" | base64 -d 2>/dev/null || true)
+  if [ -n "$_owner_pw" ]; then
+    printf 'INTERVIEW_OWNER_PASSWORD=%s\n' "$_owner_pw" > "$OWNER_ENV_FILE"
+    chown "$SVC_USER":"$SVC_USER" "$OWNER_ENV_FILE"
+    chmod 600 "$OWNER_ENV_FILE"
+    echo "→ owner-пароль записан в $OWNER_ENV_FILE (600)"
+  fi
+fi
+
 # 5) systemd-юнит ----------------------------------------------------------
 cat > "/etc/systemd/system/$SVC.service" <<UNIT
 [Unit]
@@ -95,6 +108,7 @@ WorkingDirectory=$APP_DIR/backend
 Environment=INTERVIEW_DB_PATH=$DATA_DIR/interview.db
 Environment=INTERVIEW_CONTENT_DIR=$APP_DIR/content
 Environment=INTERVIEW_FRONTEND_DIR=$APP_DIR/frontend/dist
+EnvironmentFile=-$OWNER_ENV_FILE
 ExecStart=$APP_DIR/backend/.venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT
 Restart=always
 RestartSec=2

@@ -81,7 +81,7 @@ export function DetailDrawer({ node, score, note, fullscreen, hidden, onToggleHi
             onClick={() => onToggleHide(node.id)}
             title={hidden ? "Вернуть на доску" : "Скрыть с доски (локально, обратимо)"}
           >
-            {hidden ? "↩ Вернуть" : "🙈 Скрыть"}
+            {hidden ? "Вернуть" : "Скрыть"}
           </button>
           <button
             className="drawer__delete"
@@ -92,15 +92,15 @@ export function DetailDrawer({ node, score, note, fullscreen, hidden, onToggleHi
             }}
             title="Удалить вопрос из банка (необратимо)"
           >
-            🗑 Удалить
+            Удалить
           </button>
           {!editing && (
             <button className="drawer__edit" onClick={startEdit} title="Редактировать вопрос (в банке)">
-              ✏ Редактировать
+              Редактировать
             </button>
           )}
           <button onClick={onToggleFullscreen} title="Развернуть/свернуть">
-            {fullscreen ? "⤢ свернуть" : "⤢ на весь экран"}
+            {fullscreen ? "Свернуть" : "На весь экран"}
           </button>
           <button onClick={onClose} title="Закрыть (Esc)">
             ✕

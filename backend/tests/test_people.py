@@ -14,9 +14,12 @@ from app.db import Database
 
 
 def _client() -> TestClient:
-    from app.main import app
+    from app.main import OWNER_EMAIL, OWNER_PASSWORD, app
 
-    return TestClient(app)
+    c = TestClient(app)
+    # auth-identity (#36): логинимся owner'ом — ручки гейтятся.
+    c.post("/api/auth/login", json={"email": OWNER_EMAIL, "password": OWNER_PASSWORD})
+    return c
 
 
 # --- API: CRUD кандидатов ---
@@ -175,7 +178,7 @@ def test_migration_upgrades_old_sessions_schema(tmp_path):
 
     # Открытие через Database выполняет миграцию (ALTER ADD COLUMN под guard'ом).
     db = Database(path)
-    sess = db.get_session(1)
+    sess = db.get_session(1, "default")
     assert sess is not None
     assert sess["candidate"] == "Старый Кандидат"
     assert sess["tenant_id"] == "default"  # новый столбец с DEFAULT
@@ -184,7 +187,7 @@ def test_migration_upgrades_old_sessions_schema(tmp_path):
 
     # Повторное открытие идемпотентно (guard PRAGMA не делает повторный ALTER).
     db2 = Database(path)
-    assert db2.get_session(1)["candidate"] == "Старый Кандидат"
+    assert db2.get_session(1, "default")["candidate"] == "Старый Кандидат"
 
     # И новые сессии со ссылками работают на мигрированной БД.
     db2.ensure_tenant("default")

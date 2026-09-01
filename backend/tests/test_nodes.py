@@ -13,9 +13,12 @@ from fastapi.testclient import TestClient
 
 
 def _client() -> TestClient:
-    from app.main import app
+    from app.main import OWNER_EMAIL, OWNER_PASSWORD, app
 
-    return TestClient(app)
+    c = TestClient(app)
+    # auth-identity (#36): ручки гейтятся — логинимся owner'ом (cookie живёт в TestClient).
+    c.post("/api/auth/login", json={"email": OWNER_EMAIL, "password": OWNER_PASSWORD})
+    return c
 
 
 def _graph_ids(c: TestClient) -> set:

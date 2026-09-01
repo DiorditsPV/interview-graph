@@ -10,6 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Tuple
 
+from .auth import hash_password
 from .db import Database
 from .importer import load_content
 
@@ -38,4 +39,18 @@ def seed_interviewer_if_empty(db: Database, tenant_id: str) -> int:
     if db.count_interviewers(tenant_id) > 0:
         return 0
     db.create_interviewer(tenant_id, {"name": "Я", "role": "Ведущий"})
+    return 1
+
+
+def seed_owner_if_empty(db: Database, tenant_id: str, email: str, password: str) -> int:
+    """Сид первого owner-пользователя при пустой таблице users тенанта.
+
+    Без этого после включения auth никто не сможет войти (нет аккаунтов) — owner
+    нужен, чтобы залогиниться и завести коллег. Креды берутся из env (см. main.py).
+    Идемпотентно: при непустой таблице ничего не делает.
+    """
+    db.ensure_tenant(tenant_id)
+    if db.count_users(tenant_id) > 0:
+        return 0
+    db.create_user(tenant_id, email, hash_password(password), role="owner")
     return 1

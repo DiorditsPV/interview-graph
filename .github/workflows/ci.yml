@@ -64,6 +64,7 @@ jobs:
         working-directory: backend
         env:
           INTERVIEW_DB_PATH: /tmp/iv_ci.db
+          INTERVIEW_OWNER_PASSWORD: interview-dev   # детерминированный owner-пароль для auth-фикстур
         run: python -m pytest -q
 
       # --- 5. Браузер для smoke (на раннере — без allowlist-ограничений) ---
@@ -75,10 +76,12 @@ jobs:
       - name: Smoke (headless runtime)
         env:
           INTERVIEW_DB_PATH: /tmp/iv_smoke.db
+          INTERVIEW_OWNER_PASSWORD: interview-dev   # smoke логинится этим owner-паролем
           SMOKE_URL: http://localhost:8000/
         run: |
           cd backend
           python -m uvicorn app.main:app --port 8000 > /tmp/uvicorn.log 2>&1 &
-          for i in $(seq 1 40); do curl -sf http://localhost:8000/api/graph >/dev/null && break; sleep 0.5; done
+          # /api/graph теперь за auth (401) — проба готовности по корню (200).
+          for i in $(seq 1 40); do curl -sf http://localhost:8000/ >/dev/null && break; sleep 0.5; done
           cd ../frontend
           npm run smoke
