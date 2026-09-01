@@ -33,9 +33,9 @@ function QuestionNodeImpl({ data, selected }: NodeProps) {
       title={node.question}
     >
       <div className="qnode__head">
-        <span className="qnode__kind">
-          {hidden ? "🙈 " : ""}
-          {isTask ? "🛠 задача" : "❓ вопрос"}
+        <span className={`qnode__kind ${isTask ? "qnode__kind--task" : ""}`}>
+          {hidden ? "скрыт · " : ""}
+          {isTask ? "задача" : "вопрос"}
         </span>
         <span className="qnode__diff" data-diff={node.difficulty}>
           {node.difficulty}
@@ -61,13 +61,15 @@ function QuestionNodeImpl({ data, selected }: NodeProps) {
         <span className="qnode__topic" style={{ background: color }}>
           {node.topic}
         </span>
-        <span className="qnode__score">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <span key={i} className={score != null && i <= score ? "star star--on" : "star"}>
-              ●
-            </span>
-          ))}
-        </span>
+        {/* Балл цифрой, а не пятью точками: на масштабе «вся доска» точки нечитаемы,
+            а оценённость карточки — главный сигнал во время интервью. */}
+        {score != null ? (
+          <span className="qnode__grade" data-band={score >= 4 ? "high" : score === 3 ? "mid" : "low"}>
+            {score}/5
+          </span>
+        ) : (
+          <span className="qnode__grade qnode__grade--empty">—</span>
+        )}
       </div>
     </div>
   );

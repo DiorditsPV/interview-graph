@@ -54,6 +54,16 @@ function scoresOf(s: { scores: Session["scores"] }): Record<string, number> {
   return Object.fromEntries(Object.entries(s.scores).map(([id, v]) => [id, v.score]));
 }
 
+// То же для заметок: они лежат в схеме оценок (score+note) и должны переживать
+// перезагрузку/подключение к сессии, иначе выглядят как потерянные.
+function notesOf(s: { scores: Session["scores"] }): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(s.scores)
+      .filter(([, v]) => v.note)
+      .map(([id, v]) => [id, v.note as string]),
+  );
+}
+
 const nodeTypes = {
   question: QuestionNode,
   blockGroup: BlockGroupNode,
@@ -96,6 +106,7 @@ function buildNodes(
   showHidden: boolean,
   guidesH: boolean,
   guidesV: boolean,
+  dark: boolean,
 ): Node[] {
   const nodes: Node[] = [];
   const anyTag = Object.values(activeTags).some(Boolean);
@@ -104,7 +115,7 @@ function buildNodes(
     id: "bg-bands",
     type: "bands",
     position: { x: -LABEL_W, y: 0 },
-    data: { bands: p.bands, width: p.width, labelW: LABEL_W, height: p.height },
+    data: { bands: p.bands, width: p.width, labelW: LABEL_W, height: p.height, dark },
     draggable: false,
     selectable: false,
     zIndex: -5,
@@ -129,7 +140,7 @@ function buildNodes(
       id: `bg-${bg.block}`,
       type: "blockGroup",
       position: { x: bg.x, y: 0 },
-      data: { block: bg.block, width: bg.width, height: bg.height, count: blockNodes.length, done, split: bg.split },
+      data: { block: bg.block, width: bg.width, height: bg.height, count: blockNodes.length, done, split: bg.split, dark },
       draggable: false,
       selectable: false,
       zIndex: -6,
@@ -144,7 +155,7 @@ function buildNodes(
       id: `sh-${col.block}-${col.subblock}`,
       type: "subhead",
       position: { x: col.x, y: 0 },
-      data: { block: col.block, label: col.label, width: col.width, count: colNodes.length, done },
+      data: { block: col.block, label: col.label, width: col.width, count: colNodes.length, done, dark },
       draggable: false,
       selectable: false,
       zIndex: -3,
@@ -284,6 +295,10 @@ export default function App() {
   const [guidesH, setGuidesH] = useState<boolean>(() => localStorage.getItem("guidesH") === "1");
   const [guidesV, setGuidesV] = useState<boolean>(() => localStorage.getItem("guidesV") === "1");
   const [agendaOpen, setAgendaOpen] = useState<boolean>(() => localStorage.getItem("agendaOpen") === "1");
+  // Панель фильтров лежит поверх канвы: без сворачивания она съедает правую треть доски.
+  const [filtersOpen, setFiltersOpen] = useState<boolean>(
+    () => localStorage.getItem("filtersOpen") !== "0",
+  );
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -294,6 +309,7 @@ export default function App() {
   useEffect(() => localStorage.setItem("guidesV", guidesV ? "1" : "0"), [guidesV]);
   useEffect(() => localStorage.setItem("track", activeTrack), [activeTrack]);
   useEffect(() => localStorage.setItem("agendaOpen", agendaOpen ? "1" : "0"), [agendaOpen]);
+  useEffect(() => localStorage.setItem("filtersOpen", filtersOpen ? "1" : "0"), [filtersOpen]);
   // hide-local: персист набора скрытых id.
   useEffect(() => localStorage.setItem("hiddenIds", JSON.stringify([...hiddenIds])), [hiddenIds]);
   // draft-autosave: persist черновика оценок, пока нет активной сессии (в сессии — БД источник правды).
@@ -472,9 +488,9 @@ export default function App() {
   const rfNodes = useMemo(
     () =>
       placement
-        ? buildNodes(graph, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, trackInclude, query.toLowerCase().trim(), unscoredOnly, hiddenIds, showHidden, guidesH, guidesV)
+        ? buildNodes(graph, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, trackInclude, query.toLowerCase().trim(), unscoredOnly, hiddenIds, showHidden, guidesH, guidesV, theme === "dark")
         : [],
-    [graph, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, trackInclude, query, unscoredOnly, hiddenIds, showHidden, guidesH, guidesV],
+    [graph, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, trackInclude, query, unscoredOnly, hiddenIds, showHidden, guidesH, guidesV, theme],
   );
 
   const centerOn = useCallback(
@@ -665,6 +681,7 @@ export default function App() {
         const s = await api.getSession(id);
         setSession(s);
         setScores(scoresOf(s));
+        setNotes(notesOf(s));
         setSessionParam(id);
       } catch {
         setSessionParam(null);
@@ -707,6 +724,7 @@ export default function App() {
       try {
         const snap = JSON.parse(e.data) as Session;
         setScores((prev) => ({ ...prev, ...scoresOf(snap) }));
+        setNotes((prev) => ({ ...prev, ...notesOf(snap) }));
       } catch {
         /* ignore malformed frame */
       }
@@ -726,7 +744,8 @@ export default function App() {
     if (!id) return;
     const s = await api.getSession(id);
     setSession(s);
-    setScores(Object.fromEntries(Object.entries(s.scores).map(([nid, v]) => [nid, v.score])));
+    setScores(scoresOf(s));
+    setNotes(notesOf(s));
   }, []);
 
   const toggleBlock = (b: Block) => setActiveBlocks((s) => ({ ...s, [b]: !s[b] }));
@@ -759,6 +778,14 @@ export default function App() {
   }, [graph, scores]);
 
   const anyTagActive = Object.values(activeTags).some(Boolean);
+  // Свёрнутая панель не должна прятать факт, что доска отфильтрована, — отсюда точка-индикатор.
+  const anyFilterOn =
+    anyTagActive ||
+    query.trim() !== "" ||
+    unscoredOnly ||
+    BLOCK_ORDER.some((b) => !activeBlocks[b]) ||
+    DIFFS.some((d) => !activeDiffs[d]) ||
+    KINDS.some((k) => !activeKinds[k]);
   // Прогресс по ТЕКУЩЕМУ отфильтрованному набору. Условие "проходит фильтры" держать в
   // синхроне с предикатом `dimmed` в buildNodes (block/diff/kind/tag).
   const coverage = useMemo(() => {
@@ -971,27 +998,28 @@ export default function App() {
             </>
           )}
           <button
-            className="iconbtn addbtn"
+            className="iconbtn addbtn btn--quiet"
             onClick={() => setAddOpen(true)}
             title="Добавить вопрос в банк"
           >
             Добавить вопрос
           </button>
           <button
-            className="iconbtn uploadbtn"
+            className="iconbtn uploadbtn btn--quiet"
             onClick={() => setUploadOpen(true)}
             title="Загрузить вопросы (.md/.json)"
           >
             Загрузить
           </button>
           <button
-            className="iconbtn"
+            className="iconbtn bankscreenbtn btn--quiet"
             onClick={() => setShowBank(true)}
             disabled={graph.length === 0}
             title="Открыть экран со всеми вопросами банка"
           >
             Все вопросы
           </button>
+          <span className="session__sep" aria-hidden="true" />
           <button
             className="iconbtn dlbtn"
             onClick={() => downloadReport(session?.candidate ?? candidate, graph, scores, trackLabel, notes, reportPeople)}
@@ -1017,7 +1045,7 @@ export default function App() {
             Сравнить
           </button>
           <button
-            className="iconbtn bankbtn"
+            className="iconbtn bankbtn btn--quiet"
             onClick={() => downloadBank(graph)}
             disabled={graph.length === 0}
             title="Скачать весь банк вопросов (HTML)"
@@ -1025,14 +1053,14 @@ export default function App() {
             Банк
           </button>
           <button
-            className="iconbtn helpbtn"
+            className="iconbtn helpbtn btn--quiet"
             onClick={() => setHelpOpen(true)}
             title="Горячие клавиши (?)"
           >
             ?
           </button>
           <button
-            className="iconbtn themebtn"
+            className="iconbtn themebtn btn--quiet"
             onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
             title="Переключить тему (светлая/тёмная)"
           >
@@ -1116,7 +1144,25 @@ export default function App() {
               />
 
               <Panel position="top-right">
-                <div className="filterpanel" role="region" aria-label="Фильтры вопросов">
+                <div
+                  className={`filterpanel ${filtersOpen ? "" : "filterpanel--closed"}`}
+                  role="region"
+                  aria-label="Фильтры вопросов"
+                >
+                  <div className="fp__bar">
+                    <button
+                      className="fp__toggle"
+                      onClick={() => setFiltersOpen((v) => !v)}
+                      aria-expanded={filtersOpen}
+                      title={filtersOpen ? "Свернуть фильтры" : "Развернуть фильтры"}
+                    >
+                      Фильтры
+                      <span className="fp__chevron">{filtersOpen ? "▸" : "◂"}</span>
+                    </button>
+                    {!filtersOpen && anyFilterOn && <span className="fp__badge" title="Фильтры активны" />}
+                  </div>
+                  {filtersOpen && (
+                  <>
                   <input
                     className="fp__search"
                     placeholder="Поиск по вопросам…"
@@ -1215,6 +1261,8 @@ export default function App() {
                         </button>
                       ))}
                   </div>
+                  </>
+                  )}
                 </div>
               </Panel>
 
