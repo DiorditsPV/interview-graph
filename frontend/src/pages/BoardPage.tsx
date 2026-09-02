@@ -170,7 +170,7 @@ function buildNodes(
     // hide-local: скрытый вопрос гасится (если не показываем скрытые); при показе — помечается.
     const hidden = hiddenIds.has(n.id);
     const dimmed =
-      !activeBlocks[n.block] ||
+      activeBlocks[n.block] === false ||
       !activeDiffs[n.difficulty] ||
       !activeKinds[n.kind] ||
       !tagOk ||
@@ -380,7 +380,7 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
     const s = new Set<string>();
     for (const n of graph) {
       const tagOk = !anyTag || n.tags.some((t) => activeTags[t]);
-      if (activeBlocks[n.block] && activeDiffs[n.difficulty] && activeKinds[n.kind] && tagOk) {
+      if (activeBlocks[n.block] !== false && activeDiffs[n.difficulty] && activeKinds[n.kind] && tagOk) {
         s.add(n.id);
       }
     }
@@ -722,7 +722,8 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
     setSession(s);
     setScores(scoresOf(s));
     setNotes(notesOf(s));
-  }, []);
+    setSessionParam(id);
+  }, [setSessionParam]);
 
   const toggleBlock = (b: string) => setActiveBlocks((s) => ({ ...s, [b]: !s[b] }));
   const toggleDiff = (d: Difficulty) => setActiveDiffs((s) => ({ ...s, [d]: !s[d] }));
@@ -769,7 +770,7 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
     let done = 0;
     for (const n of graph) {
       const tagOk = !anyTagActive || n.tags.some((t) => activeTags[t]);
-      if (activeBlocks[n.block] && activeDiffs[n.difficulty] && activeKinds[n.kind] && tagOk) {
+      if (activeBlocks[n.block] !== false && activeDiffs[n.difficulty] && activeKinds[n.kind] && tagOk) {
         total++;
         if (scores[n.id] != null) done++;
       }
