@@ -337,16 +337,26 @@ def create_pool(body: PoolCreate, request: Request, _user: dict = Depends(requir
 
     Id — транслитерация названия; занятый (в том числе tombstone удалённого) — с суффиксом -2, -3…
     """
+    import sqlite3
+
     tenant = resolve_tenant(request)
+    label = body.label.strip()
+    if not label:
+        # Field(min_length=1) пропускает строку из пробелов — иначе родится пул с пустым названием и id 'pool'.
+        raise HTTPException(status_code=422, detail="label must not be blank")
     preset = _pool_or_404(request, body.preset)
-    base = slug_from_label(body.label)
+    base = slug_from_label(label)
     pid, n = base, 2
     while db.get_pool(tenant, pid) is not None:
         pid, n = f"{base}-{n}", n + 1
-    row = db.create_pool(
-        tenant, pid, body.label.strip(), body.description.strip(), json.loads(blocks_to_json(preset.blocks))
-    )
-    db.copy_nodes(tenant, preset.id, pid)
+    try:
+        row = db.create_pool(
+            tenant, pid, label, body.description.strip(), json.loads(blocks_to_json(preset.blocks)),
+            copy_from=preset.id,
+        )
+    except sqlite3.IntegrityError as exc:
+        # id копии ноды (<pool>-<id>) занят чужой нодой — транзакция откатилась, пул не создан.
+        raise HTTPException(status_code=409, detail=f"node id collision while copying preset: {exc}")
     return _pool_out(request, pool_from_row(row))
 
 

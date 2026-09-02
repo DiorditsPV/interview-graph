@@ -316,8 +316,9 @@ await page.locator(`tr[data-session="${sid}"] a.iconbtn`, { hasText: "Откры
 await page.waitForSelector(".session__active", { timeout: 5000 });
 const active = await page.locator(".session__active").innerText();
 if (!active.includes("SmokeResume")) fail(`resume did not load session: ${active}`);
+// Граф и сессия грузятся независимо: .session__active может появиться раньше карточек — ждём оценку, а не считаем сразу.
+await page.waitForSelector(".qnode--scored", { timeout: 10000 }).catch(() => fail("resume did not restore scores onto the board"));
 const scoredCount = await page.locator(".qnode--scored").count();
-if (scoredCount < 1) fail("resume did not restore scores onto the board");
 // В активной сессии на месте «Скачать» и «Выйти»; после «Выйти» доска без сессии ведёт на форму старта.
 if ((await page.locator(".session .dlbtn").count()) !== 1) fail("download button missing in active session");
 await page.locator(".session button", { hasText: "Выйти" }).click();
