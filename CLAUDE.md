@@ -20,6 +20,9 @@ python / platform), внутри карточки ранжированы по с
 ./run.sh --build         # форс-пересборка фронта
 ./run.sh dev             # dev-профиль: порт 8001, своя БД interview-dev.db, --reload
 
+docker compose up -d --build  # тот же сервис в контейнере → :8000 (логин owner/interview-local)
+docker compose down -v        # остановить и снести том с БД
+
 # Бэкенд-тесты (из backend/, в активированном venv)
 cd backend && . .venv/bin/activate && pytest -q
 pytest tests/test_app.py -q                       # один файл
