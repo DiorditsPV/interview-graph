@@ -307,17 +307,6 @@ def get_graph(
     return GraphResponse(nodes=_db_nodes(request, _pool_or_404(pool)), errors=[])
 
 
-# PR 1: заглушки для старого фронта; удаляются вместе с ним в PR 2.
-@app.get("/api/weights")
-def get_weights(_user: dict = Depends(current_user)) -> dict:
-    return block_weights(_pool_or_404(None))
-
-
-@app.get("/api/tracks")
-def get_tracks(_user: dict = Depends(current_user)) -> list:
-    return [{"id": p.id, "label": p.label, "include": []} for p in POOLS.values()]
-
-
 @app.post("/api/import")
 def import_file(body: ImportFile, request: Request, _user: dict = Depends(require_member)) -> dict:
     """Загрузить .md/.json: распарсить тем же импортёром, валидные новые ноды сохранить в БД.

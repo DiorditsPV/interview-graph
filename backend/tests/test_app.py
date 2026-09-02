@@ -235,18 +235,6 @@ def test_api_graph_unknown_pool_404():
     assert _client().get("/api/graph?pool=nope").status_code == 404
 
 
-def test_api_tracks_stub_mirrors_pools():
-    """PR 1: старый фронт читает /api/tracks — отдаём пулы как треки без include-фильтра."""
-    tracks = _client().get("/api/tracks").json()
-    assert any(t["id"] == "data-engineer" and t["include"] == [] for t in tracks)
-
-
-def test_api_weights_stub_is_default_pool_weights():
-    assert _client().get("/api/weights").json() == {
-        "frameworks": 35, "databases": 30, "python": 23, "platform": 12
-    }
-
-
 def test_api_interview_pool_scoped():
     c = _client()
     r = c.post("/api/interview", json={"count": 8, "seed": 1, "pool": "data-engineer"})

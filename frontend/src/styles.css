@@ -57,7 +57,7 @@ body {
 
 .app { display: flex; flex-direction: column; height: 100vh; }
 
-/* ---- topbar (три ряда: поток интервью → служебное → работа с банком) ---- */
+/* ---- topbar (два ряда: где мы → ход интервью) ---- */
 .topbar {
   display: flex; flex-direction: column; gap: 6px;
   padding: 8px 16px; background: var(--surface); border-bottom: 1px solid var(--border);
@@ -67,13 +67,27 @@ body {
 .topbar__row--utility { padding-top: 6px; border-top: 1px solid var(--border); }
 .topbar__row--utility .iconbtn,
 .topbar__row--utility .tb__toggle { font-size: 13px; }
-/* ряд 3 — правки контента, а не ход интервью: тот же тихий регистр, что и служебный ряд */
-.topbar__row--content { padding-top: 6px; border-top: 1px solid var(--border); }
-.topbar__row--content .iconbtn { font-size: 13px; }
-.contentbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .topbar strong { color: var(--heading); }
 .appname { margin: 0; font-size: 16px; font-weight: 700; line-height: 1.2; color: var(--heading); }
+.topbar__back { color: var(--text-muted); text-decoration: none; font-size: 13px; white-space: nowrap; }
+.topbar__back:hover { color: var(--text); }
+.topbar__settings { margin-left: auto; }
 .topbar .muted { color: var(--text-faint); font-size: 13px; }
+
+/* ---- страницы кроме доски: тонкая полоса «← Меню · заголовок» + содержимое ---- */
+.page { display: flex; flex-direction: column; min-height: 100vh; background: var(--bg); }
+.pageshell {
+  display: flex; align-items: center; gap: 14px; padding: 10px 16px; flex-wrap: wrap;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.pageshell__back { color: var(--text-muted); text-decoration: none; font-size: 13px; white-space: nowrap; }
+.pageshell__back:hover { color: var(--text); }
+.pageshell__title { margin: 0; font-size: 16px; font-weight: 700; color: var(--heading); }
+/* узкий вьюпорт: заголовок может занять всю строку, экшены переносятся на следующую,
+   не выталкивая шапку за правый край (#18 — матрица скриншотов 390px). */
+.pageshell__actions { margin-left: auto; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.page__body { flex: 1; padding: 20px 16px; max-width: 1200px; width: 100%; margin: 0 auto; box-sizing: border-box; }
+
 .progress { display: flex; align-items: center; gap: 8px; }
 .progress__track {
   width: 120px; height: 6px; background: var(--border); border-radius: 999px; overflow: hidden;
@@ -126,32 +140,32 @@ button:disabled:hover { background: var(--surface); }
 .dlbtn:not(:disabled):hover { background: var(--accent); color: #fff; }
 .session__sep { width: 1px; align-self: stretch; margin: 2px 4px; background: var(--border); }
 
-/* ---- настройки отображения: поповер под ⚙ в шапке ----
+/* ---- настройки отображения: боковая панель ⚙ (.setdrawer) ----
    z-index между канвой (5) и модалками (50): всплывает над доской, но не над оверлеями. */
 .settings { position: relative; display: inline-flex; }
 .setbtn--on { background: var(--hover); color: var(--text); border-color: var(--border); }
-.settings__pop {
-  position: absolute; top: calc(100% + 8px); right: 0; z-index: 40;
-  min-width: 260px; padding: 14px;
-  display: flex; flex-direction: column; gap: 14px;
+.setdrawer {
+  position: fixed; left: 0; top: 0; bottom: 0; z-index: 45; width: 304px; max-width: 88vw;
+  display: flex; flex-direction: column; gap: 18px; padding: 16px; overflow-y: auto;
   background: var(--surface); color: var(--text);
-  border: 1px solid var(--border); border-radius: 12px;
-  box-shadow: 0 8px 32px var(--shadow-strong);
+  border-right: 1px solid var(--border); box-shadow: 0 0 40px var(--shadow-strong);
 }
+.setdrawer__head { display: flex; align-items: center; justify-content: space-between; }
+.setdrawer__close { padding: 2px 8px; line-height: 1; }
+.setdrawer__act {
+  display: block; width: 100%; text-align: left; padding: 8px 10px; text-decoration: none;
+  border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); font: inherit;
+}
+.setdrawer__act:hover { background: var(--hover); }
 .settings__group { display: flex; flex-direction: column; gap: 8px; }
 .settings__title {
   font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
-  color: var(--text-faint);
+  color: var(--text-muted);
 }
-/* Чипы в столбик: в поповере есть место на полные подписи вместо «Верт.»/«Гор.». */
+/* Чипы в столбик: в боковой панели ⚙ (.setdrawer) есть место на полные подписи вместо «Верт.»/«Гор.». */
 .settings__chips { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
 
-.tb__field { display: flex; align-items: center; gap: 6px; }
 .tb__lbl { font-size: 13px; color: var(--text-muted); }
-.tb__select {
-  padding: 5px 8px; border: 1px solid var(--border-strong); border-radius: 6px;
-  background: var(--surface); color: var(--text); font-size: 13px; cursor: pointer;
-}
 .tb__toggle { font-size: 13px; padding: 5px 10px; }
 .tb__toggle--on { background: var(--tag-bg); color: var(--tag-fg); border-color: var(--tag-fg); }
 
@@ -524,7 +538,7 @@ kbd {
   display: flex; flex-direction: column;
 }
 .bankbrowser__bar {
-  display: flex; align-items: center; gap: 12px; padding: 10px 16px;
+  display: flex; align-items: center; gap: 12px; padding: 10px 16px; flex-wrap: wrap;
   background: var(--surface); border-bottom: 1px solid var(--border); border-top: 4px solid #2563eb;
 }
 .bankbrowser__bar strong { font-size: 15px; color: var(--heading); }
@@ -608,3 +622,44 @@ kbd {
 @media (max-width: 640px) {
   .drawer { flex: 1 1 100%; width: 100%; max-width: 100%; }
 }
+
+/* ---- главное меню ---- */
+.home__h2 { margin: 18px 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--text-faint); }
+.home__pools { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+.poolcard {
+  position: relative;
+  display: flex; flex-direction: column; gap: 8px; padding: 16px; text-decoration: none; color: var(--text);
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+}
+.poolcard:hover { background: var(--hover); }
+.poolcard__label { font-size: 18px; font-weight: 800; color: var(--heading); text-decoration: none; }
+.poolcard__label::after { content: ""; position: absolute; inset: 0; }
+.poolcard:focus-within { border-color: var(--accent); }
+.poolcard__desc { font-size: 13px; color: var(--text-muted); }
+.poolcard__meta { font-size: 12px; color: var(--text-muted); }
+.poolcard__blocks { display: flex; flex-wrap: wrap; gap: 4px; }
+.poolcard__block { font-size: 11px; color: #fff; padding: 1px 7px; border-radius: 4px; }
+.poolcard__bank { margin-top: 4px; font-size: 12px; color: var(--accent); text-decoration: none; position: relative; z-index: 1; align-self: flex-start; }
+.home__sections { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.menucard {
+  display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; text-decoration: none; color: var(--text);
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+}
+.menucard:hover { background: var(--hover); }
+.menucard span { font-size: 13px; color: var(--text-muted); }
+/* банк как страница: без fixed-оверлея */
+.bankbrowser--embedded { position: static; inset: auto; height: auto; min-height: 60vh; }
+
+/* ---- таблицы и формы страниц ---- */
+.formrow { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; }
+.formrow input { padding: 6px 10px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--surface); color: var(--text); }
+/* узкий вьюпорт: таблица шире контейнера скроллится сама, а не раздвигает страницу
+   (#18 — матрица скриншотов 390px). min-width: max-content — не сжимается уже своего
+   содержимого (иначе текст ломается по буквам). */
+.table-wrap { width: 100%; overflow-x: auto; }
+.table { width: 100%; min-width: max-content; border-collapse: collapse; font-size: 14px; background: var(--surface); border: 1px solid var(--border); }
+.table th, .table td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+.table th { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); }
+.table__link { display: block; font-size: 12px; color: var(--accent); text-decoration: none; }
+.table__edit input { width: 100%; padding: 4px 6px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--surface); color: var(--text); }
+a.iconbtn { text-decoration: none; display: inline-block; }

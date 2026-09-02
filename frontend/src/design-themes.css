@@ -1,7 +1,7 @@
 /* ============================================================================
    Оформления доски (итог design-funnel, сентябрь 2026).
 
-   Вариант задаётся атрибутом data-design на <html> (state в App.tsx, выбор — в ⚙
+   Вариант задаётся атрибутом data-design на <html> (state в BoardPage.tsx, выбор — в ⚙
    настройках, хранится в localStorage). Дефолт — 37 «Брутализм в цвете».
 
    Правила игры:
@@ -44,7 +44,7 @@ html[data-design="57"]:not([data-theme="dark"]) .tagchip { border-radius: 0; }
 
 /* ============================ 37 · Брутализм в цвете (дефолт) ============================
    Жёсткие чёрные рамки, нулевые радиусы, плашки направлений в их семантических
-   цветах (BLOCK_COLOR), контрастная монохромная обвязка. */
+   цветах (цвета блоков из pool.yaml), контрастная монохромная обвязка. */
 html[data-design="37"]:not([data-theme="dark"]) {
   --bg: #f2f3f5; --surface: #fff; --panel-bg: rgba(255, 255, 255, .97);
   --border: #0f0f0f; --border-strong: #0f0f0f;
@@ -60,12 +60,9 @@ html[data-design="37"]:not([data-theme="dark"]) .subhead { border-radius: 0; }
 html[data-design="37"]:not([data-theme="dark"]) .bgroup__header {
   font-weight: 800; text-transform: uppercase; letter-spacing: .05em;
 }
-/* плашки направлений: 700-ряд, а не BLOCK_COLOR-600 — белый текст на 600-зелёном
-   и 600-янтарном давал 3.2–3.3:1 (ниже порога 4.5); на 700-ряде — 5.0–7.0. */
-html[data-design="37"]:not([data-theme="dark"]) .bgroup__header[data-block="frameworks"] { background: #1d4ed8 !important; color: #fff !important; }
-html[data-design="37"]:not([data-theme="dark"]) .bgroup__header[data-block="databases"] { background: #15803d !important; color: #fff !important; }
-html[data-design="37"]:not([data-theme="dark"]) .bgroup__header[data-block="python"] { background: #b45309 !important; color: #fff !important; }
-html[data-design="37"]:not([data-theme="dark"]) .bgroup__header[data-block="platform"] { background: #7e22ce !important; color: #fff !important; }
+/* плашки направлений: цвет считает BlockGroupNode (plateColor — затемнение цвета блока, пока
+   белый текст не даст ≥ 4.5:1 WCAG AA) и кладёт в --plate. !important — инлайновый полупрозрачный фон. */
+html[data-design="37"]:not([data-theme="dark"]) .bgroup__header { background: var(--plate) !important; color: #fff !important; }
 html[data-design="37"]:not([data-theme="dark"]) .topbar { border-bottom: 2px solid #0f0f0f; }
 html[data-design="37"]:not([data-theme="dark"]) .hud { border: 2px solid #0f0f0f; box-shadow: 2.5px 2.5px 0 #0f0f0f; }
 
@@ -170,9 +167,6 @@ html[data-theme="dark"] .subhead { border-radius: 0; }
 html[data-theme="dark"] .bgroup__header {
   font-weight: 800; text-transform: uppercase; letter-spacing: .05em;
 }
-html[data-theme="dark"] .bgroup__header[data-block="frameworks"] { background: #1d4ed8 !important; color: #fff !important; }
-html[data-theme="dark"] .bgroup__header[data-block="databases"] { background: #15803d !important; color: #fff !important; }
-html[data-theme="dark"] .bgroup__header[data-block="python"] { background: #b45309 !important; color: #fff !important; }
-html[data-theme="dark"] .bgroup__header[data-block="platform"] { background: #7e22ce !important; color: #fff !important; }
+html[data-theme="dark"] .bgroup__header { background: var(--plate) !important; color: #fff !important; }
 html[data-theme="dark"] .hud { border: 1.5px solid var(--border); }
 html[data-theme="dark"] .topbar { border-bottom: 1.5px solid var(--border); }

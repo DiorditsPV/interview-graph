@@ -4,7 +4,7 @@ import type { ImportResult } from "../types";
 
 // Загрузка .md/.json вопросов: drag-and-drop или выбор файла. Валидные новые ноды сохраняются на бэке,
 // после чего доска перезагружается (onImported). Esc/клик-по-фону закрывают (Esc — на оверлее).
-export function UploadModal({ onClose, onImported }: { onClose: () => void; onImported: () => void }) {
+export function UploadModal({ pool, onClose, onImported }: { pool: string; onClose: () => void; onImported: () => void }) {
   const [result, setResult] = useState<ImportResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [dragActive, setDragActive] = useState(false);
@@ -29,7 +29,7 @@ export function UploadModal({ onClose, onImported }: { onClose: () => void; onIm
     for (const file of Array.from(files)) {
       try {
         const text = await file.text();
-        const r = await api.importFile(file.name, text);
+        const r = await api.importFile(pool, file.name, text);
         acc.added.push(...r.added);
         acc.errors.push(...r.errors);
       } catch (e) {

@@ -71,7 +71,7 @@ const profile = (nodes, strength, coverage, salt, forceIds = []) => {
 
 async function seed() {
   await login();
-  const { nodes } = await api("GET", "/api/graph");
+  const { nodes } = await api("GET", "/api/graph?pool=data-engineer");
   const existing = await api("GET", "/api/candidates");
   const byName = new Map(existing.map((c) => [c.name, c]));
 
@@ -92,7 +92,7 @@ async function seed() {
   };
 
   // Идемпотентно: повторный прогон переиспользует сессию кандидата, а не плодит новые.
-  const sessions = await api("GET", "/api/sessions");
+  const sessions = await api("GET", "/api/sessions?pool=data-engineer");
   const run = async (cand, strength, coverage, salt, forceIds = []) => {
     const prev = sessions.find((s) => s.candidate === cand.name);
     if (prev) {
@@ -175,7 +175,8 @@ async function main() {
   await page.fill('.login__input[type="email"]', OWNER_EMAIL);
   await page.fill('.login__input[type="password"]', OWNER_PASSWORD);
   await page.click(".login__card button[type=submit]");
-  await page.waitForSelector(".qnode", { timeout: 15000 });
+  // После логина адрес без #-пути → главное меню (pools-main-menu), не доска.
+  await page.waitForSelector(".poolcard", { timeout: 15000 });
 
   const open = async (theme, query = `?session=${sA.id}`) => {
     await page.goto(BASE, { waitUntil: "domcontentloaded" });
@@ -187,10 +188,15 @@ async function main() {
       localStorage.removeItem("agendaOpen");
     }, theme);
     // networkidle не годится: сессия держит открытый SSE-стрим /events.
-    await page.goto(BASE + "/" + query, { waitUntil: "domcontentloaded" });
+    await page.goto(`${BASE}/#/board/data-engineer${query}`, { waitUntil: "domcontentloaded" });
     await page.waitForSelector(".qnode--scored", { timeout: 15000 });
     await settle(page, 800);
   };
+
+  // 0. Главное меню (pools-main-menu): направления как входы на доски.
+  await page.goto(BASE + "/#/", { waitUntil: "domcontentloaded" });
+  await page.waitForSelector(".poolcard", { timeout: 10000 });
+  await shot(page, "00-menu.png");
 
   // 1. Доска целиком, тёмная тема, сессия в разгаре.
   await open("dark");
@@ -245,8 +251,8 @@ async function main() {
 
   // 5. Банк вопросов: поиск по всем 61 вопросу с раскрытием ответа.
   await page.keyboard.press("Escape");
-  await page.locator(".contentbar .bankscreenbtn").click();
-  await page.waitForSelector(".bankbrowser", { timeout: 5000 });
+  await page.goto(BASE + "/#/bank/data-engineer", { waitUntil: "domcontentloaded" });
+  await page.waitForSelector(".bankbrowser--embedded", { timeout: 5000 });
   await page.locator(".bankbrowser__search").fill("spark");
   await settle(page, 400);
   await page.locator(".bankrow", { hasText: "Shuffle в Spark" }).first().click();

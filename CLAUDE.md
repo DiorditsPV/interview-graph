@@ -49,9 +49,13 @@ Dev hot-reload вручную: `uvicorn app.main:app --reload --port 8000` (из
 - `main.py` — FastAPI; полные схемы ручек в Swagger UI на `/docs`.
 
 **Фронт** (`frontend/src/`) — данные грузятся из `/api/graph` в рантайме:
-- `App.tsx` — состояние, `buildNodes`, панели/HUD, клавиатура, тема, реестр `nodeTypes`.
-- `layout.ts` — `swimlaneLayout` + `PREFERRED_SUB` (порядок под-колонок) + `SUB_LABEL` + `DIFFS`.
-- `types.ts` — `QNode`, перечисления `Block/Difficulty/Kind`, палитры `BLOCK_COLOR/LABEL`, `DIFF_COLOR`.
+- `router.ts`/`Router.tsx` — hash-роутер: `#/`, `#/board/<pool>`, `#/bank/<pool>`, `#/candidates`,
+  `#/sessions`, `#/connect`.
+- `pages/BoardPage.tsx` — доска пула: состояние, `buildNodes`, шапка, панель ⚙.
+- `pages/` — `HomePage`, `BankPage`, `CandidatesPage`, `SessionsPage`, `ConnectPage`.
+- `layout.ts` — `swimlaneLayout(nodes, pool)`: порядок блоков и под-колонок из `pool.yaml`, `DIFFS`, `subOf`.
+- `types.ts` — `QNode`, `PoolConfig` + `blockOrder/blockLabel/blockColor/subLabel` вместо констант,
+  `Block = string`, перечисления `Difficulty/Kind`, `DIFF_COLOR`.
 - `components/` — узлы канвы (QuestionNode, BlockGroupNode, SubHeadNode …) + DetailDrawer.
 - `report.ts` — клиентская генерация самодостаточного HTML-отчёта по сессии («📥 Скачать»).
 
@@ -66,7 +70,7 @@ Dev hot-reload вручную: `uvicorn app.main:app --reload --port 8000` (из
   чтобы сохранить нормализованный формат, а не ручным редактированием frontmatter.
 - **Изменения `content/` не требуют пересборки фронта** (грузится из API в рантайме).
   Изменения `frontend/src/` — требуют `npm run build`.
-- **Новый тип ноды на канве** = регистрация в `nodeTypes` (App.tsx).
+- **Новый тип ноды на канве** = регистрация в `nodeTypes` (BoardPage.tsx).
 - **Теги — только из ~17 сквозных концептов** (architecture, orchestration, optimization, …),
   1–3 на ноду, без тех-имён (технология видна по колонке). Полный список — в `AGENTS.md`.
 - В фиче-ветках **не пушить в `main`**: merge в `main` триггерит автодеплой на сервер (порт 8800,

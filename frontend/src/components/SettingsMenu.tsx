@@ -1,16 +1,20 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 
-// Поповер настроек отображения (⚙ в шапке). Раньше эти пять тумблеров лежали прямо в
-// топбаре и занимали половину служебного ряда — во время интервью к ним обращаются редко,
-// поэтому они уехали под иконку.
+// Боковая панель настроек (⚙ в шапке доски), выезжает слева — справа живут фильтры
+// и drawer вопроса. Шапка оставляет себе ход интервью; всё, что настраивают редко —
+// оформление, тема, холст, панели, справка — собрано здесь. Работа с банком — отдельная
+// страница (#/bank/<pool>), отсюда на неё только ссылка.
 //
-// Класс `.tb__toggle` сохранён намеренно: это тот же язык управления, что и в остальной
-// шапке, и на него завязан smoke.mjs.
-//
-// Закрывается по Esc и клику вне. Esc глушится в capture-фазе, иначе он же снял бы
-// выделение вопроса на доске (обработчик в App).
+// `.tb__toggle`, `.themebtn`, `.helpbtn` сохранены — на них ходит smoke.mjs.
+// Закрывается по ✕, Esc и клику вне; Esc глушится в capture-фазе (иначе снимет
+// выделение вопроса), mousedown слушаем в capture-фазе (канва React Flow гасит всплытие)
+// и не считаем «мимо» клики внутри .settings (панель + кнопка ⚙).
 
 export type DisplaySettings = {
+  design: string;
+  onSetDesign: (id: string) => void;
+  theme: "light" | "dark";
+  onToggleTheme: () => void;
   bgDots: boolean;
   onToggleBgDots: () => void;
   guidesV: boolean;
@@ -24,8 +28,8 @@ export type DisplaySettings = {
   hiddenCount: number;
   showTimer: boolean;
   onToggleTimer: () => void;
-  design: string;
-  onSetDesign: (id: string) => void;
+  onShowHelp: () => void;
+  bankHref: string;
 };
 
 // Оформления доски — итог design-funnel (номера сквозные из воронки).
@@ -36,28 +40,24 @@ const DESIGNS: [string, string][] = [
   ["58", "Изыскания"],
 ];
 
-export function SettingsMenu({
-  settings,
-  onClose,
-}: {
-  settings: DisplaySettings;
-  onClose: () => void;
+function Chip({ on, onClick, title, className = "", children }: {
+  on: boolean; onClick: () => void; title?: string; className?: string; children: React.ReactNode;
 }) {
-  const popRef = useRef<HTMLDivElement>(null);
+  return (
+    <button className={`tb__toggle ${className} ${on ? "tb__toggle--on" : ""}`} onClick={onClick} aria-pressed={on} title={title}>
+      {children}
+    </button>
+  );
+}
 
+export function SettingsMenu({ settings: s, onClose }: { settings: DisplaySettings; onClose: () => void }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return; // прочие хоткеи доски продолжают работать
+      if (e.key !== "Escape") return;
       e.preventDefault();
       e.stopImmediatePropagation();
       onClose();
     };
-    // Клик мимо закрывает панель. Две тонкости:
-    // 1) «мимо» — вне всего блока .settings (панель + кнопка ⚙): если закрывать и по
-    //    mousedown на кнопке, её click-тоггл срабатывает следом по уже закрытой панели
-    //    и открывает её заново — кнопка «не закрывала» настройки;
-    // 2) capture-фаза: mousedown по канве проглатывает React Flow (d3-zoom гасит
-    //    всплытие), до document в bubble-фазе он не доходит.
     const onDown = (e: MouseEvent) => {
       const t = e.target as Element | null;
       if (t && t.closest(".settings")) return;
@@ -71,21 +71,19 @@ export function SettingsMenu({
     };
   }, [onClose]);
 
-  const s = settings;
-
   return (
-    <div className="settings__pop" ref={popRef} role="dialog" aria-label="Настройки отображения">
+    <div className="setdrawer" role="dialog" aria-label="Настройки" aria-modal="false">
+      <div className="setdrawer__head">
+        <strong>Настройки</strong>
+        <button className="setdrawer__close" onClick={onClose} title="Закрыть (Esc)">✕</button>
+      </div>
+
       <div className="settings__group">
         <div className="settings__title">Оформление</div>
         <div className="settings__chips" role="radiogroup" aria-label="Оформление доски">
           {DESIGNS.map(([id, label]) => (
-            <button
-              key={id}
-              className={`tb__toggle ${s.design === id ? "tb__toggle--on" : ""}`}
-              onClick={() => s.onSetDesign(id)}
-              role="radio"
-              aria-checked={s.design === id}
-            >
+            <button key={id} className={`tb__toggle ${s.design === id ? "tb__toggle--on" : ""}`}
+              onClick={() => s.onSetDesign(id)} role="radio" aria-checked={s.design === id}>
               {label}
             </button>
           ))}
@@ -93,62 +91,40 @@ export function SettingsMenu({
       </div>
 
       <div className="settings__group">
+        <div className="settings__title">Тема</div>
+        <div className="settings__chips">
+          <Chip className="themebtn" on={s.theme === "dark"} onClick={s.onToggleTheme} title="Выбор запоминается">Тёмная тема</Chip>
+        </div>
+      </div>
+
+      <div className="settings__group">
         <div className="settings__title">Холст</div>
         <div className="settings__chips" role="group" aria-label="Отображение холста">
-          <button
-            className={`tb__toggle ${s.bgDots ? "tb__toggle--on" : ""}`}
-            onClick={s.onToggleBgDots}
-            aria-pressed={s.bgDots}
-          >
-            Точки на фоне
-          </button>
-          <button
-            className={`tb__toggle ${s.guidesV ? "tb__toggle--on" : ""}`}
-            onClick={s.onToggleGuidesV}
-            aria-pressed={s.guidesV}
-            title="Границы блоков"
-          >
-            Вертикальные направляющие
-          </button>
-          <button
-            className={`tb__toggle ${s.guidesH ? "tb__toggle--on" : ""}`}
-            onClick={s.onToggleGuidesH}
-            aria-pressed={s.guidesH}
-            title="Уровни Base / Junior / Middle / Senior"
-          >
-            Горизонтальные направляющие
-          </button>
+          <Chip on={s.bgDots} onClick={s.onToggleBgDots}>Точки на фоне</Chip>
+          <Chip on={s.guidesV} onClick={s.onToggleGuidesV} title="Границы блоков">Вертикальные направляющие</Chip>
+          <Chip on={s.guidesH} onClick={s.onToggleGuidesH} title="Уровни Base / Junior / Middle / Senior">Горизонтальные направляющие</Chip>
         </div>
       </div>
 
       <div className="settings__group">
         <div className="settings__title">Панели</div>
         <div className="settings__chips" role="group" aria-label="Панели">
-          <button
-            className={`tb__toggle ${s.agendaOpen ? "tb__toggle--on" : ""}`}
-            onClick={s.onToggleAgenda}
-            aria-pressed={s.agendaOpen}
-            title="Сайдбар со списком вопросов и переходом по ним"
-          >
-            Агенда
-          </button>
-          <button
-            className={`tb__toggle ${s.showHidden ? "tb__toggle--on" : ""}`}
-            onClick={s.onToggleHidden}
-            aria-pressed={s.showHidden}
-            title="Показывать вопросы, убранные с доски"
-          >
+          <Chip on={s.agendaOpen} onClick={s.onToggleAgenda} title="Сайдбар со списком вопросов">Агенда</Chip>
+          <Chip on={s.showHidden} onClick={s.onToggleHidden} title="Показывать вопросы, убранные с доски">
             Скрытые вопросы{s.hiddenCount ? ` (${s.hiddenCount})` : ""}
-          </button>
-          <button
-            className={`tb__toggle ${s.showTimer ? "tb__toggle--on" : ""}`}
-            onClick={s.onToggleTimer}
-            aria-pressed={s.showTimer}
-            title="Время на вопрос и на всю сессию в нижней панели"
-          >
-            Таймер
-          </button>
+          </Chip>
+          <Chip on={s.showTimer} onClick={s.onToggleTimer} title="Время на вопрос и на сессию в нижней панели">Таймер</Chip>
         </div>
+      </div>
+
+      <div className="settings__group">
+        <div className="settings__title">Банк вопросов</div>
+        <a className="setdrawer__act" href={s.bankHref}>Открыть банк направления →</a>
+      </div>
+
+      <div className="settings__group">
+        <div className="settings__title">Справка</div>
+        <button className="setdrawer__act helpbtn" onClick={() => { onClose(); s.onShowHelp(); }}>Горячие клавиши</button>
       </div>
     </div>
   );

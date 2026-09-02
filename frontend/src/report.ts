@@ -1,8 +1,8 @@
 // Генерация самодостаточного HTML-отчёта по результатам интервью.
 // Открывается в браузере, печатается в PDF. Светлый (документ для шаринга/печати).
 
-import { BLOCK_ORDER, DIFFS, SUB_LABEL, subOf } from "./layout";
-import { BLOCK_COLOR, BLOCK_LABEL, DIFF_COLOR, type Block, type QNode } from "./types";
+import { DIFFS, subOf } from "./layout";
+import { blockColor, blockLabel, blockOrder, subLabel, DIFF_COLOR, type PoolConfig, type QNode } from "./types";
 
 const esc = (s: string) =>
   s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
@@ -33,7 +33,7 @@ export function buildReportHtml(
   candidate: string,
   nodes: QNode[],
   scores: Record<string, number>,
-  trackLabel?: string,
+  pool: PoolConfig,
   notes?: Record<string, string>,
   people?: ReportPeople,
 ): string {
@@ -44,7 +44,7 @@ export function buildReportHtml(
   const vals = scored.map((n) => scores[n.id]);
   const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
 
-  const blocks: Block[] = [...BLOCK_ORDER];
+  const blocks: string[] = [...blockOrder(pool)];
   for (const n of nodes) if (!blocks.includes(n.block)) blocks.push(n.block);
 
   // Сводка по блокам: охват и средний балл.
@@ -73,7 +73,7 @@ export function buildReportHtml(
       const rows = list
         .map((n) => {
           const s = scores[n.id];
-          const sub = n.subblock ? `<span class="sub">${esc(SUB_LABEL[n.subblock] ?? n.subblock)}</span> ` : "";
+          const sub = n.subblock ? `<span class="sub">${esc(subLabel(pool, n.block, n.subblock))}</span> ` : "";
           const tags = n.tags.length
             ? `<div class="tags">${n.tags.map((t) => `<span class="tag">${esc(t)}</span>`).join("")}</div>`
             : "";
@@ -89,7 +89,7 @@ export function buildReportHtml(
         })
         .join("\n");
       return `<section>
-  <h2 style="border-left-color:${BLOCK_COLOR[b]}">${esc(BLOCK_LABEL[b] ?? b)}</h2>
+  <h2 style="border-left-color:${blockColor(pool, b)}">${esc(blockLabel(pool, b))}</h2>
   <table><thead><tr><th>Сложность</th><th>Вопрос</th><th>Оценка</th></tr></thead>
   <tbody>${rows}</tbody></table>
 </section>`;
@@ -99,8 +99,8 @@ export function buildReportHtml(
   const summaryChips = blockStat
     .map(
       (s) =>
-        `<div class="bchip" style="border-left-color:${BLOCK_COLOR[s.b]}">
-      <div class="bchip__name">${esc(BLOCK_LABEL[s.b] ?? s.b)}</div>
+        `<div class="bchip" style="border-left-color:${blockColor(pool, s.b)}">
+      <div class="bchip__name">${esc(blockLabel(pool, s.b))}</div>
       <div class="bchip__val">${s.avg != null ? s.avg.toFixed(1) : "—"} <span>·  ${s.done}/${s.total}</span></div>
     </div>`,
     )
@@ -158,7 +158,7 @@ export function buildReportHtml(
         people?.position || people?.seniority
           ? ` (${esc([people?.position, people?.seniority].filter(Boolean).join(", "))})`
           : ""
-      } · ${dateStr}${trackLabel ? ` · направление: <b>${esc(trackLabel)}</b>` : ""}${
+      } · ${dateStr} · направление: <b>${esc(pool.label)}</b>${
         people?.interviewer ? ` · интервьюер: <b>${esc(people.interviewer)}</b>` : ""
       }</div>
     </div>
@@ -174,11 +174,11 @@ export function buildReportHtml(
 }
 
 // ---- Экспорт всего банка вопросов (полные формулировки + ответы, без оценок) ----
-export function buildBankHtml(nodes: QNode[]): string {
+export function buildBankHtml(nodes: QNode[], pool: PoolConfig): string {
   const now = new Date();
   const dateStr = `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
 
-  const blocks: Block[] = [...BLOCK_ORDER];
+  const blocks: string[] = [...blockOrder(pool)];
   for (const n of nodes) if (!blocks.includes(n.block)) blocks.push(n.block);
 
   const drank = (d: string) => DIFFS.indexOf(d as any);
@@ -188,8 +188,8 @@ export function buildBankHtml(nodes: QNode[]): string {
     .filter((s) => s.total > 0)
     .map(
       (s) =>
-        `<div class="bchip" style="border-left-color:${BLOCK_COLOR[s.b]}">
-      <div class="bchip__name">${esc(BLOCK_LABEL[s.b] ?? s.b)}</div>
+        `<div class="bchip" style="border-left-color:${blockColor(pool, s.b)}">
+      <div class="bchip__name">${esc(blockLabel(pool, s.b))}</div>
       <div class="bchip__val">${s.total}</div>
     </div>`,
     )
@@ -208,7 +208,7 @@ export function buildBankHtml(nodes: QNode[]): string {
       if (!list.length) return "";
       const cards = list
         .map((n) => {
-          const sub = n.subblock ? `<span class="sub">${esc(SUB_LABEL[n.subblock] ?? n.subblock)}</span> ` : "";
+          const sub = n.subblock ? `<span class="sub">${esc(subLabel(pool, n.block, n.subblock))}</span> ` : "";
           const kind = n.kind === "task" ? `<span class="kind">задача</span>` : "";
           const tags = n.tags.length
             ? `<div class="tags">${n.tags.map((t) => `<span class="tag">${esc(t)}</span>`).join("")}</div>`
@@ -234,7 +234,7 @@ export function buildBankHtml(nodes: QNode[]): string {
         })
         .join("\n");
       return `<section>
-  <h2 style="border-left-color:${BLOCK_COLOR[b]}">${esc(BLOCK_LABEL[b] ?? b)} <span class="cnt">${list.length}</span></h2>
+  <h2 style="border-left-color:${blockColor(pool, b)}">${esc(blockLabel(pool, b))} <span class="cnt">${list.length}</span></h2>
   ${cards}
 </section>`;
     })
@@ -290,8 +290,8 @@ export function buildBankHtml(nodes: QNode[]): string {
 </body></html>`;
 }
 
-export function downloadBank(nodes: QNode[]): void {
-  const html = buildBankHtml(nodes);
+export function downloadBank(nodes: QNode[], pool: PoolConfig): void {
+  const html = buildBankHtml(nodes, pool);
   const blob = new Blob([html], { type: "text/html;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const now = new Date();
@@ -309,11 +309,11 @@ export function downloadReport(
   candidate: string,
   nodes: QNode[],
   scores: Record<string, number>,
-  trackLabel?: string,
+  pool: PoolConfig,
   notes?: Record<string, string>,
   people?: ReportPeople,
 ): void {
-  const html = buildReportHtml(candidate, nodes, scores, trackLabel, notes, people);
+  const html = buildReportHtml(candidate, nodes, scores, pool, notes, people);
   const blob = new Blob([html], { type: "text/html;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const now = new Date();

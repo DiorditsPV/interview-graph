@@ -1,4 +1,4 @@
-import type { Block, Difficulty, QNode } from "./types";
+import { blockOrder, subLabel, type Difficulty, type PoolConfig, type QNode } from "./types";
 
 // Детерминированная swimlane-раскладка с под-блоками.
 // Горизонталь: блоки (Фреймворки/Базы данных/Python/Платформа), причём блок может
@@ -17,7 +17,6 @@ export const HEADER_H = 46; // полоса заголовка под-колон
 export const LABEL_W = 120;
 export const TOP_H = SUPER_H + HEADER_H;
 
-export const BLOCK_ORDER: Block[] = ["frameworks", "databases", "python", "platform"];
 export const DIFFS: Difficulty[] = ["base", "junior", "middle", "senior"];
 export const DIFF_LABEL_FULL: Record<Difficulty, string> = {
   base: "BASE",
@@ -26,27 +25,10 @@ export const DIFF_LABEL_FULL: Record<Difficulty, string> = {
   senior: "SENIOR",
 };
 
-// Предпочтительный порядок под-блоков и их подписи.
-const PREFERRED_SUB: Partial<Record<Block, string[]>> = {
-  frameworks: ["airflow", "pyspark", "dbt", "streaming"],
-  databases: ["sql", "dbms", "storage", "formats"],
-};
-export const SUB_LABEL: Record<string, string> = {
-  airflow: "Airflow",
-  pyspark: "PySpark",
-  dbt: "dbt",
-  streaming: "Streaming",
-  sql: "SQL",
-  dbms: "СУБД и движки",
-  storage: "Хранилища",
-  formats: "Форматы",
-  engines: "Движки и хранение",
-};
-
 export const subOf = (n: QNode): string => n.subblock || n.block;
 
 export interface Column {
-  block: Block;
+  block: string;
   subblock: string;
   label: string | null; // подпись под-колонки (null = блок не делится → без под-хедера)
   x: number;
@@ -55,7 +37,7 @@ export interface Column {
   count: number;
 }
 export interface BlockGroup {
-  block: Block;
+  block: string;
   x: number;
   width: number;
   height: number;
@@ -80,15 +62,18 @@ export interface Placement {
   rowOf: Record<string, number>;
 }
 
-export function swimlaneLayout(nodes: QNode[]): Placement {
-  const blocks: Block[] = [...BLOCK_ORDER];
-  for (const n of nodes) if (!blocks.includes(n.block)) blocks.push(n.block);
+export function swimlaneLayout(nodes: QNode[], pool: PoolConfig): Placement {
+  // Порядок колонок — из pool.yaml; блоки, которых в конфиге нет (например, старый
+  // контент после смены таксономии), идут следом по алфавиту, чтобы ничего не потерять.
+  const blocks: string[] = [...blockOrder(pool)];
+  for (const n of [...nodes].sort((a, c) => a.block.localeCompare(c.block)))
+    if (!blocks.includes(n.block)) blocks.push(n.block);
 
-  // Под-блоки каждого блока (в предпочтительном порядке + прочие).
+  // Под-блоки каждого блока: сначала объявленные в pool.yaml (в их порядке), потом прочие.
   const subsByBlock: Record<string, string[]> = {};
   for (const b of blocks) {
     const present = Array.from(new Set(nodes.filter((n) => n.block === b).map(subOf)));
-    const pref = PREFERRED_SUB[b] ?? [];
+    const pref = pool.blocks.find((x) => x.id === b)?.subblocks.map((s) => s.id) ?? [];
     const ordered = [
       ...pref.filter((s) => present.includes(s)),
       ...present.filter((s) => !pref.includes(s)).sort(),
@@ -151,7 +136,7 @@ export function swimlaneLayout(nodes: QNode[]): Placement {
       columns.push({
         block,
         subblock: sub,
-        label: split ? SUB_LABEL[sub] ?? sub : null,
+        label: split ? subLabel(pool, block, sub) : null,
         x: colX,
         width: COL_W,
         height: totalHeight,

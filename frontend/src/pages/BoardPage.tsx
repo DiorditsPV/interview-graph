@@ -10,20 +10,17 @@ import {
   type ReactFlowInstance,
 } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api, type NodeCreate, type NodeUpdate } from "./api";
-import { BandsNode } from "./components/BandsNode";
-import { BankBrowser } from "./components/BankBrowser";
-import { BlockGroupNode } from "./components/BlockGroupNode";
-import { SettingsMenu } from "./components/SettingsMenu";
-import { DetailDrawer } from "./components/DetailDrawer";
-import { GuidesNode } from "./components/GuidesNode";
-import { QuestionNode } from "./components/QuestionNode";
-import { ShortcutsHelp } from "./components/ShortcutsHelp";
-import { SubHeadNode } from "./components/SubHeadNode";
-import { UploadModal } from "./components/UploadModal";
-import { downloadBank, downloadReport } from "./report";
+import { api, type NodeUpdate } from "../api";
+import { BandsNode } from "../components/BandsNode";
+import { BlockGroupNode } from "../components/BlockGroupNode";
+import { SettingsMenu } from "../components/SettingsMenu";
+import { DetailDrawer } from "../components/DetailDrawer";
+import { GuidesNode } from "../components/GuidesNode";
+import { QuestionNode } from "../components/QuestionNode";
+import { ShortcutsHelp } from "../components/ShortcutsHelp";
+import { SubHeadNode } from "../components/SubHeadNode";
+import { downloadReport } from "../report";
 import {
-  BLOCK_ORDER,
   CARD_H,
   CARD_W,
   DIFFS,
@@ -31,38 +28,24 @@ import {
   subOf,
   swimlaneLayout,
   type Placement,
-} from "./layout";
+} from "../layout";
 import {
-  BLOCK_COLOR,
-  BLOCK_LABEL,
+  blockColor,
+  blockLabel,
+  blockOrder,
   DIFF_COLOR,
-  nodeInTrack,
-  type Block,
   type Candidate,
   type Difficulty,
   type ImportErr,
   type Interviewer,
+  type PoolConfig,
   type QNode,
   type Session,
   type SessionMeta,
   type SessionSummary,
-  type Track,
-} from "./types";
-
-// Снимок сессии с сервера → плоская карта оценок, которой оперирует UI.
-function scoresOf(s: { scores: Session["scores"] }): Record<string, number> {
-  return Object.fromEntries(Object.entries(s.scores).map(([id, v]) => [id, v.score]));
-}
-
-// То же для заметок: они лежат в схеме оценок (score+note) и должны переживать
-// перезагрузку/подключение к сессии, иначе выглядят как потерянные.
-function notesOf(s: { scores: Session["scores"] }): Record<string, string> {
-  return Object.fromEntries(
-    Object.entries(s.scores)
-      .filter(([, v]) => v.note)
-      .map(([id, v]) => [id, v.note as string]),
-  );
-}
+} from "../types";
+import { href } from "../router";
+import { notesOf, scoresOf } from "../sessionUtils";
 
 const nodeTypes = {
   question: QuestionNode,
@@ -91,6 +74,7 @@ type BgVariant = "off" | "dots";
 
 function buildNodes(
   graph: QNode[],
+  pool: PoolConfig,
   p: Placement,
   scores: Record<string, number>,
   currentId: string | null,
@@ -99,7 +83,6 @@ function buildNodes(
   activeDiffs: Record<string, boolean>,
   activeTags: Record<string, boolean>,
   activeKinds: Record<string, boolean>,
-  trackInclude: string[],
   query: string,
   unscoredOnly: boolean,
   hiddenIds: Set<string>,
@@ -140,7 +123,17 @@ function buildNodes(
       id: `bg-${bg.block}`,
       type: "blockGroup",
       position: { x: bg.x, y: 0 },
-      data: { block: bg.block, width: bg.width, height: bg.height, count: blockNodes.length, done, split: bg.split, dark },
+      data: {
+        block: bg.block,
+        label: blockLabel(pool, bg.block),
+        color: blockColor(pool, bg.block),
+        width: bg.width,
+        height: bg.height,
+        count: blockNodes.length,
+        done,
+        split: bg.split,
+        dark,
+      },
       draggable: false,
       selectable: false,
       zIndex: -6,
@@ -155,7 +148,15 @@ function buildNodes(
       id: `sh-${col.block}-${col.subblock}`,
       type: "subhead",
       position: { x: col.x, y: 0 },
-      data: { block: col.block, label: col.label, width: col.width, count: colNodes.length, done, dark },
+      data: {
+        block: col.block,
+        label: col.label,
+        color: blockColor(pool, col.block),
+        width: col.width,
+        count: colNodes.length,
+        done,
+        dark,
+      },
       draggable: false,
       selectable: false,
       zIndex: -3,
@@ -169,11 +170,10 @@ function buildNodes(
     // hide-local: скрытый вопрос гасится (если не показываем скрытые); при показе — помечается.
     const hidden = hiddenIds.has(n.id);
     const dimmed =
-      !activeBlocks[n.block] ||
+      activeBlocks[n.block] === false ||
       !activeDiffs[n.difficulty] ||
       !activeKinds[n.kind] ||
       !tagOk ||
-      !nodeInTrack(n, trackInclude) ||
       !matchesQuery(n, query) ||
       (unscoredOnly && scores[n.id] != null) ||
       (hidden && !showHidden);
@@ -184,7 +184,14 @@ function buildNodes(
       // Явные размеры (= размер карточки) нужны минимапе React Flow, иначе ноды не рисуются.
       width: CARD_W,
       height: CARD_H,
-      data: { node: n, score: scores[n.id], current: n.id === currentId, dimmed, hidden: hidden && showHidden },
+      data: {
+        node: n,
+        color: blockColor(pool, n.block),
+        score: scores[n.id],
+        current: n.id === currentId,
+        dimmed,
+        hidden: hidden && showHidden,
+      },
       selected: n.id === selectedId,
       draggable: false,
       selectable: !dimmed,
@@ -195,10 +202,26 @@ function buildNodes(
   return nodes;
 }
 
-// hide-local: набор локально скрытых id (в localStorage). Читаем безопасно.
-function readHiddenIds(): Set<string> {
+// Ключи доски теперь с суффиксом пула, чтобы DE и SA не пересекались. Старый ключ без
+// суффикса принадлежит бывшему единственному банку — переносим его в data-engineer один раз.
+function legacyKey(base: string, pool: string): string {
+  const key = `${base}:${pool}`;
   try {
-    const raw = JSON.parse(localStorage.getItem("hiddenIds") || "[]");
+    if (pool === "data-engineer" && localStorage.getItem(key) == null) {
+      const old = localStorage.getItem(base);
+      if (old != null) {
+        localStorage.setItem(key, old);
+        localStorage.removeItem(base);
+      }
+    }
+  } catch { /* приват-режим */ }
+  return key;
+}
+
+// hide-local: набор локально скрытых id (в localStorage). Читаем безопасно.
+function readHiddenIds(pool: string): Set<string> {
+  try {
+    const raw = JSON.parse(localStorage.getItem(legacyKey("hiddenIds", pool)) || "[]");
     return new Set(Array.isArray(raw) ? raw.filter((x) => typeof x === "string") : []);
   } catch {
     return new Set();
@@ -206,9 +229,9 @@ function readHiddenIds(): Set<string> {
 }
 
 // draft-autosave: черновик оценок (без активной сессии) — устойчивость к refresh/крашу.
-function readDraftScores(): Record<string, number> {
+function readDraftScores(pool: string): Record<string, number> {
   try {
-    const raw = JSON.parse(localStorage.getItem("draftScores") || "{}");
+    const raw = JSON.parse(localStorage.getItem(legacyKey("draftScores", pool)) || "{}");
     if (!raw || typeof raw !== "object") return {};
     const out: Record<string, number> = {};
     for (const [k, v] of Object.entries(raw)) if (typeof v === "number") out[k] = v;
@@ -218,39 +241,23 @@ function readDraftScores(): Record<string, number> {
   }
 }
 
-const ALL_BLOCKS: Record<string, boolean> = Object.fromEntries(BLOCK_ORDER.map((b) => [b, true]));
 const ALL_DIFFS: Record<string, boolean> = Object.fromEntries(DIFFS.map((d) => [d, true]));
 const KINDS = ["question", "task"] as const;
 const KIND_LABEL: Record<string, string> = { question: "вопрос", task: "задача" };
 const KIND_COLOR: Record<string, string> = { question: "#2563eb", task: "#9333ea" };
 const ALL_KINDS: Record<string, boolean> = { question: true, task: true };
-// question-management: пустой черновик формы добавления вопроса.
-const EMPTY_ADD = {
-  block: "databases",
-  topic: "",
-  difficulty: "middle",
-  kind: "question",
-  title: "",
-  question: "",
-  answer: "",
-  tags: "",
-};
 
-export default function App() {
+export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; sessionFromUrl: number | null }) {
   const [graph, setGraph] = useState<QNode[]>([]);
   const [errors, setErrors] = useState<ImportErr[]>([]);
   const [placement, setPlacement] = useState<Placement | null>(null);
-  const [scores, setScores] = useState<Record<string, number>>(readDraftScores);
+  const [scores, setScores] = useState<Record<string, number>>(() => readDraftScores(pool.id));
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
-  const [showBank, setShowBank] = useState(false);
   // hide-local: скрытые с доски вопросы (клиентски) + тумблер показа.
-  const [hiddenIds, setHiddenIds] = useState<Set<string>>(readHiddenIds);
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(() => readHiddenIds(pool.id));
   const [showHidden, setShowHidden] = useState(false);
-  // question-management: модалка добавления вопроса + её черновик.
-  const [addOpen, setAddOpen] = useState(false);
-  const [addDraft, setAddDraft] = useState(EMPTY_ADD);
   const [session, setSession] = useState<Session | null>(null);
   const [candidate, setCandidate] = useState("");
   // people-schema: кандидаты/интервьюеры как сущности БД + выбор при старте сессии.
@@ -266,22 +273,19 @@ export default function App() {
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [now, setNow] = useState(() => Date.now());
   const [sessionStart, setSessionStart] = useState<number | null>(() => {
-    const v = localStorage.getItem("timerStart");
+    const v = localStorage.getItem(legacyKey("timerStart", pool.id));
     return v ? Number(v) : null;
   });
   const [questionStart, setQuestionStart] = useState<number>(() => Date.now());
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
-  const [uploadOpen, setUploadOpen] = useState(false);
   const [tagsCollapsed, setTagsCollapsed] = useState(false);
-  const [activeBlocks, setActiveBlocks] = useState<Record<string, boolean>>(ALL_BLOCKS);
+  const [activeBlocks, setActiveBlocks] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(blockOrder(pool).map((b) => [b, true])),
+  );
   const [activeDiffs, setActiveDiffs] = useState<Record<string, boolean>>(ALL_DIFFS);
   const [activeTags, setActiveTags] = useState<Record<string, boolean>>({});
   const [activeKinds, setActiveKinds] = useState<Record<string, boolean>>(ALL_KINDS);
-  const [tracks, setTracks] = useState<Track[]>([]);
-  const [activeTrack, setActiveTrack] = useState<string>(
-    () => localStorage.getItem("track") || "data-engineer",
-  );
   const [query, setQuery] = useState("");
   const [unscoredOnly, setUnscoredOnly] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">(
@@ -315,7 +319,6 @@ export default function App() {
   useEffect(() => localStorage.setItem("bgVariant", bgVariant), [bgVariant]);
   useEffect(() => localStorage.setItem("guidesH", guidesH ? "1" : "0"), [guidesH]);
   useEffect(() => localStorage.setItem("guidesV", guidesV ? "1" : "0"), [guidesV]);
-  useEffect(() => localStorage.setItem("track", activeTrack), [activeTrack]);
   useEffect(() => localStorage.setItem("agendaOpen", agendaOpen ? "1" : "0"), [agendaOpen]);
   useEffect(() => localStorage.setItem("showTimer", showTimer ? "1" : "0"), [showTimer]);
   useEffect(() => {
@@ -324,16 +327,19 @@ export default function App() {
   }, [design]);
   useEffect(() => localStorage.setItem("filtersOpen", filtersOpen ? "1" : "0"), [filtersOpen]);
   // hide-local: персист набора скрытых id.
-  useEffect(() => localStorage.setItem("hiddenIds", JSON.stringify([...hiddenIds])), [hiddenIds]);
+  useEffect(
+    () => localStorage.setItem(`hiddenIds:${pool.id}`, JSON.stringify([...hiddenIds])),
+    [hiddenIds, pool.id],
+  );
   // draft-autosave: persist черновика оценок, пока нет активной сессии (в сессии — БД источник правды).
   useEffect(() => {
     if (session) return;
     try {
-      localStorage.setItem("draftScores", JSON.stringify(scores));
+      localStorage.setItem(`draftScores:${pool.id}`, JSON.stringify(scores));
     } catch {
       /* ignore quota errors */
     }
-  }, [scores, session]);
+  }, [scores, session, pool.id]);
 
   // hide-local: скрыть/вернуть вопрос на доску (клиентски, не трогает банк/БД).
   const toggleHide = useCallback((id: string) => {
@@ -352,10 +358,10 @@ export default function App() {
     setSessionStart((s) => {
       if (s != null) return s;
       const t = Date.now();
-      localStorage.setItem("timerStart", String(t));
+      localStorage.setItem(`timerStart:${pool.id}`, String(t));
       return t;
     });
-  }, [currentId]);
+  }, [currentId, pool.id]);
   useEffect(() => {
     if (!currentId && sessionStart == null) return;
     const id = setInterval(() => setNow(Date.now()), 1000);
@@ -368,38 +374,24 @@ export default function App() {
     () => Array.from(new Set(graph.flatMap((n) => n.tags))).sort(),
     [graph],
   );
-  const trackInclude = useMemo(
-    () => tracks.find((t) => t.id === activeTrack)?.include ?? [],
-    [tracks, activeTrack],
-  );
-  const trackLabel = useMemo(
-    () => tracks.find((t) => t.id === activeTrack)?.label,
-    [tracks, activeTrack],
-  );
-  // Видимый срез (трек + активные фильтры) — для навигации «Дальше».
+  // Видимый срез (активные фильтры) — для навигации «Дальше».
   const visibleIds = useMemo(() => {
     const anyTag = Object.values(activeTags).some(Boolean);
     const s = new Set<string>();
     for (const n of graph) {
       const tagOk = !anyTag || n.tags.some((t) => activeTags[t]);
-      if (
-        activeBlocks[n.block] &&
-        activeDiffs[n.difficulty] &&
-        activeKinds[n.kind] &&
-        tagOk &&
-        nodeInTrack(n, trackInclude)
-      ) {
+      if (activeBlocks[n.block] !== false && activeDiffs[n.difficulty] && activeKinds[n.kind] && tagOk) {
         s.add(n.id);
       }
     }
     return s;
-  }, [graph, activeBlocks, activeDiffs, activeKinds, activeTags, trackInclude]);
+  }, [graph, activeBlocks, activeDiffs, activeKinds, activeTags]);
 
   // Строки агенды в порядке клавиатурной навигации, с заголовком при смене блока.
   const agendaRows = useMemo(() => {
-    if (!placement) return [] as ({ kind: "head"; block: Block } | { kind: "item"; node: QNode })[];
-    const rows: ({ kind: "head"; block: Block } | { kind: "item"; node: QNode })[] = [];
-    let last: Block | null = null;
+    if (!placement) return [] as ({ kind: "head"; block: string } | { kind: "item"; node: QNode })[];
+    const rows: ({ kind: "head"; block: string } | { kind: "item"; node: QNode })[] = [];
+    let last: string | null = null;
     for (const id of placement.order.flat()) {
       const n = nodeMap[id];
       if (!n) continue;
@@ -415,14 +407,14 @@ export default function App() {
   const loadGraph = useCallback(
     () =>
       api
-        .graph()
+        .graph(pool.id)
         .then((g) => {
           setGraph(g.nodes);
           setErrors(g.errors);
-          setPlacement(swimlaneLayout(g.nodes));
+          setPlacement(swimlaneLayout(g.nodes, pool));
         })
         .catch((err) => setErrors([{ file: "API", error: String(err) }])),
-    [],
+    [pool],
   );
 
   useEffect(() => {
@@ -465,45 +457,16 @@ export default function App() {
     [loadGraph],
   );
 
-  // question-management: создать вопрос из формы шапки (POST → перечитать граф → выбрать новый).
-  const createNode = useCallback(async () => {
-    const payload: NodeCreate = {
-      block: addDraft.block as Block,
-      topic: addDraft.topic.trim(),
-      difficulty: addDraft.difficulty as Difficulty,
-      kind: addDraft.kind as "question" | "task",
-      title: addDraft.title.trim() || undefined,
-      question: addDraft.question,
-      answer: addDraft.answer,
-      tags: addDraft.tags.split(",").map((t) => t.trim()).filter(Boolean),
-    };
-    let res: { id: string };
-    try {
-      res = await api.createNode(payload);
-    } catch {
-      alert("Не удалось создать вопрос");
-      return;
-    }
-    await loadGraph();
-    setAddOpen(false);
-    setAddDraft(EMPTY_ADD);
-    setSelectedId(res.id);
-  }, [addDraft, loadGraph]);
-
   useEffect(() => {
-    api.tracks().then(setTracks).catch(() => setTracks([]));
-  }, []);
-
-  useEffect(() => {
-    api.listSessions().then(setPastSessions).catch(() => setPastSessions([]));
-  }, []);
+    api.listSessions(pool.id).then(setPastSessions).catch(() => setPastSessions([]));
+  }, [pool.id]);
 
   const rfNodes = useMemo(
     () =>
       placement
-        ? buildNodes(graph, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, trackInclude, query.toLowerCase().trim(), unscoredOnly, hiddenIds, showHidden, guidesH, guidesV, theme === "dark")
+        ? buildNodes(graph, pool, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, query.toLowerCase().trim(), unscoredOnly, hiddenIds, showHidden, guidesH, guidesV, theme === "dark")
         : [],
-    [graph, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, trackInclude, query, unscoredOnly, hiddenIds, showHidden, guidesH, guidesV, theme],
+    [graph, pool, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, query, unscoredOnly, hiddenIds, showHidden, guidesH, guidesV, theme],
   );
 
   const centerOn = useCallback(
@@ -552,7 +515,7 @@ export default function App() {
   // «Дальше»: следующий НЕОЦЕНЁННЫЙ вопрос по порядку сетки (с переносом по кругу).
   const nextQuestion = useCallback(() => {
     if (!placement) return;
-    // только видимый срез (трек + фильтры)
+    // только видимый срез (активные фильтры)
     const flat = placement.order.flat().filter((id) => visibleIds.has(id));
     if (!flat.length) return;
     const start = currentId ? flat.indexOf(currentId) : -1;
@@ -629,13 +592,12 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, [placement, currentId, selectedId, applyScore, moveCurrent, nextQuestion]);
 
-  // Привязать активную сессию к URL (?session=<id>) — ссылкой можно поделиться с HR.
-  const setSessionParam = useCallback((id: number | null) => {
-    const url = new URL(window.location.href);
-    if (id == null) url.searchParams.delete("session");
-    else url.searchParams.set("session", String(id));
-    window.history.replaceState(null, "", url.toString());
-  }, []);
+  // Привязать активную сессию к адресу (#/board/<pool>?session=<id>) — ссылкой можно поделиться.
+  // replaceState не шлёт hashchange: роутер не перерисовывает доску, состояние остаётся.
+  const setSessionParam = useCallback(
+    (id: number | null) => window.history.replaceState(null, "", href.board(pool.id, id)),
+    [pool.id],
+  );
 
   const startSession = useCallback(async () => {
     // people-schema: либо выбран существующий кандидат (pickedCandidateId), либо вводим имя.
@@ -646,7 +608,7 @@ export default function App() {
     }
     if (candidateId == null && !name) return;
     // draft-autosave: именованная сессия персистит в БД — локальный черновик больше не нужен.
-    localStorage.removeItem("draftScores");
+    localStorage.removeItem(`draftScores:${pool.id}`);
     // Новое имя без выбранной карточки → завести кандидата (с опц. позицией/грейдом).
     if (candidateId == null && name) {
       try {
@@ -662,6 +624,7 @@ export default function App() {
       }
     }
     const s = await api.createSession(
+      pool.id,
       name || "—",
       candidateId ?? undefined,
       pickedInterviewerId ?? undefined,
@@ -670,13 +633,13 @@ export default function App() {
     setScores(scoresOf(s));
     setSessionParam(s.id);
     // Обновляем оба списка сессий (loadsess-резюме и live-пикер).
-    api.listSessions().then((ls) => {
+    api.listSessions(pool.id).then((ls) => {
       setPastSessions(ls);
       setSessions(ls);
     }).catch(() => void 0);
     const t = Date.now();
     setSessionStart(t);
-    localStorage.setItem("timerStart", String(t));
+    localStorage.setItem(`timerStart:${pool.id}`, String(t));
   }, [
     candidate,
     candidates,
@@ -685,6 +648,7 @@ export default function App() {
     candPosition,
     candSeniority,
     setSessionParam,
+    pool.id,
   ]);
 
   // Подключиться к уже существующей сессии (другой интервьюер / HR): подтянуть оценки.
@@ -711,10 +675,9 @@ export default function App() {
 
   // Список сессий для пикера + авто-подключение по ?session=<id> при загрузке.
   useEffect(() => {
-    api.listSessions().then(setSessions).catch(() => void 0);
-    const fromUrl = new URLSearchParams(window.location.search).get("session");
-    if (fromUrl) joinSession(Number(fromUrl));
-  }, [joinSession]);
+    api.listSessions(pool.id).then(setSessions).catch(() => void 0);
+    if (sessionFromUrl) joinSession(sessionFromUrl);
+  }, [joinSession, pool.id, sessionFromUrl]);
 
   // people-schema: подтянуть кандидатов и интервьюеров; преселект дефолтного интервьюера.
   useEffect(() => {
@@ -759,9 +722,10 @@ export default function App() {
     setSession(s);
     setScores(scoresOf(s));
     setNotes(notesOf(s));
-  }, []);
+    setSessionParam(id);
+  }, [setSessionParam]);
 
-  const toggleBlock = (b: Block) => setActiveBlocks((s) => ({ ...s, [b]: !s[b] }));
+  const toggleBlock = (b: string) => setActiveBlocks((s) => ({ ...s, [b]: !s[b] }));
   const toggleDiff = (d: Difficulty) => setActiveDiffs((s) => ({ ...s, [d]: !s[d] }));
   const toggleTag = (t: string) => setActiveTags((s) => ({ ...s, [t]: !s[t] }));
   const clearTags = () => setActiveTags({});
@@ -781,14 +745,14 @@ export default function App() {
   }, [interviewers, candidates, session, pickedInterviewerId, pickedCandidateId]);
   const progress = useMemo(() => {
     const out: Record<string, { done: number; total: number }> = {};
-    for (const b of BLOCK_ORDER) out[b] = { done: 0, total: 0 };
+    for (const b of blockOrder(pool)) out[b] = { done: 0, total: 0 };
     for (const n of graph) {
       out[n.block] ??= { done: 0, total: 0 };
       out[n.block].total++;
       if (scores[n.id] != null) out[n.block].done++;
     }
     return out;
-  }, [graph, scores]);
+  }, [graph, scores, pool]);
 
   const anyTagActive = Object.values(activeTags).some(Boolean);
   // Свёрнутая панель не должна прятать факт, что доска отфильтрована, — отсюда точка-индикатор.
@@ -796,7 +760,7 @@ export default function App() {
     anyTagActive ||
     query.trim() !== "" ||
     unscoredOnly ||
-    BLOCK_ORDER.some((b) => !activeBlocks[b]) ||
+    blockOrder(pool).some((b) => !activeBlocks[b]) ||
     DIFFS.some((d) => !activeDiffs[d]) ||
     KINDS.some((k) => !activeKinds[k]);
   // Прогресс по ТЕКУЩЕМУ отфильтрованному набору. Условие "проходит фильтры" держать в
@@ -806,7 +770,7 @@ export default function App() {
     let done = 0;
     for (const n of graph) {
       const tagOk = !anyTagActive || n.tags.some((t) => activeTags[t]);
-      if (activeBlocks[n.block] && activeDiffs[n.difficulty] && activeKinds[n.kind] && tagOk) {
+      if (activeBlocks[n.block] !== false && activeDiffs[n.difficulty] && activeKinds[n.kind] && tagOk) {
         total++;
         if (scores[n.id] != null) done++;
       }
@@ -819,38 +783,59 @@ export default function App() {
   return (
     <div className="app">
       <header className="topbar">
-        {/* topbar-redeclutter, ряд 1 — поток интервью: направление, прогресс, сессия */}
+        {/* ряд 1 — где мы: назад в меню, направление, прогресс, настройки */}
         <div className="topbar__row topbar__row--flow">
-        <h1 className="appname">Интервью · граф вопросов</h1>
-        <span className="muted">{graph.length} нод</span>
-
-        <div className="tb__field">
-          <span className="tb__lbl">Направление</span>
-          <select
-            className="tb__select"
-            value={activeTrack}
-            onChange={(e) => setActiveTrack(e.target.value)}
-            title="Направление интервью — фокусирует доску на релевантных вопросах"
-          >
-            {tracks.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="progress" title="Оценено по текущему набору фильтров">
-          <div className="progress__track">
-            <div className="progress__fill" style={{ width: `${coverage.pct}%` }} />
+          <a className="topbar__back" href={href.home} title="Главное меню">← Меню</a>
+          <h1 className="appname">{pool.label}</h1>
+          <span className="muted">{graph.length} вопросов</span>
+          <div className="progress" title="Оценено по текущему набору фильтров">
+            <div className="progress__track">
+              <div className="progress__fill" style={{ width: `${coverage.pct}%` }} />
+            </div>
+            <span className="progress__label">
+              оценено {coverage.done} / {coverage.total} ({coverage.pct}%)
+            </span>
           </div>
-          <span className="progress__label">
-            оценено {coverage.done} / {coverage.total} ({coverage.pct}%)
-          </span>
-        </div>
+          <div className="settings topbar__settings">
+            <button
+              className={`iconbtn setbtn btn--quiet ${settingsOpen ? "setbtn--on" : ""}`}
+              onClick={() => setSettingsOpen((v) => !v)}
+              aria-expanded={settingsOpen}
+              aria-haspopup="dialog"
+              title="Настройки"
+            >
+              ⚙
+            </button>
+            {settingsOpen && (
+              <SettingsMenu
+                onClose={() => setSettingsOpen(false)}
+                settings={{
+                  design,
+                  onSetDesign: setDesign,
+                  theme,
+                  onToggleTheme: () => setTheme((t) => (t === "dark" ? "light" : "dark")),
+                  bgDots: bgVariant === "dots",
+                  onToggleBgDots: () => setBgVariant((v) => (v === "dots" ? "off" : "dots")),
+                  guidesV,
+                  onToggleGuidesV: () => setGuidesV((v) => !v),
+                  guidesH,
+                  onToggleGuidesH: () => setGuidesH((v) => !v),
+                  agendaOpen,
+                  onToggleAgenda: () => setAgendaOpen((v) => !v),
+                  showHidden,
+                  onToggleHidden: () => setShowHidden((v) => !v),
+                  hiddenCount: hiddenIds.size,
+                  showTimer,
+                  onToggleTimer: () => setShowTimer((v) => !v),
+                  onShowHelp: () => setHelpOpen(true),
+                  bankHref: href.bank(pool.id),
+                }}
+              />
+            )}
+          </div>
         </div>
 
-        {/* topbar-redeclutter, ряд 2 — служебное: отображение холста, контент/аналитика, переключатели */}
+        {/* ряд 2 — ход интервью: кандидат, сессия, результат */}
         <div className="topbar__row topbar__row--utility">
         <div className="session">
           {session ? (
@@ -969,7 +954,7 @@ export default function App() {
           <span className="session__sep" aria-hidden="true" />
           <button
             className="iconbtn dlbtn"
-            onClick={() => downloadReport(session?.candidate ?? candidate, graph, scores, trackLabel, notes, reportPeople)}
+            onClick={() => downloadReport(session?.candidate ?? candidate, graph, scores, pool, notes, reportPeople)}
             disabled={scored === 0}
             title={scored === 0 ? "Сначала выставьте оценки" : "Скачать результаты (HTML)"}
           >
@@ -978,96 +963,13 @@ export default function App() {
           {graph.length > 0 && scored === graph.length && (
             <button
               className="cta-done"
-              onClick={() => downloadReport(session?.candidate ?? candidate, graph, scores, trackLabel, notes, reportPeople)}
+              onClick={() => downloadReport(session?.candidate ?? candidate, graph, scores, pool, notes, reportPeople)}
               title="Все вопросы оценены — скачать итоговый отчёт"
             >
               Завершить · Скачать отчёт
             </button>
           )}
-          <button
-            className="iconbtn helpbtn btn--quiet"
-            onClick={() => setHelpOpen(true)}
-            title="Горячие клавиши (?)"
-          >
-            ?
-          </button>
-          <button
-            className="iconbtn themebtn btn--quiet"
-            onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
-            title="Переключить тему (светлая/тёмная)"
-          >
-            {theme === "dark" ? "☀️" : "🌙"}
-          </button>
-          <div className="settings">
-            <button
-              className={`iconbtn setbtn btn--quiet ${settingsOpen ? "setbtn--on" : ""}`}
-              onClick={() => setSettingsOpen((v) => !v)}
-              aria-expanded={settingsOpen}
-              aria-haspopup="dialog"
-              title="Настройки отображения"
-            >
-              ⚙
-            </button>
-            {settingsOpen && (
-              <SettingsMenu
-                onClose={() => setSettingsOpen(false)}
-                settings={{
-                  bgDots: bgVariant === "dots",
-                  onToggleBgDots: () => setBgVariant((v) => (v === "dots" ? "off" : "dots")),
-                  guidesV,
-                  onToggleGuidesV: () => setGuidesV((v) => !v),
-                  guidesH,
-                  onToggleGuidesH: () => setGuidesH((v) => !v),
-                  agendaOpen,
-                  onToggleAgenda: () => setAgendaOpen((v) => !v),
-                  showHidden,
-                  onToggleHidden: () => setShowHidden((v) => !v),
-                  hiddenCount: hiddenIds.size,
-                  showTimer,
-                  onToggleTimer: () => setShowTimer((v) => !v),
-                  design,
-                  onSetDesign: setDesign,
-                }}
-              />
-            )}
-          </div>
         </div>
-        </div>
-
-        {/* ряд 3 — работа с банком вопросов: правки контента, а не ход интервью */}
-        <div className="topbar__row topbar__row--content">
-          <div className="contentbar" role="group" aria-label="Работа с вопросами">
-            <button
-              className="iconbtn addbtn btn--quiet"
-              onClick={() => setAddOpen(true)}
-              title="Добавить вопрос в банк"
-            >
-              Добавить вопрос
-            </button>
-            <button
-              className="iconbtn uploadbtn btn--quiet"
-              onClick={() => setUploadOpen(true)}
-              title="Загрузить вопросы (.md/.json)"
-            >
-              Загрузить
-            </button>
-            <button
-              className="iconbtn bankscreenbtn btn--quiet"
-              onClick={() => setShowBank(true)}
-              disabled={graph.length === 0}
-              title="Открыть экран со всеми вопросами банка"
-            >
-              Все вопросы
-            </button>
-            <button
-              className="iconbtn bankbtn btn--quiet"
-              onClick={() => downloadBank(graph)}
-              disabled={graph.length === 0}
-              title="Скачать весь банк вопросов (HTML)"
-            >
-              Банк
-            </button>
-          </div>
         </div>
       </header>
 
@@ -1088,8 +990,8 @@ export default function App() {
             <h4>Агенда · {agendaRows.filter((r) => r.kind === "item").length}</h4>
             {agendaRows.map((r, i) =>
               r.kind === "head" ? (
-                <div key={`h-${r.block}-${i}`} className="iv-block" style={{ color: BLOCK_COLOR[r.block] }}>
-                  {BLOCK_LABEL[r.block]}
+                <div key={`h-${r.block}-${i}`} className="iv-block" style={{ color: blockColor(pool, r.block) }}>
+                  {blockLabel(pool, r.block)}
                 </div>
               ) : (
                 <button
@@ -1099,7 +1001,7 @@ export default function App() {
                     r.node.id === currentId ? "ivbtn--current" : "",
                     scores[r.node.id] != null ? "ivbtn--scored" : "",
                   ].join(" ")}
-                  style={{ borderLeftColor: BLOCK_COLOR[r.node.block] }}
+                  style={{ borderLeftColor: blockColor(pool, r.node.block) }}
                   onClick={() => moveCurrent(r.node.id)}
                   title={r.node.question}
                 >
@@ -1137,7 +1039,7 @@ export default function App() {
               <MiniMap
                 nodeColor={(n) =>
                   n.type === "question"
-                    ? BLOCK_COLOR[(n.data as any)?.node?.block as Block] ?? "#999"
+                    ? ((n.data as { color?: string })?.color ?? "#999")
                     : "rgba(100,116,139,0.18)"
                 }
                 pannable
@@ -1172,19 +1074,19 @@ export default function App() {
                     onChange={(e) => setQuery(e.target.value)}
                   />
                   <div className="fp__group">
-                    <h2 className="fp__title">Направления</h2>
-                    {BLOCK_ORDER.map((b) => (
+                    <h2 className="fp__title">Блоки</h2>
+                    {blockOrder(pool).map((b) => (
                       <button
                         key={b}
                         className={`fp__chip ${activeBlocks[b] ? "" : "fp__chip--off"}`}
                         style={{
-                          borderColor: BLOCK_COLOR[b],
-                          color: activeBlocks[b] ? "#fff" : BLOCK_COLOR[b],
-                          background: activeBlocks[b] ? BLOCK_COLOR[b] : "transparent",
+                          borderColor: blockColor(pool, b),
+                          color: activeBlocks[b] ? "#fff" : blockColor(pool, b),
+                          background: activeBlocks[b] ? blockColor(pool, b) : "transparent",
                         }}
                         onClick={() => toggleBlock(b)}
                       >
-                        {BLOCK_LABEL[b]} {progress[b].done}/{progress[b].total}
+                        {blockLabel(pool, b)} {progress[b].done}/{progress[b].total}
                       </button>
                     ))}
                   </div>
@@ -1316,6 +1218,7 @@ export default function App() {
 
         <DetailDrawer
           node={selectedNode}
+          pool={pool}
           score={selectedId ? scores[selectedId] : undefined}
           note={selectedId ? notes[selectedId] : undefined}
           fullscreen={fullscreen}
@@ -1333,76 +1236,6 @@ export default function App() {
         />
       </div>
       {helpOpen && <ShortcutsHelp onClose={() => setHelpOpen(false)} />}
-      {uploadOpen && (
-        <UploadModal onClose={() => setUploadOpen(false)} onImported={loadGraph} />
-      )}
-      {showBank && <BankBrowser nodes={graph} onClose={() => setShowBank(false)} />}
-
-      {/* question-management: модалка добавления вопроса в банк */}
-      {addOpen && (
-        <div className="modal" onClick={() => setAddOpen(false)}>
-          <div className="modal__card addform" onClick={(e) => e.stopPropagation()}>
-            <h3>Новый вопрос</h3>
-            <div className="addform__row">
-              <label className="drawer__field">
-                Блок
-                <select value={addDraft.block} onChange={(e) => setAddDraft({ ...addDraft, block: e.target.value })}>
-                  {BLOCK_ORDER.map((b) => (
-                    <option key={b} value={b}>{BLOCK_LABEL[b as Block]}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="drawer__field">
-                Тема
-                <input
-                  value={addDraft.topic}
-                  onChange={(e) => setAddDraft({ ...addDraft, topic: e.target.value })}
-                  placeholder="например, sql"
-                />
-              </label>
-            </div>
-            <div className="addform__row">
-              <label className="drawer__field">
-                Сложность
-                <select value={addDraft.difficulty} onChange={(e) => setAddDraft({ ...addDraft, difficulty: e.target.value })}>
-                  {DIFFS.map((d) => (
-                    <option key={d} value={d}>{d}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="drawer__field">
-                Тип
-                <select value={addDraft.kind} onChange={(e) => setAddDraft({ ...addDraft, kind: e.target.value })}>
-                  <option value="question">вопрос</option>
-                  <option value="task">задача</option>
-                </select>
-              </label>
-            </div>
-            <label className="drawer__field">
-              Заголовок
-              <input value={addDraft.title} onChange={(e) => setAddDraft({ ...addDraft, title: e.target.value })} />
-            </label>
-            <label className="drawer__field">
-              {addDraft.kind === "task" ? "Задача" : "Вопрос"}
-              <textarea rows={3} value={addDraft.question} onChange={(e) => setAddDraft({ ...addDraft, question: e.target.value })} />
-            </label>
-            <label className="drawer__field">
-              {addDraft.kind === "task" ? "Эталон / решение" : "Ответ"}
-              <textarea rows={5} value={addDraft.answer} onChange={(e) => setAddDraft({ ...addDraft, answer: e.target.value })} />
-            </label>
-            <label className="drawer__field">
-              Теги (через запятую)
-              <input value={addDraft.tags} onChange={(e) => setAddDraft({ ...addDraft, tags: e.target.value })} />
-            </label>
-            <div className="addform__btns">
-              <button className="btn--primary" onClick={createNode} disabled={!addDraft.topic.trim() || !addDraft.question.trim()}>
-                Создать
-              </button>
-              <button onClick={() => setAddOpen(false)}>Отмена</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
