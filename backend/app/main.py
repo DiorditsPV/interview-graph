@@ -35,7 +35,7 @@ from .auth import (
 from .db import SESSION_MAX_AGE, Database
 from .hub import SessionHub
 from .importer import parse_file, validate_against_pool
-from .models import Block, Difficulty, GraphResponse, Kind, Node
+from .models import Difficulty, GraphResponse, Kind, Node
 from .pools import PoolCfg, block_weights, default_pool_id, load_pools
 from .sampler import build_interview
 from .seed import seed_interviewer_if_empty, seed_owner_if_empty, seed_pool_if_empty
@@ -128,6 +128,7 @@ class SessionCreate(BaseModel):
     candidate: str = Field(min_length=1)
     candidate_id: Optional[int] = Field(default=None, alias="candidateId")
     interviewer_id: Optional[int] = Field(default=None, alias="interviewerId")
+    pool: Optional[str] = None  # id пула; None → пул по умолчанию (совместимость со старым фронтом)
     model_config = {"populate_by_name": True}
 
 
@@ -172,12 +173,14 @@ class InterviewRequest(BaseModel):
 class ImportFile(BaseModel):
     filename: str = Field(min_length=1)
     content: str
+    pool: Optional[str] = None
 
 
 class NodeCreate(BaseModel):
     """Создание вопроса из UI: id генерится сервером, остальное валидируется."""
 
-    block: Block
+    pool: Optional[str] = None
+    block: str = Field(min_length=1)
     topic: str = Field(min_length=1)
     difficulty: Difficulty = "middle"
     kind: Kind = "question"
@@ -331,17 +334,23 @@ def import_file(body: ImportFile, request: Request, _user: dict = Depends(requir
     from .importer import _fmt_error  # локально — внутренний хелпер форматирования ошибок
 
     tenant = resolve_tenant(request)
+    pool = _pool_or_404(body.pool)
     added: List[dict] = []
     errors: List[dict] = []
     with tempfile.TemporaryDirectory() as td:
         tmp = Path(td) / name
         tmp.write_text(body.content, encoding="utf-8")
         try:
-            nodes = parse_file(tmp)
+            nodes = parse_file(tmp, pool.id)
         except Exception as exc:  # noqa: BLE001 — любую ошибку парсинга показываем пользователю
             return {"added": [], "errors": [{"file": name, "error": _fmt_error(exc)}]}
 
     for node in nodes:
+        try:
+            validate_against_pool(node, pool)
+        except ValueError as exc:
+            errors.append({"file": name, "error": str(exc)})
+            continue
         if db.get_node(tenant, node.id) is not None:
             errors.append({"file": name, "error": f"duplicate id '{node.id}' (already in bank)"})
             continue
@@ -376,12 +385,16 @@ def _unique_node_id(tenant: str, base: str) -> str:
 
 @app.post("/api/nodes")
 def add_node(body: NodeCreate, request: Request, _user: dict = Depends(require_member)) -> dict:
-    """Создать новый вопрос в банке (БД, source='user'). id генерится из topic/title."""
+    """Создать новый вопрос в банке пула (БД, source='user'). id генерится из topic/title."""
     tenant = resolve_tenant(request)
+    pool = _pool_or_404(body.pool)
     base = _slugify(body.topic or body.title or body.block)
     node_id = _unique_node_id(tenant, base)
-    # Валидация через Node (extra=forbid, Literal-проверки) до записи.
-    node = Node.model_validate({**body.model_dump(), "id": node_id})
+    node = Node.model_validate({**body.model_dump(exclude={"pool"}), "pool": pool.id, "id": node_id})
+    try:
+        validate_against_pool(node, pool)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     saved = db.upsert_node(tenant, node.model_dump(by_alias=True), source="user")
     return {"id": saved["id"], "block": saved["block"], "title": saved.get("title") or ""}
 
@@ -400,8 +413,10 @@ def edit_node(
     # existing несёт БД-поля (source/hidden/timestamps), которых нет в Node (extra=forbid):
     # валидируем только подмножество полей Node, а в БД пишем полный merged (db читает по .get).
     try:
-        Node.model_validate({k: v for k, v in merged.items() if k in _NODE_FIELDS})
-    except Exception as exc:  # noqa: BLE001 — pydantic ValidationError → 422
+        node = Node.model_validate({k: v for k, v in merged.items() if k in _NODE_FIELDS})
+        if merged["pool"] in POOLS:
+            validate_against_pool(node, POOLS[merged["pool"]])
+    except Exception as exc:  # noqa: BLE001 — pydantic ValidationError / block вне пула → 422
         raise HTTPException(status_code=422, detail=str(exc))
     saved = db.upsert_node(tenant, merged, source=existing.get("source", "user"))
     return {"updated": saved["id"]}
@@ -482,17 +497,22 @@ def create_session(
         if cand is None:
             raise HTTPException(status_code=404, detail=f"candidate '{body.candidate_id}' not found")
         candidate_name = cand["name"]
+    pool = _pool_or_404(body.pool)
     return db.create_session(
         candidate_name,
         tenant_id=tenant,
         candidate_id=body.candidate_id,
         interviewer_id=body.interviewer_id,
+        pool=pool.id,
     )
 
 
 @app.get("/api/sessions")
-def list_sessions(request: Request, _user: dict = Depends(current_user)) -> list:
-    return db.list_sessions(resolve_tenant(request))
+def list_sessions(
+    request: Request, pool: Optional[str] = None, _user: dict = Depends(current_user)
+) -> list:
+    tenant = resolve_tenant(request)
+    return db.list_sessions(tenant, pool=_pool_or_404(pool).id if pool else None)
 
 
 @app.get("/api/sessions/{session_id}")

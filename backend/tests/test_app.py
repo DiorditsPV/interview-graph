@@ -106,6 +106,18 @@ def test_api_list_sessions():
     assert all({"id", "candidate", "created_at"} <= set(r) for r in rows)
 
 
+def test_api_session_carries_pool():
+    c = _client()
+    s = c.post("/api/sessions", json={"candidate": "Пулов", "pool": "data-engineer"}).json()
+    assert s["pool"] == "data-engineer"
+    default = c.post("/api/sessions", json={"candidate": "Дефолтов"}).json()
+    assert default["pool"] == "data-engineer"
+    assert c.post("/api/sessions", json={"candidate": "X", "pool": "nope"}).status_code == 404
+    rows = c.get("/api/sessions?pool=data-engineer").json()
+    assert all(r["pool"] == "data-engineer" for r in rows)
+    assert c.get("/api/sessions?pool=nope").status_code == 404
+
+
 def test_api_session_events_snapshot():
     # Бесконечный SSE-поток нельзя гонять через TestClient.iter_lines (зависает на close),
     # поэтому тянем первый кадр напрямую из генератора StreamingResponse.
@@ -338,6 +350,28 @@ def test_api_import_duplicate_id():
     assert any("duplicate" in e["error"] for e in data["errors"])
     # существующий sql-01 не перезаписан (всё ещё на месте)
     assert (CONTENT / "databases" / "sql-01.md").exists()
+
+
+def test_api_import_rejects_block_outside_pool():
+    c = _client()
+    md = "---\nid: zzz-outside-01\nblock: requirements\ntopic: t\n---\n## Вопрос\nq?\n"
+    r = c.post("/api/import", json={"filename": "x.md", "content": md, "pool": "data-engineer"})
+    data = r.json()
+    assert data["added"] == []
+    assert any("block 'requirements'" in e["error"] for e in data["errors"])
+    assert "zzz-outside-01" not in {n["id"] for n in c.get("/api/graph").json()["nodes"]}
+
+
+def test_api_import_default_pool_and_graph_visibility():
+    c = _client()
+    md = "---\nid: zzz-pooled-01\nblock: python\ntopic: t\n---\n## Вопрос\nq?\n"
+    try:
+        data = c.post("/api/import", json={"filename": "p.md", "content": md}).json()
+        assert any(a["id"] == "zzz-pooled-01" for a in data["added"])
+        node = next(n for n in c.get("/api/graph?pool=data-engineer").json()["nodes"] if n["id"] == "zzz-pooled-01")
+        assert node["pool"] == "data-engineer"
+    finally:
+        _delete_node("zzz-pooled-01")
 
 
 # --- DB как источник правды для банка вопросов (content-store-db) ---
