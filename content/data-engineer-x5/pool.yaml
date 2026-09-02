@@ -1,0 +1,33 @@
+id: data-engineer-x5
+label: Data Engineer X5
+description: Скрипт интервью — Python-лайвкодинг, SQL и индексы, Spark, Airflow, ClickHouse
+blocks:
+  - id: python
+    label: Python
+    color: "#d97706"
+    weight: 30
+  - id: sql
+    label: SQL и индексы
+    color: "#16a34a"
+    weight: 25
+    subblocks:
+      - id: queries
+        label: Запросы
+      - id: indexes
+        label: Индексы и планы
+  - id: spark
+    label: Spark
+    color: "#2563eb"
+    weight: 25
+  - id: airflow
+    label: Airflow
+    color: "#9333ea"
+    weight: 12
+  - id: clickhouse
+    label: ClickHouse
+    color: "#dc2626"
+    weight: 6
+  - id: ai
+    label: AI в работе
+    color: "#0891b2"
+    weight: 2
