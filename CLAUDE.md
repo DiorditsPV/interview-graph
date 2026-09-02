@@ -39,10 +39,12 @@ Dev hot-reload вручную: `uvicorn app.main:app --reload --port 8000` (из
 ## Архитектура
 
 **Бэкенд** (`backend/app/`) — поток данных «контент-файлы → импорт → in-memory граф → API → SQLite-сессии»:
-- `importer.py` — парсит `content/<block>/*.md|*.json` через `python-frontmatter` в модели `Node`.
+- `pools.py` — читает `content/<pool>/pool.yaml` (блоки, под-колонки, цвета, веса) — таксономия пула.
+- `importer.py` — парсит `content/<pool>/<block>/*.md|*.json` через `python-frontmatter` в `Node`,
+  проверяя block/subblock по `pool.yaml`; `pool` ноды ставится по каталогу, не во frontmatter.
 - `models.py` — pydantic `Node` с `extra="forbid"`: добавление поля ноды = правка `models.py`
   **И** `frontend/src/types.ts` **И** миграция всех контент-файлов, иначе импорт падает.
-- `sampler.py` — собирает набор вопросов пропорционально весам блоков (`content/weights.yaml`).
+- `sampler.py` — собирает набор вопросов пропорционально весам блоков пула.
 - `db.py` — SQLite: сессии кандидатов и оценки. `tenancy.py` — изоляция тенантов. `hub.py` — SSE.
 - `main.py` — FastAPI; полные схемы ручек в Swagger UI на `/docs`.
 
@@ -53,8 +55,9 @@ Dev hot-reload вручную: `uvicorn app.main:app --reload --port 8000` (из
 - `components/` — узлы канвы (QuestionNode, BlockGroupNode, SubHeadNode …) + DetailDrawer.
 - `report.ts` — клиентская генерация самодостаточного HTML-отчёта по сессии («📥 Скачать»).
 
-**Под-колонки** внутри блока задаются полем `subblock` во frontmatter, порядок — в `PREFERRED_SUB`:
-frameworks → `airflow|pyspark|dbt|streaming`; databases → `sql|dbms|storage|formats`.
+**Под-колонки** внутри блока задаются полем `subblock` во frontmatter, порядок и подписи — в `subblocks`
+соответствующего блока в `pool.yaml`: frameworks → `airflow|pyspark|dbt|streaming`; databases →
+`sql|dbms|storage|formats`.
 
 ## Грабли (важно)
 - **Ground truth контента — через `cat`/`grep`/`GET /api/graph`, НЕ через Read-инструмент.**
@@ -68,6 +71,8 @@ frameworks → `airflow|pyspark|dbt|streaming`; databases → `sql|dbms|storage|
   1–3 на ноду, без тех-имён (технология видна по колонке). Полный список — в `AGENTS.md`.
 - В фиче-ветках **не пушить в `main`**: merge в `main` триггерит автодеплой на сервер (порт 8800,
   см. `DEPLOY.md`).
+- **Новый пул** = каталог `content/<id>/` с `pool.yaml` (id = имя каталога); id нод уникальны в пределах
+  тенанта — используйте префикс пула.
 
 ## Проверка изменений
 Скилл **interview-verify** (или вручную): import 0 ошибок (`/api/graph`) → `pytest` →

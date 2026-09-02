@@ -31,13 +31,13 @@ Dev (hot reload): `uvicorn app.main:app --reload --port 8000` (из `backend/`, 
   `components/` — узлы канвы (QuestionNode, BlockGroupNode, SubHeadNode, BandsNode, GuidesNode) и
   оверлеи/панели (DetailDrawer, BankBrowser, UploadModal, CompareModal, ShortcutsHelp).
   Тесты: `frontend/smoke.mjs`, `frontend/screenshot.mjs`.
-- `content/<block>/*.md|*.json` — банк вопросов; `content/weights.yaml` — веса блоков.
+- `content/<pool>/pool.yaml` — таксономия и веса пула; `content/<pool>/<block>/*.md|*.json` — его вопросы.
 - `backend/tests/` — pytest (`test_app.py` импорт/sampler/API/сессии, `test_nodes.py` CRUD нод,
   `test_people.py` кандидаты/интервьюеры/тенант-изоляция). `Q_IDEAS.txt` — реестр вопросов + идеи (`[x]`/`[ ]`).
 - `REPORT.md` — отчёт-исследование и архитектурные решения. `.claude/skills/` — скиллы (ниже).
 
 ## API (FastAPI)
-Граф/контент: `GET /api/graph` (ноды + ошибки импорта), `GET /api/weights`, `GET /api/tracks`,
+Граф/контент: `GET /api/graph` (ноды + ошибки импорта), `GET /api/pools`, `GET /api/graph?pool=`,
 `POST /api/import`, `POST/PUT/DELETE /api/nodes`. Интервью/сессии: `POST /api/interview`,
 `POST /api/sessions`, `GET /api/sessions`, `GET /api/sessions/{id}`, `POST /api/sessions/{id}/score`,
 `GET /api/sessions/{id}/events` (SSE). Люди: `GET/POST/PUT /api/candidates`,

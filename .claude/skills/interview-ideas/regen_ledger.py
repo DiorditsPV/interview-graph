@@ -3,14 +3,16 @@
 
 Только stdlib. Нужен поднятый сервер. Запуск из любого места:
     python3 .claude/skills/interview-ideas/regen_ledger.py
-Переменные окружения: API_URL (по умолч. http://127.0.0.1:8000/api/graph).
+Переменные окружения: API_URL (по умолч. http://127.0.0.1:8000/api), POOL=... (по умолч. data-engineer).
 """
 import json
 import os
 import pathlib
 import urllib.request
 
-API_URL = os.environ.get("API_URL", "http://127.0.0.1:8000/api/graph")
+POOL = os.environ.get("POOL", "data-engineer")   # id пула (content/<pool>/)
+API_BASE = os.environ.get("API_URL", "http://127.0.0.1:8000/api").rstrip("/")
+GRAPH_URL = f"{API_BASE}/graph?pool={POOL}"
 ROOT = pathlib.Path(__file__).resolve().parents[3]  # .../interview
 QFILE = ROOT / "Q_IDEAS.txt"
 
@@ -34,7 +36,7 @@ def gk(n):
 
 
 def main():
-    ns = json.load(urllib.request.urlopen(API_URL))["nodes"]
+    ns = json.load(urllib.request.urlopen(GRAPH_URL))["nodes"]
     out = [
         "Реестр вопросов интервью и идеи для новых.",
         "",

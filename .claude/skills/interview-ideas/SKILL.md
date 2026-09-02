@@ -69,6 +69,7 @@ python3 .claude/skills/interview-ideas/regen_ledger.py
 Скрипт (stdlib, нужен сервер на :8000) пересобирает `[x]`-реестр из `/api/graph` (ground truth),
 группирует по block/subblock, сортирует base<junior<middle<senior и **сохраняет** текущие `[ ]`-идеи.
 Env `API_URL` переопределяет адрес. Пиши `Q_IDEAS.txt` в корне проекта.
+Пул задаётся `POOL=<id>` (по умолчанию `data-engineer`); контент — `content/<pool>/<block>/`.
 
 ## Подсказка по содержанию
 Стек команды (X5, дата-инженерия): Python, Airflow, Spark/PySpark, Flink, Trino, ClickHouse, Kafka,

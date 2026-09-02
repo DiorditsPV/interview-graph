@@ -28,6 +28,7 @@ python3 .claude/skills/interview-refactor/inventory.py
 ```
 Скрипт (stdlib, нужен сервер на :8000) печатает все ноды по группам block/subblock:
 `difficulty · kind · id · [tags] · title`. Полный текст конкретной ноды — `cat content/<block>/<id>.md`.
+Пул задаётся `POOL=<id>` (по умолчанию `data-engineer`); контент — `content/<pool>/<block>/`.
 
 ### Шаг 2. Оценить по трём осям (выдать список находок ДО правок)
 1. **Сложность.** Соответствует ли `difficulty` глубине вопроса?
