@@ -29,13 +29,13 @@ export default function Router() {
   switch (route.name) {
     case "board": {
       const pool = poolOf(route.pool);
-      if (!pool) return <HomePage pools={pools} notice={`Направления «${route.pool}» нет`} />;
+      if (!pool) return <HomePage pools={pools} notice={`Направления «${route.pool}» нет`} onChanged={reloadPools} />;
       // key — чтобы смена пула пересоздавала доску целиком (состояние, таймеры, SSE).
       return <BoardPage key={pool.id} pool={pool} sessionFromUrl={route.session} />;
     }
     case "bank": {
       const pool = poolOf(route.pool);
-      if (!pool) return <HomePage pools={pools} notice={`Направления «${route.pool}» нет`} />;
+      if (!pool) return <HomePage pools={pools} notice={`Направления «${route.pool}» нет`} onChanged={reloadPools} />;
       return <BankPage key={pool.id} pool={pool} onChanged={reloadPools} />;
     }
     case "candidates":
@@ -45,6 +45,6 @@ export default function Router() {
     case "connect":
       return <ConnectPage pools={pools} />;
     default:
-      return <HomePage pools={pools} startPool={route.name === "home" ? route.start : null} />;
+      return <HomePage pools={pools} startPool={route.name === "home" ? route.start : null} onChanged={reloadPools} />;
   }
 }
