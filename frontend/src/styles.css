@@ -639,7 +639,19 @@ kbd {
 .poolcard__meta { font-size: 12px; color: var(--text-muted); }
 .poolcard__blocks { display: flex; flex-wrap: wrap; gap: 4px; }
 .poolcard__block { font-size: 11px; color: #fff; padding: 1px 7px; border-radius: 4px; }
-.poolcard__bank { margin-top: 4px; font-size: 12px; color: var(--accent); text-decoration: none; position: relative; z-index: 1; align-self: flex-start; }
+.poolcard__bank { font-size: 12px; color: var(--accent); text-decoration: none; }
+/* Кнопка старта и форма — над «растяжкой» .poolcard__label::after, иначе клики уходят на доску. */
+.poolcard__actions { display: flex; align-items: center; gap: 12px; margin-top: 4px; position: relative; z-index: 1; }
+.poolcard__start { padding: 6px 12px; font-size: 13px; }
+.poolcard__form {
+  position: relative; z-index: 1; display: grid; gap: 6px; padding: 10px; margin-top: 4px;
+  border: 1px solid var(--border); border-radius: 8px; background: var(--bg);
+}
+.poolcard__form input, .poolcard__form select {
+  padding: 6px 10px; border: 1px solid var(--border-strong); border-radius: 6px; font-size: 14px;
+  background: var(--surface); color: var(--text);
+}
+.poolcard__form-actions { display: flex; gap: 8px; }
 .home__sections { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
 .menucard {
   display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; text-decoration: none; color: var(--text);
