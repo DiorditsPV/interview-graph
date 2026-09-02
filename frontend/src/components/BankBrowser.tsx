@@ -83,7 +83,7 @@ export function BankBrowser({ nodes, pool, onClose, embedded }: Props) {
     });
 
   return (
-    <div className={embedded ? "bankbrowser bankbrowser--embedded" : "bankbrowser"} role="dialog" aria-label="Все вопросы" aria-modal="true">
+    <div className={embedded ? "bankbrowser bankbrowser--embedded" : "bankbrowser"} role={embedded ? undefined : "dialog"} aria-label="Все вопросы" aria-modal={embedded ? undefined : "true"}>
       <header className="bankbrowser__bar">
         <strong>Все вопросы</strong>
         <span className="bankbrowser__count">
