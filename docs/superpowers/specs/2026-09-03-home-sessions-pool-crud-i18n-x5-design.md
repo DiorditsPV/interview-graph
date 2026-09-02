@@ -146,7 +146,7 @@ CREATE TABLE IF NOT EXISTS pools (
 
 | ручка | тело / ответ | ошибки |
 |---|---|---|
-| `POST /api/pools` (member) | `{label, description?, preset}` → пул как в `GET /api/pools` (с `counts`) | 404 preset нет; 422 пустой label; 409 сгенерированный id занят после 20 попыток суффикса (практически недостижимо) |
+| `POST /api/pools` (member) | `{label, description?, preset}` → пул как в `GET /api/pools` (с `counts`) | 404 preset нет; 422 пустой label |
 | `PUT /api/pools/{id}` (member) | `{label?, description?}` → пул | 404; 422 пустой label |
 | `DELETE /api/pools/{id}` (member) | → `{deleted, nodes_removed, sessions_kept}` | 404 |
 
