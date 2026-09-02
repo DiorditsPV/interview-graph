@@ -44,7 +44,9 @@ export function LangProvider({ children }: { children: ReactNode }) {
     setLangState(l);
   }, []);
   useEffect(() => {
+    // index.html вне React-дерева: lang и заголовок вкладки подтягиваем к выбранному языку здесь.
     document.documentElement.lang = lang;
+    document.title = t("Интервью · граф вопросов");
   }, [lang]);
   const value = useMemo(() => ({ lang, setLang }), [lang, setLang]);
   return <LangCtx.Provider value={value}>{children}</LangCtx.Provider>;

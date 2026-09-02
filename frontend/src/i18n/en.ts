@@ -37,6 +37,9 @@ export const EN: Record<string, string> = {
   "Начать интервью": "Start interview",
   "Агенда": "Agenda",
 
+  // --- index.html / LangProvider (заголовок вкладки) ---
+  "Интервью · граф вопросов": "Interview · question graph",
+
   // --- HomePage ---
   "Интервью · доска вопросов": "Interview · question board",
   "Направления": "Tracks",
