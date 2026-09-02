@@ -62,33 +62,35 @@ export function CandidatesPage({ pools }: { pools: PoolConfig[] }) {
         <input placeholder="Контакт" value={draft.contact} onChange={(e) => setDraft({ ...draft, contact: e.target.value })} />
         <button className="btn--primary cand-add" onClick={addCandidate} disabled={!draft.name.trim()}>Добавить</button>
       </div>
-      <table className="table">
-        <thead><tr><th>Имя</th><th>Позиция</th><th>Грейд</th><th>Контакт</th><th>Сессии</th><th></th></tr></thead>
-        <tbody>
-          {cands.map((c) =>
-            editId === c.id ? (
-              <tr key={c.id} className="table__edit">
-                <td><input value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} /></td>
-                <td><input value={edit.position} onChange={(e) => setEdit({ ...edit, position: e.target.value })} /></td>
-                <td><input value={edit.seniority} onChange={(e) => setEdit({ ...edit, seniority: e.target.value })} /></td>
-                <td><input value={edit.contact} onChange={(e) => setEdit({ ...edit, contact: e.target.value })} /></td>
-                <td />
-                <td><button className="btn--primary" onClick={saveEdit}>Сохранить</button> <button onClick={() => setEditId(null)}>Отмена</button></td>
-              </tr>
-            ) : (
-              <tr key={c.id}>
-                <td>{c.name}</td><td>{c.position ?? "—"}</td><td>{c.seniority ?? "—"}</td><td>{c.contact ?? "—"}</td>
-                <td>
-                  {sessions.filter((s) => s.candidate_id === c.id).map((s) => (
-                    <a key={s.id} className="table__link" href={href.board(s.pool, s.id)}>{poolLabel(s.pool)} · {s.created_at.slice(0, 10)}</a>
-                  ))}
-                </td>
-                <td><button onClick={() => { setEditId(c.id); setEdit({ name: c.name, position: c.position ?? "", seniority: c.seniority ?? "", contact: c.contact ?? "", note: c.note ?? "" }); }}>Изменить</button></td>
-              </tr>
-            ),
-          )}
-        </tbody>
-      </table>
+      <div className="table-wrap">
+        <table className="table">
+          <thead><tr><th>Имя</th><th>Позиция</th><th>Грейд</th><th>Контакт</th><th>Сессии</th><th></th></tr></thead>
+          <tbody>
+            {cands.map((c) =>
+              editId === c.id ? (
+                <tr key={c.id} className="table__edit">
+                  <td><input value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} /></td>
+                  <td><input value={edit.position} onChange={(e) => setEdit({ ...edit, position: e.target.value })} /></td>
+                  <td><input value={edit.seniority} onChange={(e) => setEdit({ ...edit, seniority: e.target.value })} /></td>
+                  <td><input value={edit.contact} onChange={(e) => setEdit({ ...edit, contact: e.target.value })} /></td>
+                  <td />
+                  <td><button className="btn--primary" onClick={saveEdit}>Сохранить</button> <button onClick={() => setEditId(null)}>Отмена</button></td>
+                </tr>
+              ) : (
+                <tr key={c.id}>
+                  <td>{c.name}</td><td>{c.position ?? "—"}</td><td>{c.seniority ?? "—"}</td><td>{c.contact ?? "—"}</td>
+                  <td>
+                    {sessions.filter((s) => s.candidate_id === c.id).map((s) => (
+                      <a key={s.id} className="table__link" href={href.board(s.pool, s.id)}>{poolLabel(s.pool)} · {s.created_at.slice(0, 10)}</a>
+                    ))}
+                  </td>
+                  <td><button onClick={() => { setEditId(c.id); setEdit({ name: c.name, position: c.position ?? "", seniority: c.seniority ?? "", contact: c.contact ?? "", note: c.note ?? "" }); }}>Изменить</button></td>
+                </tr>
+              ),
+            )}
+          </tbody>
+        </table>
+      </div>
 
       <h2 className="home__h2">Интервьюеры · {ivs.length}</h2>
       <div className="formrow">
@@ -97,10 +99,12 @@ export function CandidatesPage({ pools }: { pools: PoolConfig[] }) {
         <input placeholder="Email" value={ivDraft.email} onChange={(e) => setIvDraft({ ...ivDraft, email: e.target.value })} />
         <button className="btn--primary" onClick={addInterviewer} disabled={!ivDraft.name.trim()}>Добавить</button>
       </div>
-      <table className="table">
-        <thead><tr><th>Имя</th><th>Роль</th><th>Email</th></tr></thead>
-        <tbody>{ivs.map((i) => <tr key={i.id}><td>{i.name}</td><td>{i.role ?? "—"}</td><td>{i.email ?? "—"}</td></tr>)}</tbody>
-      </table>
+      <div className="table-wrap">
+        <table className="table">
+          <thead><tr><th>Имя</th><th>Роль</th><th>Email</th></tr></thead>
+          <tbody>{ivs.map((i) => <tr key={i.id}><td>{i.name}</td><td>{i.role ?? "—"}</td><td>{i.email ?? "—"}</td></tr>)}</tbody>
+        </table>
+      </div>
     </PageShell>
   );
 }

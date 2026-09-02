@@ -77,13 +77,15 @@ body {
 /* ---- страницы кроме доски: тонкая полоса «← Меню · заголовок» + содержимое ---- */
 .page { display: flex; flex-direction: column; min-height: 100vh; background: var(--bg); }
 .pageshell {
-  display: flex; align-items: center; gap: 14px; padding: 10px 16px;
+  display: flex; align-items: center; gap: 14px; padding: 10px 16px; flex-wrap: wrap;
   background: var(--surface); border-bottom: 1px solid var(--border);
 }
 .pageshell__back { color: var(--text-muted); text-decoration: none; font-size: 13px; white-space: nowrap; }
 .pageshell__back:hover { color: var(--text); }
 .pageshell__title { margin: 0; font-size: 16px; font-weight: 700; color: var(--heading); }
-.pageshell__actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+/* узкий вьюпорт: заголовок может занять всю строку, экшены переносятся на следующую,
+   не выталкивая шапку за правый край (#18 — матрица скриншотов 390px). */
+.pageshell__actions { margin-left: auto; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .page__body { flex: 1; padding: 20px 16px; max-width: 1200px; width: 100%; margin: 0 auto; box-sizing: border-box; }
 
 .progress { display: flex; align-items: center; gap: 8px; }
@@ -541,7 +543,7 @@ kbd {
   display: flex; flex-direction: column;
 }
 .bankbrowser__bar {
-  display: flex; align-items: center; gap: 12px; padding: 10px 16px;
+  display: flex; align-items: center; gap: 12px; padding: 10px 16px; flex-wrap: wrap;
   background: var(--surface); border-bottom: 1px solid var(--border); border-top: 4px solid #2563eb;
 }
 .bankbrowser__bar strong { font-size: 15px; color: var(--heading); }
@@ -656,7 +658,11 @@ kbd {
 /* ---- таблицы и формы страниц ---- */
 .formrow { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; }
 .formrow input { padding: 6px 10px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--surface); color: var(--text); }
-.table { width: 100%; border-collapse: collapse; font-size: 14px; background: var(--surface); border: 1px solid var(--border); }
+/* узкий вьюпорт: таблица шире контейнера скроллится сама, а не раздвигает страницу
+   (#18 — матрица скриншотов 390px). min-width: max-content — не сжимается уже своего
+   содержимого (иначе текст ломается по буквам). */
+.table-wrap { width: 100%; overflow-x: auto; }
+.table { width: 100%; min-width: max-content; border-collapse: collapse; font-size: 14px; background: var(--surface); border: 1px solid var(--border); }
 .table th, .table td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
 .table th { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-faint); }
 .table__link { display: block; font-size: 12px; color: var(--accent); text-decoration: none; }
