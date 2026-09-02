@@ -53,9 +53,9 @@ Dev hot-reload вручную: `uvicorn app.main:app --reload --port 8000` (из
   `#/sessions`, `#/connect`.
 - `pages/BoardPage.tsx` — доска пула: состояние, `buildNodes`, шапка, панель ⚙.
 - `pages/` — `HomePage`, `BankPage`, `CandidatesPage`, `SessionsPage`, `ConnectPage`.
-- `layout.ts` — `swimlaneLayout` + `PREFERRED_SUB` (порядок под-колонок) + `SUB_LABEL` + `DIFFS`.
+- `layout.ts` — `swimlaneLayout(nodes, pool)`: порядок блоков и под-колонок из `pool.yaml`, `DIFFS`, `subOf`.
 - `types.ts` — `QNode`, `PoolConfig` + `blockOrder/blockLabel/blockColor/subLabel` вместо констант,
-  перечисления `Block/Difficulty/Kind`, `DIFF_COLOR`.
+  `Block = string`, перечисления `Difficulty/Kind`, `DIFF_COLOR`.
 - `components/` — узлы канвы (QuestionNode, BlockGroupNode, SubHeadNode …) + DetailDrawer.
 - `report.ts` — клиентская генерация самодостаточного HTML-отчёта по сессии («📥 Скачать»).
 

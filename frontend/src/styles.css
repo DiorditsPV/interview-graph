@@ -140,7 +140,7 @@ button:disabled:hover { background: var(--surface); }
 .dlbtn:not(:disabled):hover { background: var(--accent); color: #fff; }
 .session__sep { width: 1px; align-self: stretch; margin: 2px 4px; background: var(--border); }
 
-/* ---- настройки отображения: поповер под ⚙ в шапке ----
+/* ---- настройки отображения: боковая панель ⚙ (.setdrawer) ----
    z-index между канвой (5) и модалками (50): всплывает над доской, но не над оверлеями. */
 .settings { position: relative; display: inline-flex; }
 .setbtn--on { background: var(--hover); color: var(--text); border-color: var(--border); }
@@ -162,15 +162,10 @@ button:disabled:hover { background: var(--surface); }
   font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
   color: var(--text-muted);
 }
-/* Чипы в столбик: в поповере есть место на полные подписи вместо «Верт.»/«Гор.». */
+/* Чипы в столбик: в боковой панели ⚙ (.setdrawer) есть место на полные подписи вместо «Верт.»/«Гор.». */
 .settings__chips { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
 
-.tb__field { display: flex; align-items: center; gap: 6px; }
 .tb__lbl { font-size: 13px; color: var(--text-muted); }
-.tb__select {
-  padding: 5px 8px; border: 1px solid var(--border-strong); border-radius: 6px;
-  background: var(--surface); color: var(--text); font-size: 13px; cursor: pointer;
-}
 .tb__toggle { font-size: 13px; padding: 5px 10px; }
 .tb__toggle--on { background: var(--tag-bg); color: var(--tag-fg); border-color: var(--tag-fg); }
 

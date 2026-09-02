@@ -27,12 +27,12 @@ Dev (hot reload): `uvicorn app.main:app --reload --port 8000` (из `backend/`, 
 - `frontend/src/` — `router.ts`/`Router.tsx` (hash-роутер: `#/`, `#/board/<pool>`, `#/bank/<pool>`,
   `#/candidates`, `#/sessions`, `#/connect`), `pages/BoardPage.tsx` (доска пула: состояние, `buildNodes`,
   шапка, панель ⚙), `pages/` (`HomePage`, `BankPage`, `CandidatesPage`, `SessionsPage`, `ConnectPage`),
-  `api.ts` (обёртки над `/api`), `layout.ts` (`swimlaneLayout`, `PREFERRED_SUB`, `SUB_LABEL`, `DIFFS`,
-  константы), `types.ts` (`QNode`, `PoolConfig` + `blockOrder/blockLabel/blockColor/subLabel` вместо
-  констант, `Block/Difficulty/Kind`, `DIFF_COLOR`), `report.ts` (HTML-отчёт), `styles.css`
+  `api.ts` (обёртки над `/api`), `layout.ts` (`swimlaneLayout(nodes, pool)`, `DIFFS`, `subOf`),
+  `types.ts` (`QNode`, `PoolConfig` + `blockOrder/blockLabel/blockColor/subLabel` вместо
+  констант, `Block = string`, `Difficulty/Kind`, `DIFF_COLOR`), `report.ts` (HTML-отчёт), `styles.css`
   (CSS-переменные тем), `main.tsx`.
   `components/` — узлы канвы (QuestionNode, BlockGroupNode, SubHeadNode, BandsNode, GuidesNode) и
-  оверлеи/панели (DetailDrawer, BankBrowser, UploadModal, CompareModal, ShortcutsHelp).
+  оверлеи/панели (DetailDrawer, BankBrowser, UploadModal, ShortcutsHelp).
   Тесты: `frontend/smoke.mjs`, `frontend/screenshot.mjs`.
 - `content/<pool>/pool.yaml` — таксономия и веса пула; `content/<pool>/<block>/*.md|*.json` — его вопросы.
 - `backend/tests/` — pytest (`test_app.py` импорт/sampler/API/сессии, `test_nodes.py` CRUD нод,
@@ -48,13 +48,15 @@ Dev (hot reload): `uvicorn app.main:app --reload --port 8000` (из `backend/`, 
 
 ## Модель ноды и формат контента
 Frontmatter (ключи алфавитные, `tags` — block-style): `id`, `kind` (question|task), `block`
-(frameworks|databases|python|platform), `subblock`, `topic`, `title` (короткий заголовок карточки),
+(значения — блоки из `content/<pool>/pool.yaml` того пула; data-engineer: frameworks|databases|python|platform,
+system-analyst: requirements|modeling|data|integration), `subblock`, `topic`, `title` (короткий заголовок карточки),
 `difficulty` (base|junior|middle|senior), `weight`, `tags` (1–3), для `task` — `starterCode`, `rubric`.
 Тело: `## Вопрос` / `## Ответ` (для задач — `## Задача` / `## Эталон`). Не начинай строки тела с `#`
 вне блоков кода (это маркеры разбиения). Полный текст — в drawer; на карточке только `title` + теги.
 
-**Под-колонки** (`PREFERRED_SUB` в `layout.ts`): frameworks → `airflow|pyspark|dbt|streaming`;
-databases → `sql|dbms|storage|formats`; python и platform — одна колонка.
+**Под-колонки** внутри блока задаются полем `subblock`, порядок и подписи — в `subblocks` соответствующего
+блока в `content/<pool>/pool.yaml`: data-engineer → frameworks: `airflow|pyspark|dbt|streaming`,
+databases: `sql|dbms|storage|formats`; system-analyst — свои под-колонки по блокам, см. `pool.yaml`.
 
 ## Конвенции и грабли (ВАЖНО)
 - **Ground truth — через `cat`/`grep`/`/api/graph`, НЕ через Read-инструмент**: контент-файлы
