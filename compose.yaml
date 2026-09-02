@@ -1,0 +1,28 @@
+# Локальный запуск сервиса в контейнере:
+#   docker compose up -d --build                  → http://localhost:8000
+#   INTERVIEW_PORT=8080 docker compose up -d      → если :8000 занят ./run.sh
+#   docker compose down                           → остановить (том с БД остаётся)
+#   docker compose down -v                        → снести вместе с данными
+
+services:
+  interview:
+    build: .
+    image: interview-graph:local
+    container_name: interview-graph
+    ports:
+      - "${INTERVIEW_PORT:-8000}:8000"
+    environment:
+      # Без явного пароля owner генерится случайным на каждом старте, а в БД сидится
+      # один раз при первом. С постоянным томом это значит «после первого старта войти
+      # уже нельзя»: новый пароль против старого хеша. Поэтому известный дефолт.
+      # Оба креда сидятся в БД ОДИН раз при первом старте: чтобы сменить их на уже
+      # поднятом сервисе, нужен `docker compose down -v` (пересоздать том).
+      INTERVIEW_OWNER_EMAIL: "${INTERVIEW_OWNER_EMAIL:-admin}"
+      INTERVIEW_OWNER_PASSWORD: "${INTERVIEW_OWNER_PASSWORD:-admin}"
+    volumes:
+      # Именованный том: переживает пересборку образа и docker compose down.
+      - interview-db:/data
+    restart: unless-stopped
+
+volumes:
+  interview-db:

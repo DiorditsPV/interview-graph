@@ -1,0 +1,29 @@
+# Всё, что не должно попасть ни в контекст сборки, ни в образ.
+.git
+.github
+.claude
+
+# Фронт собирается внутри образа из исходников и лока.
+**/node_modules
+frontend/dist
+frontend/dist-demo
+
+# Питон-окружение и кэши хоста.
+backend/.venv
+**/__pycache__
+*.py[cod]
+.pytest_cache
+.mypy_cache
+.ruff_cache
+
+# Данные и секреты: БД живёт в томе, ключи деплоя в образ не нужны.
+*.db
+.deploy
+
+# 4 МБ витринных скриншотов — в рантайме не нужны, только раздувают контекст.
+docs/screenshots
+
+.DS_Store
+**/.DS_Store
+.idea
+last_run.json
