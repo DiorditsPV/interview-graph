@@ -57,6 +57,28 @@ def test_copy_nodes_and_delete_pool_removes_them(tmp_path):
     assert db.count_nodes("t", pool="src") == 1
 
 
+def test_copy_nodes_collision_rolls_back(tmp_path):
+    import sqlite3
+
+    import pytest
+
+    db = _db(tmp_path)
+    db.create_pool("t", "src", "Src", "", BLOCKS)
+    db.create_pool("t", "other", "Other", "", BLOCKS)
+    for nid, pool in (("q-01", "src"), ("q-02", "src"), ("dst-q-02", "other")):
+        db.upsert_node("t", {"id": nid, "pool": pool, "block": "a", "topic": "x", "question": "Q?", "answer": "A"})
+    # чужая нода занимает id копии → ничего не копируется и пул-сирота не создаётся
+    with pytest.raises(sqlite3.IntegrityError):
+        db.create_pool("t", "dst", "Dst", "", BLOCKS, copy_from="src")
+    assert db.get_pool("t", "dst") is None
+    assert db.get_node("t", "dst-q-01") is None
+    assert db.get_node("t", "dst-q-02")["pool"] == "other"  # чужая нода не перетёрта
+    # без коллизии — пул и обе копии в одной транзакции
+    db.delete_node("t", "dst-q-02")
+    created = db.create_pool("t", "dst", "Dst", "", BLOCKS, copy_from="src")
+    assert created["id"] == "dst" and db.count_nodes("t", pool="dst") == 2
+
+
 # --- API ---
 from fastapi.testclient import TestClient
 
@@ -95,6 +117,8 @@ def test_create_pool_errors():
     c = _client()
     assert c.post("/api/pools", json={"label": "X", "preset": "nope"}).status_code == 404
     assert c.post("/api/pools", json={"label": "", "preset": "data-engineer"}).status_code == 422
+    assert c.post("/api/pools", json={"label": "   ", "preset": "data-engineer"}).status_code == 422
+    assert "pool" not in {p["id"] for p in c.get("/api/pools").json()}  # пул-призрак с id 'pool' не создан
     assert c.post("/api/pools", json={"label": "X"}).status_code == 422
 
 

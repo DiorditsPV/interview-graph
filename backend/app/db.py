@@ -426,9 +426,20 @@ class Database:
         return cur.rowcount == 1
 
     def create_pool(
-        self, tenant_id: str, pool_id: str, label: str, description: str, blocks: List[Dict]
+        self,
+        tenant_id: str,
+        pool_id: str,
+        label: str,
+        description: str,
+        blocks: List[Dict],
+        copy_from: Optional[str] = None,
     ) -> Dict:
-        """Направление из UI (source='user'). Занятость id проверяет вызывающий (get_pool)."""
+        """Направление из UI (source='user'); с copy_from — ещё и копия его вопросов.
+
+        Строка пула и копии нод пишутся одной транзакцией: падение посередине (в том числе
+        коллизия id ноды) откатывает всё, «пула-сироты» без вопросов не остаётся.
+        Занятость id пула проверяет вызывающий (get_pool).
+        """
         now = _now()
         with self._conn() as conn:
             conn.execute(
@@ -439,6 +450,8 @@ class Database:
                 """,
                 (tenant_id, pool_id, label, description, json.dumps(blocks, ensure_ascii=False), now, now),
             )
+            if copy_from is not None:
+                self._copy_nodes(conn, tenant_id, copy_from, pool_id, now)
         return self.get_pool(tenant_id, pool_id)
 
     def update_pool(self, tenant_id: str, pool_id: str, fields: Dict) -> Optional[Dict]:
@@ -474,17 +487,42 @@ class Database:
         return removed
 
     def copy_nodes(self, tenant_id: str, src_pool: str, dst_pool: str) -> int:
-        """Скопировать все ноды src в dst (пресет → новое направление): id с префиксом dst,
-        source='user', hidden сбрасывается. Возвращает число скопированных."""
-        n = 0
-        for node in self.list_nodes(tenant_id, pool=src_pool):
-            self.upsert_node(
-                tenant_id,
-                {**node, "id": f"{dst_pool}-{node['id']}", "pool": dst_pool, "hidden": False},
-                source="user",
+        """Скопировать все ноды src в dst (пресет → новое направление) одной транзакцией.
+
+        Возвращает число скопированных. Коллизия id (`<dst>-<id>` уже занят чужой нодой) —
+        sqlite3.IntegrityError, ничего не копируется.
+        """
+        with self._conn() as conn:
+            return self._copy_nodes(conn, tenant_id, src_pool, dst_pool, _now())
+
+    @staticmethod
+    def _copy_nodes(
+        conn: sqlite3.Connection, tenant_id: str, src_pool: str, dst_pool: str, now: str
+    ) -> int:
+        """Копии нод внутри открытой транзакции: id с префиксом dst, source='user', hidden=0.
+
+        Обычный INSERT (не upsert): чужая нода с таким же id не перетирается молча — ошибка
+        целостности откатывает транзакцию целиком.
+        """
+        rows = conn.execute(
+            "SELECT * FROM nodes WHERE tenant_id = ? AND pool = ? ORDER BY rowid", (tenant_id, src_pool)
+        ).fetchall()
+        for r in rows:
+            conn.execute(
+                """
+                INSERT INTO nodes (
+                    tenant_id, id, pool, kind, block, subblock, topic, title, difficulty,
+                    weight, question, answer, starter_code, rubric, tags, source,
+                    hidden, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'user', 0, ?, ?)
+                """,
+                (
+                    tenant_id, f"{dst_pool}-{r['id']}", dst_pool, r["kind"], r["block"], r["subblock"],
+                    r["topic"], r["title"], r["difficulty"], r["weight"], r["question"], r["answer"],
+                    r["starter_code"], r["rubric"], r["tags"], now, now,
+                ),
             )
-            n += 1
-        return n
+        return len(rows)
 
     # --- interviewers (per-tenant) ---
     def list_interviewers(self, tenant_id: str) -> List[Dict]:
