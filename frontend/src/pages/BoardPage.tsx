@@ -13,7 +13,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type NodeUpdate } from "../api";
 import { BandsNode } from "../components/BandsNode";
 import { BlockGroupNode } from "../components/BlockGroupNode";
+import { LangSwitch } from "../components/LangSwitch";
 import { SettingsMenu } from "../components/SettingsMenu";
+import { useT } from "../i18n";
 import { DetailDrawer } from "../components/DetailDrawer";
 import { GuidesNode } from "../components/GuidesNode";
 import { QuestionNode } from "../components/QuestionNode";
@@ -244,6 +246,7 @@ const KIND_COLOR: Record<string, string> = { question: "#2563eb", task: "#9333ea
 const ALL_KINDS: Record<string, boolean> = { question: true, task: true };
 
 export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; sessionFromUrl: number | null }) {
+  const t = useT();
   const [graph, setGraph] = useState<QNode[]>([]);
   const [errors, setErrors] = useState<ImportErr[]>([]);
   const [placement, setPlacement] = useState<Placement | null>(null);
@@ -704,7 +707,7 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
       <header className="topbar">
         {/* ряд 1 — где мы: назад в меню, направление, прогресс, настройки */}
         <div className="topbar__row topbar__row--flow">
-          <a className="topbar__back" href={href.home} title="Главное меню">← Меню</a>
+          <a className="topbar__back" href={href.home} title={t("Главное меню")}>{t("← Меню")}</a>
           <h1 className="appname">{pool.label}</h1>
           <span className="muted">{graph.length} вопросов</span>
           <div className="progress" title="Оценено по текущему набору фильтров">
@@ -715,6 +718,7 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
               оценено {coverage.done} / {coverage.total} ({coverage.pct}%)
             </span>
           </div>
+          <LangSwitch />
           <div className="settings topbar__settings">
             <button
               className={`iconbtn setbtn btn--quiet ${settingsOpen ? "setbtn--on" : ""}`}

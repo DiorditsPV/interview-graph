@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
+import { LangSwitch } from "../components/LangSwitch";
 import { PoolFormModal } from "../components/PoolFormModal";
 import { StartSessionForm } from "../components/StartSessionForm";
+import { useT } from "../i18n";
 import { href } from "../router";
 import type { PoolConfig } from "../types";
 
@@ -17,6 +19,7 @@ export function HomePage({
   startPool: startPool0,
   onChanged,
 }: { pools: PoolConfig[]; notice?: string; startPool?: string | null; onChanged: () => void }) {
+  const t = useT();
   const [startPool, setStartPool] = useState<string | null>(startPool0 ?? null);
   const [modal, setModal] = useState<PoolModal>(null);
   // Переход #/ → #/?start=<pool> не перемонтирует страницу — синхронизируем с пропом.
@@ -40,12 +43,15 @@ export function HomePage({
   return (
     <div className="page home">
       <header className="pageshell">
-        <h1 className="pageshell__title">Интервью · доска вопросов</h1>
+        <h1 className="pageshell__title">{t("Интервью · доска вопросов")}</h1>
+        <div className="pageshell__actions">
+          <LangSwitch />
+        </div>
       </header>
       <main className="page__body">
         {notice && <div className="errbar">{notice}</div>}
 
-        <h2 className="home__h2">Направления</h2>
+        <h2 className="home__h2">{t("Направления")}</h2>
         {pools.length === 0 ? (
           <p className="muted">Нет ни одного пула: положите каталог с `pool.yaml` в `content/`.</p>
         ) : (
@@ -67,7 +73,7 @@ export function HomePage({
                 {/* Кнопка и форма лежат над «растяжкой» (.poolcard__label::after) — иначе клик уводит на доску. */}
                 <div className="poolcard__actions">
                   <button className="poolcard__start btn--primary" onClick={() => setStartPool(p.id)}>
-                    Начать интервью
+                    {t("Начать интервью")}
                   </button>
                   <a className="poolcard__bank" href={href.bank(p.id)}>банк вопросов →</a>
                   <span className="poolcard__manage">
@@ -101,7 +107,7 @@ export function HomePage({
           />
         )}
 
-        <h2 className="home__h2">Разделы</h2>
+        <h2 className="home__h2">{t("Разделы")}</h2>
         <div className="home__sections">
           <a className="menucard" href={href.candidates}>
             <strong>Кандидаты</strong>
