@@ -7,25 +7,26 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Tuple
 
 from .auth import hash_password
 from .db import Database
-from .importer import load_content
+from .importer import load_pool_content
+from .pools import PoolCfg
 
 
-def seed_tenant_if_empty(db: Database, tenant_id: str, content_dir: Path) -> Tuple[int, list]:
-    """Если у тенанта нет нод — залить их из content_dir. Вернуть (вставлено, ошибки импорта).
+def seed_pool_if_empty(db: Database, tenant_id: str, pool: PoolCfg) -> Tuple[int, list]:
+    """Если у тенанта нет нод этого пула — залить их из каталога пула.
 
-    При непустой таблице возвращает (0, []) — сид не выполняется (не трогаем пользовательские данные).
+    Проверка по count_nodes(tenant, pool): полный пул не трогается, пустой — засеивается.
+    Так после миграции старой БД (все ноды → 'data-engineer') DE не пересеивается,
+    а новый пул засеивается при первом старте. Возвращает (вставлено, ошибки импорта).
     """
     db.ensure_tenant(tenant_id)
-    if db.count_nodes(tenant_id) > 0:
+    if db.count_nodes(tenant_id, pool=pool.id) > 0:
         return 0, []
-    nodes, errors = load_content(content_dir)
-    rows = [n.model_dump() for n in nodes]
-    inserted = db.seed_nodes(tenant_id, rows)
+    nodes, errors = load_pool_content(pool)
+    inserted = db.seed_nodes(tenant_id, [n.model_dump() for n in nodes])
     return inserted, errors
 
 

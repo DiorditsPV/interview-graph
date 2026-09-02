@@ -197,38 +197,53 @@ def test_api_interview():
     assert len(r.json()["order"]) <= 8
 
 
-# --- tracks ---
-def test_load_tracks():
-    tracks = load_tracks(CONTENT)
-    ids = {t["id"] for t in tracks}
-    assert {"data-engineer", "backend", "analyst"} <= ids
-    for t in tracks:
-        assert t.get("id") and "label" in t and isinstance(t["include"], list)
-
-
-def test_node_in_track_matcher():
-    nmap = {n.id: n for n in load_pool_content(_de())[0]}
-    inc = ["python", "databases/sql", "frameworks/airflow"]
-    assert node_in_track(nmap["py-lang-01"], inc)          # python (block)
-    assert node_in_track(nmap["sql-01"], inc)              # databases/sql
-    assert node_in_track(nmap["af-orchestration-01"], inc)  # frameworks/airflow
-    assert not node_in_track(nmap["spark-batch-01"], inc)   # frameworks/pyspark — нет
-    assert node_in_track(nmap["sql-01"], [])               # пустой include = все
-
-
-def test_api_tracks_endpoint():
-    r = _client().get("/api/tracks")
+# --- pools ---
+def test_api_pools_lists_data_engineer_with_counts():
+    r = _client().get("/api/pools")
     assert r.status_code == 200
-    assert {"data-engineer", "backend", "analyst"} <= {t["id"] for t in r.json()}
+    pools = {p["id"]: p for p in r.json()}
+    de = pools["data-engineer"]
+    assert de["label"] == "Дата-инженер"
+    assert [b["id"] for b in de["blocks"]] == ["frameworks", "databases", "python", "platform"]
+    assert de["blocks"][0]["subblocks"][0] == {"id": "airflow", "label": "Airflow"}
+    assert de["counts"]["nodes"] >= 15
+    assert isinstance(de["counts"]["sessions"], int)
+    assert "dir" not in de
 
 
-def test_interview_track_scoped():
-    nmap = {n.id: n for n in load_pool_content(_de())[0]}
-    inc = ["databases/sql", "databases/dbms", "python", "platform"]
-    order = _client().post("/api/interview", json={"count": 50, "track": "analyst", "seed": 1}).json()["order"]
-    assert order
-    for nid in order:
-        assert node_in_track(nmap[nid], inc), f"{nid} вне трека analyst"
+def test_api_graph_default_pool_is_data_engineer():
+    c = _client()
+    default = c.get("/api/graph").json()["nodes"]
+    explicit = c.get("/api/graph?pool=data-engineer").json()["nodes"]
+    assert {n["id"] for n in default} == {n["id"] for n in explicit}
+    assert all(n["pool"] == "data-engineer" for n in explicit)
+
+
+def test_api_graph_unknown_pool_404():
+    assert _client().get("/api/graph?pool=nope").status_code == 404
+
+
+def test_api_tracks_stub_mirrors_pools():
+    """PR 1: старый фронт читает /api/tracks — отдаём пулы как треки без include-фильтра."""
+    tracks = _client().get("/api/tracks").json()
+    assert any(t["id"] == "data-engineer" and t["include"] == [] for t in tracks)
+
+
+def test_api_weights_stub_is_default_pool_weights():
+    assert _client().get("/api/weights").json() == {
+        "frameworks": 35, "databases": 30, "python": 23, "platform": 12
+    }
+
+
+def test_api_interview_pool_scoped():
+    c = _client()
+    r = c.post("/api/interview", json={"count": 8, "seed": 1, "pool": "data-engineer"})
+    assert r.status_code == 200
+    ids = r.json()["order"]
+    assert 0 < len(ids) <= 8
+    pool_ids = {n["id"] for n in c.get("/api/graph?pool=data-engineer").json()["nodes"]}
+    assert set(ids) <= pool_ids
+    assert c.post("/api/interview", json={"count": 3, "pool": "nope"}).status_code == 404
 
 
 def test_api_list_sessions_for_resume():
@@ -327,24 +342,18 @@ def test_api_import_duplicate_id():
 
 # --- DB как источник правды для банка вопросов (content-store-db) ---
 def test_graph_served_from_db_seed():
-    """Сид из content/*.md наполняет БД; /api/graph отдаёт ноды из БД."""
     nodes_on_disk, _ = load_pool_content(_de())
-    api_ids = {n["id"] for n in _client().get("/api/graph").json()["nodes"]}
-    disk_ids = {n.id for n in nodes_on_disk}
-    # Все засеяные с диска ноды присутствуют в БД-выдаче (плюс могут быть user-ноды от других тестов).
-    assert disk_ids <= api_ids
-    assert len(api_ids) >= len(disk_ids)
+    api_ids = {n["id"] for n in _client().get("/api/graph?pool=data-engineer").json()["nodes"]}
+    assert {n.id for n in nodes_on_disk} <= api_ids
 
 
 def test_seed_is_idempotent():
-    """Повторный сид в непустую БД ничего не вставляет (не плодит дубли)."""
     from app.main import db
     from app.tenancy import DEFAULT_TENANT
-    before = db.count_nodes(DEFAULT_TENANT)
+    before = db.count_nodes(DEFAULT_TENANT, pool="data-engineer")
     nodes, _ = load_pool_content(_de())
-    inserted = db.seed_nodes(DEFAULT_TENANT, [n.model_dump() for n in nodes])
-    assert inserted == 0
-    assert db.count_nodes(DEFAULT_TENANT) == before
+    assert db.seed_nodes(DEFAULT_TENANT, [n.model_dump() for n in nodes]) == 0
+    assert db.count_nodes(DEFAULT_TENANT, pool="data-engineer") == before
 
 
 def test_node_crud_and_hidden():

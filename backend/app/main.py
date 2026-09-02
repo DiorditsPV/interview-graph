@@ -16,7 +16,7 @@ import os
 import secrets
 import tempfile
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -34,10 +34,11 @@ from .auth import (
 )
 from .db import SESSION_MAX_AGE, Database
 from .hub import SessionHub
-from .importer import parse_file
+from .importer import parse_file, validate_against_pool
 from .models import Block, Difficulty, GraphResponse, Kind, Node
-from .sampler import build_interview, load_tracks, load_weights
-from .seed import seed_interviewer_if_empty, seed_owner_if_empty, seed_tenant_if_empty
+from .pools import PoolCfg, block_weights, default_pool_id, load_pools
+from .sampler import build_interview
+from .seed import seed_interviewer_if_empty, seed_owner_if_empty, seed_pool_if_empty
 from .tenancy import resolve_tenant
 
 log = logging.getLogger("interview")
@@ -82,13 +83,17 @@ db = Database(DB_PATH)
 app.state.db = db  # auth-зависимости берут db отсюда (request.app.state.db)
 hub = SessionHub()
 
-# Сид банка вопросов в БД при первом старте (пустая таблица nodes у тенанта default).
-# Источник правды — БД; content/*.md — стартовый набор. Идемпотентно при рестарте/деплое.
-_seeded, _seed_errors = seed_tenant_if_empty(db, resolve_tenant(), CONTENT_DIR)
-if _seeded:
-    log.info("seeded %d nodes from %s", _seeded, CONTENT_DIR)
-if _seed_errors:
-    log.warning("content import errors during seed: %s", _seed_errors)
+# Пулы направлений: content/<pool>/pool.yaml. Читаются при старте; сид — на каждый пул
+# отдельно (пустой засеивается из своего каталога, полный не трогается).
+POOLS: Dict[str, PoolCfg] = load_pools(CONTENT_DIR)
+if not POOLS:
+    log.warning("no pools found in %s — /api/pools will be empty", CONTENT_DIR)
+for _pool in POOLS.values():
+    _seeded, _seed_errors = seed_pool_if_empty(db, resolve_tenant(), _pool)
+    if _seeded:
+        log.info("seeded %d nodes into pool %s", _seeded, _pool.id)
+    if _seed_errors:
+        log.warning("content import errors in pool %s: %s", _pool.id, _seed_errors)
 # Сид интервьюера по умолчанию («Я») для тенанта default — у сессии всегда есть проводивший.
 if seed_interviewer_if_empty(db, resolve_tenant()):
     log.info("seeded default interviewer")
@@ -160,7 +165,7 @@ class ScoreIn(BaseModel):
 class InterviewRequest(BaseModel):
     count: int = Field(default=20, ge=1, le=200)
     difficulties: Optional[List[str]] = None
-    track: Optional[str] = None
+    pool: Optional[str] = None
     seed: Optional[int] = None
 
 
@@ -259,29 +264,55 @@ def create_user(body: UserCreate, request: Request, _owner: dict = Depends(requi
 _NODE_FIELDS = set(Node.model_fields)
 
 
-def _db_nodes(request: Request = None) -> List[Node]:
-    """Ноды банка из БД (источник правды) как объекты Node для текущего тенанта."""
+def _pool_or_404(pool_id: Optional[str]) -> PoolCfg:
+    """Пул по id; без id — пул по умолчанию (data-engineer или первый по алфавиту)."""
+    pid = pool_id or default_pool_id(POOLS)
+    if pid is None or pid not in POOLS:
+        raise HTTPException(status_code=404, detail=f"pool '{pool_id}' not found")
+    return POOLS[pid]
+
+
+def _db_nodes(request: Request, pool: PoolCfg) -> List[Node]:
+    """Ноды пула из БД (источник правды) как объекты Node для текущего тенанта."""
     tenant = resolve_tenant(request)
     return [
         Node.model_validate({k: v for k, v in row.items() if k in _NODE_FIELDS})
-        for row in db.list_nodes(tenant)
+        for row in db.list_nodes(tenant, pool=pool.id)
+    ]
+
+
+@app.get("/api/pools")
+def get_pools(request: Request, _user: dict = Depends(current_user)) -> list:
+    tenant = resolve_tenant(request)
+    return [
+        {
+            **p.to_dict(),
+            "counts": {
+                "nodes": db.count_nodes(tenant, pool=p.id),
+                "sessions": db.count_sessions(tenant, p.id),
+            },
+        }
+        for p in POOLS.values()
     ]
 
 
 @app.get("/api/graph", response_model=GraphResponse)
-def get_graph(request: Request, _user: dict = Depends(current_user)) -> GraphResponse:
+def get_graph(
+    request: Request, pool: Optional[str] = None, _user: dict = Depends(current_user)
+) -> GraphResponse:
     # Вопросы читаются из БД (а не с диска) — рантайм-правки переживают деплой.
-    return GraphResponse(nodes=_db_nodes(request), errors=[])
+    return GraphResponse(nodes=_db_nodes(request, _pool_or_404(pool)), errors=[])
 
 
+# PR 1: заглушки для старого фронта; удаляются вместе с ним в PR 2.
 @app.get("/api/weights")
 def get_weights(_user: dict = Depends(current_user)) -> dict:
-    return load_weights(CONTENT_DIR)
+    return block_weights(_pool_or_404(None))
 
 
 @app.get("/api/tracks")
 def get_tracks(_user: dict = Depends(current_user)) -> list:
-    return load_tracks(CONTENT_DIR)
+    return [{"id": p.id, "label": p.label, "include": []} for p in POOLS.values()]
 
 
 @app.post("/api/import")
@@ -389,17 +420,12 @@ def remove_node(node_id: str, request: Request, _user: dict = Depends(require_me
 def make_interview(
     req: InterviewRequest, request: Request, _user: dict = Depends(current_user)
 ) -> dict:
-    nodes = _db_nodes(request)
-    track_include = None
-    if req.track:
-        match = next((t for t in load_tracks(CONTENT_DIR) if t["id"] == req.track), None)
-        track_include = match["include"] if match else None
+    pool = _pool_or_404(req.pool)
     order = build_interview(
-        nodes,
+        _db_nodes(request, pool),
         count=req.count,
         difficulties=req.difficulties,
-        block_weights=load_weights(CONTENT_DIR),
-        track_include=track_include,
+        block_weights=block_weights(pool),
         seed=req.seed,
     )
     return {"order": order}
