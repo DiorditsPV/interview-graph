@@ -6,64 +6,64 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from app.importer import load_content
+from app.importer import load_pool_content
 from app.models import Node
-from app.sampler import build_interview, load_tracks, load_weights, node_in_track
+from app.pools import load_pools
+from app.sampler import build_interview
 
 CONTENT_ROOT = Path(__file__).resolve().parent.parent.parent / "content"
 CONTENT = CONTENT_ROOT / "data-engineer"   # каталог пула по умолчанию
 
 
+def _de():
+    return load_pools(CONTENT_ROOT)["data-engineer"]
+
+
 def test_content_imports_without_errors():
-    nodes, errors = load_content(CONTENT)
+    nodes, errors = load_pool_content(_de())
     assert errors == [], f"import errors: {errors}"
     assert len(nodes) >= 15
+    assert all(n.pool == "data-engineer" for n in nodes)
 
 
 def test_nodes_have_title_and_tags():
-    nodes, _ = load_content(CONTENT)
+    nodes, _ = load_pool_content(_de())
     assert all(n.title for n in nodes), "every node should have a title"
-    # хотя бы часть нод имеет теги
     assert any(n.tags for n in nodes)
 
 
 def test_both_formats_loaded():
-    nodes, _ = load_content(CONTENT)
+    nodes, _ = load_pool_content(_de())
     ids = {n.id for n in nodes}
-    assert "af-orchestration-01" in ids        # markdown
-    assert "domain-01" in ids and "monitoring-01" in ids  # json
+    assert "af-orchestration-01" in ids
+    assert "domain-01" in ids and "monitoring-01" in ids
 
 
 def test_markdown_body_split():
-    nodes, _ = load_content(CONTENT)
+    nodes, _ = load_pool_content(_de())
     node = next(n for n in nodes if n.id == "af-orchestration-01")
     assert node.question and "DAG" in node.question
     assert node.answer and "идемпотентн" in node.answer.lower()
 
 
 def test_task_node_has_starter_and_rubric():
-    nodes, _ = load_content(CONTENT)
+    nodes, _ = load_pool_content(_de())
     task = next(n for n in nodes if n.id == "spark-batch-02")
     assert task.kind == "task"
     assert task.starter_code and "spark.read" in task.starter_code
     assert len(task.rubric) >= 2
 
 
-def test_weights_loaded():
-    w = load_weights(CONTENT)
-    assert w == {"frameworks": 35, "databases": 30, "python": 23, "platform": 12}
-
-
 def test_build_interview_respects_count_and_balance():
-    nodes, _ = load_content(CONTENT)
+    nodes, _ = load_pool_content(_de())
     order = build_interview(nodes, count=10, seed=42)
     assert 1 <= len(order) <= 10
-    assert len(order) == len(set(order))  # без повторов
+    assert len(order) == len(set(order))
 
 
-def test_invalid_node_rejected():
+def test_node_requires_pool():
     with pytest.raises(Exception):
-        Node.model_validate({"id": "x", "block": "BAD", "topic": "t", "question": "q"})
+        Node.model_validate({"id": "x", "block": "python", "topic": "t", "question": "q"})  # нет pool
 
 
 # --- API ---
@@ -207,7 +207,7 @@ def test_load_tracks():
 
 
 def test_node_in_track_matcher():
-    nmap = {n.id: n for n in load_content(CONTENT)[0]}
+    nmap = {n.id: n for n in load_pool_content(_de())[0]}
     inc = ["python", "databases/sql", "frameworks/airflow"]
     assert node_in_track(nmap["py-lang-01"], inc)          # python (block)
     assert node_in_track(nmap["sql-01"], inc)              # databases/sql
@@ -223,7 +223,7 @@ def test_api_tracks_endpoint():
 
 
 def test_interview_track_scoped():
-    nmap = {n.id: n for n in load_content(CONTENT)[0]}
+    nmap = {n.id: n for n in load_pool_content(_de())[0]}
     inc = ["databases/sql", "databases/dbms", "python", "platform"]
     order = _client().post("/api/interview", json={"count": 50, "track": "analyst", "seed": 1}).json()["order"]
     assert order
@@ -328,7 +328,7 @@ def test_api_import_duplicate_id():
 # --- DB как источник правды для банка вопросов (content-store-db) ---
 def test_graph_served_from_db_seed():
     """Сид из content/*.md наполняет БД; /api/graph отдаёт ноды из БД."""
-    nodes_on_disk, _ = load_content(CONTENT)
+    nodes_on_disk, _ = load_pool_content(_de())
     api_ids = {n["id"] for n in _client().get("/api/graph").json()["nodes"]}
     disk_ids = {n.id for n in nodes_on_disk}
     # Все засеяные с диска ноды присутствуют в БД-выдаче (плюс могут быть user-ноды от других тестов).
@@ -341,7 +341,7 @@ def test_seed_is_idempotent():
     from app.main import db
     from app.tenancy import DEFAULT_TENANT
     before = db.count_nodes(DEFAULT_TENANT)
-    nodes, _ = load_content(CONTENT)
+    nodes, _ = load_pool_content(_de())
     inserted = db.seed_nodes(DEFAULT_TENANT, [n.model_dump() for n in nodes])
     assert inserted == 0
     assert db.count_nodes(DEFAULT_TENANT) == before
