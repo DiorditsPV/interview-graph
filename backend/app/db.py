@@ -48,6 +48,18 @@ CREATE TABLE IF NOT EXISTS nodes (
     updated_at   TEXT NOT NULL,
     PRIMARY KEY (tenant_id, id)
 );
+CREATE TABLE IF NOT EXISTS pools (
+    tenant_id   TEXT NOT NULL DEFAULT 'default' REFERENCES tenants(id),
+    id          TEXT NOT NULL,                 -- = content/<pool>/ у сидов; slug из названия у UI-созданных
+    label       TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    blocks      TEXT NOT NULL,                 -- JSON: [{id,label,color,weight,subblocks:[{id,label}]}]
+    source      TEXT NOT NULL DEFAULT 'seed',  -- seed | user
+    deleted_at  TEXT,                          -- tombstone: сид не воскрешает, id остаётся занятым
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL,
+    PRIMARY KEY (tenant_id, id)
+);
 CREATE TABLE IF NOT EXISTS users (
     tenant_id     TEXT NOT NULL DEFAULT 'default' REFERENCES tenants(id),
     id            TEXT NOT NULL,                -- генерится сервером (token_hex); TEXT — под шов interviewers.user_id
@@ -118,6 +130,13 @@ def _row_to_node(row: sqlite3.Row) -> Dict:
         d[f] = json.loads(d.get(f) or "[]")
     d["hidden"] = bool(d.get("hidden"))
     # models.Node принимает starter_code по alias starterCode; отдаём snake_case как есть.
+    return d
+
+
+def _row_to_pool(row: sqlite3.Row) -> Dict:
+    """Строка pools → dict направления: blocks из JSON в список."""
+    d = dict(row)
+    d["blocks"] = json.loads(d.get("blocks") or "[]")
     return d
 
 
@@ -367,6 +386,105 @@ class Database:
                 )
                 inserted += cur.rowcount
         return inserted
+
+    # --- pools (направления: сид из content/<pool>/pool.yaml, CRUD из UI; per-tenant) ---
+    def list_pools(self, tenant_id: str) -> List[Dict]:
+        """Живые направления в порядке создания (сиды идут в порядке каталогов content/)."""
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM pools WHERE tenant_id = ? AND deleted_at IS NULL ORDER BY rowid",
+                (tenant_id,),
+            ).fetchall()
+        return [_row_to_pool(r) for r in rows]
+
+    def get_pool(self, tenant_id: str, pool_id: str) -> Optional[Dict]:
+        """Направление по id, включая tombstone (deleted_at не None) — для проверки занятости id."""
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM pools WHERE tenant_id = ? AND id = ?", (tenant_id, pool_id)
+            ).fetchone()
+        return _row_to_pool(row) if row else None
+
+    def upsert_pool_seed(self, tenant_id: str, pool: Dict) -> bool:
+        """Сид конфига направления: INSERT OR IGNORE — правки из UI и tombstone переживают рестарт.
+
+        `pool` — {id, label, description, blocks: list}. Возвращает True, если строка вставлена.
+        """
+        now = _now()
+        with self._conn() as conn:
+            cur = conn.execute(
+                """
+                INSERT OR IGNORE INTO pools (
+                    tenant_id, id, label, description, blocks, source, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, 'seed', ?, ?)
+                """,
+                (
+                    tenant_id, pool["id"], pool["label"], pool.get("description") or "",
+                    json.dumps(pool["blocks"], ensure_ascii=False), now, now,
+                ),
+            )
+        return cur.rowcount == 1
+
+    def create_pool(
+        self, tenant_id: str, pool_id: str, label: str, description: str, blocks: List[Dict]
+    ) -> Dict:
+        """Направление из UI (source='user'). Занятость id проверяет вызывающий (get_pool)."""
+        now = _now()
+        with self._conn() as conn:
+            conn.execute(
+                """
+                INSERT INTO pools (
+                    tenant_id, id, label, description, blocks, source, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, 'user', ?, ?)
+                """,
+                (tenant_id, pool_id, label, description, json.dumps(blocks, ensure_ascii=False), now, now),
+            )
+        return self.get_pool(tenant_id, pool_id)
+
+    def update_pool(self, tenant_id: str, pool_id: str, fields: Dict) -> Optional[Dict]:
+        """Правка названия/описания (остальные ключи игнорируются). None — нет или удалено."""
+        current = self.get_pool(tenant_id, pool_id)
+        if current is None or current["deleted_at"] is not None:
+            return None
+        allowed = {k: v for k, v in fields.items() if k in ("label", "description")}
+        if allowed:
+            sets = ", ".join(f"{k} = ?" for k in allowed)
+            with self._conn() as conn:
+                conn.execute(
+                    f"UPDATE pools SET {sets}, updated_at = ? WHERE tenant_id = ? AND id = ?",
+                    (*allowed.values(), _now(), tenant_id, pool_id),
+                )
+        return self.get_pool(tenant_id, pool_id)
+
+    def delete_pool(self, tenant_id: str, pool_id: str) -> Optional[int]:
+        """Удалить направление: вопросы стираются, строка остаётся tombstone'ом (сессии не трогаем —
+        история интервью). Возвращает число удалённых нод; None — нет или уже удалено."""
+        current = self.get_pool(tenant_id, pool_id)
+        if current is None or current["deleted_at"] is not None:
+            return None
+        now = _now()
+        with self._conn() as conn:
+            removed = conn.execute(
+                "DELETE FROM nodes WHERE tenant_id = ? AND pool = ?", (tenant_id, pool_id)
+            ).rowcount
+            conn.execute(
+                "UPDATE pools SET deleted_at = ?, updated_at = ? WHERE tenant_id = ? AND id = ?",
+                (now, now, tenant_id, pool_id),
+            )
+        return removed
+
+    def copy_nodes(self, tenant_id: str, src_pool: str, dst_pool: str) -> int:
+        """Скопировать все ноды src в dst (пресет → новое направление): id с префиксом dst,
+        source='user', hidden сбрасывается. Возвращает число скопированных."""
+        n = 0
+        for node in self.list_nodes(tenant_id, pool=src_pool):
+            self.upsert_node(
+                tenant_id,
+                {**node, "id": f"{dst_pool}-{node['id']}", "pool": dst_pool, "hidden": False},
+                source="user",
+            )
+            n += 1
+        return n
 
     # --- interviewers (per-tenant) ---
     def list_interviewers(self, tenant_id: str) -> List[Dict]:
