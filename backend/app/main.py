@@ -469,51 +469,6 @@ def list_sessions(request: Request, _user: dict = Depends(current_user)) -> list
     return db.list_sessions(resolve_tenant(request))
 
 
-BLOCK_ORDER = ["frameworks", "databases", "python", "platform"]
-
-
-def _agg(vals: List[int]) -> dict:
-    return {"avg": round(sum(vals) / len(vals), 2) if vals else None, "scored": len(vals)}
-
-
-# ВАЖНО: объявлено ДО "/api/sessions/{session_id}" — иначе FastAPI попытается распарсить
-# "compare" как session_id: int и вернёт 422 (роут станет недоступен).
-@app.get("/api/sessions/compare")
-def compare_sessions(ids: str, request: Request, _user: dict = Depends(current_user)) -> dict:
-    try:
-        id_list = [int(x) for x in ids.split(",") if x.strip()]
-    except ValueError:
-        raise HTTPException(status_code=400, detail="ids must be comma-separated integers")
-    if not id_list:
-        raise HTTPException(status_code=400, detail="ids is required")
-
-    tenant = resolve_tenant(request)
-    node_block = {n.id: n.block for n in _db_nodes(request)}
-    present = [b for b in BLOCK_ORDER if b in set(node_block.values())]
-
-    sessions_out = []
-    for sid in id_list:
-        sess = db.get_session(sid, tenant)
-        if sess is None:
-            continue
-        by_block: dict = {b: [] for b in present}
-        all_scores: List[int] = []
-        for node_id, sc in sess["scores"].items():
-            blk = node_block.get(node_id)
-            if blk is None:
-                continue
-            by_block.setdefault(blk, []).append(sc["score"])
-            all_scores.append(sc["score"])
-        sessions_out.append({
-            "id": sess["id"],
-            "candidate": sess["candidate"],
-            "created_at": sess["created_at"],
-            "overall": _agg(all_scores),
-            "byBlock": {b: _agg(by_block.get(b, [])) for b in present},
-        })
-    return {"blocks": present, "sessions": sessions_out}
-
-
 @app.get("/api/sessions/{session_id}")
 def get_session(session_id: int, request: Request, _user: dict = Depends(current_user)) -> dict:
     session = db.get_session(session_id, resolve_tenant(request))
