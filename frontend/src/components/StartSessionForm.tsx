@@ -19,6 +19,7 @@ export function StartSessionForm({ pool, onClose }: { pool: PoolConfig; onClose:
   }, []);
 
   const start = async () => {
+    if (busy) return; // Enter в инпуте обходит disabled кнопки — иначе повторный старт плодит сессии
     let candidateId = pickedId;
     let candName = name.trim();
     if (candidateId != null) candName = candidates.find((c) => c.id === candidateId)?.name ?? candName;
