@@ -45,21 +45,7 @@ import {
   type SessionSummary,
 } from "../types";
 import { href } from "../router";
-
-// Снимок сессии с сервера → плоская карта оценок, которой оперирует UI.
-function scoresOf(s: { scores: Session["scores"] }): Record<string, number> {
-  return Object.fromEntries(Object.entries(s.scores).map(([id, v]) => [id, v.score]));
-}
-
-// То же для заметок: они лежат в схеме оценок (score+note) и должны переживать
-// перезагрузку/подключение к сессии, иначе выглядят как потерянные.
-function notesOf(s: { scores: Session["scores"] }): Record<string, string> {
-  return Object.fromEntries(
-    Object.entries(s.scores)
-      .filter(([, v]) => v.note)
-      .map(([id, v]) => [id, v.note as string]),
-  );
-}
+import { notesOf, scoresOf } from "../sessionUtils";
 
 const nodeTypes = {
   question: QuestionNode,

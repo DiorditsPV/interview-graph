@@ -652,3 +652,13 @@ kbd {
 .menucard span { font-size: 13px; color: var(--text-muted); }
 /* банк как страница: без fixed-оверлея */
 .bankbrowser--embedded { position: static; inset: auto; height: auto; min-height: 60vh; }
+
+/* ---- таблицы и формы страниц ---- */
+.formrow { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; }
+.formrow input { padding: 6px 10px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--surface); color: var(--text); }
+.table { width: 100%; border-collapse: collapse; font-size: 14px; background: var(--surface); border: 1px solid var(--border); }
+.table th, .table td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+.table th { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-faint); }
+.table__link { display: block; font-size: 12px; color: var(--accent); text-decoration: none; }
+.table__edit input { width: 100%; padding: 4px 6px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--surface); color: var(--text); }
+a.iconbtn { text-decoration: none; display: inline-block; }
