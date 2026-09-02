@@ -18,8 +18,11 @@ DIFFS = ["base", "junior", "middle", "senior"]
 
 def main():
     ns = json.load(urllib.request.urlopen(GRAPH_URL))["nodes"]
-    pools = json.load(urllib.request.urlopen(f"{API_BASE}/pools"))
-    pool = next((p for p in pools if p["id"] == POOL), None)
+    try:
+        pools = json.load(urllib.request.urlopen(f"{API_BASE}/pools"))
+        pool = next((p for p in pools if p["id"] == POOL), None)
+    except Exception:
+        pool = None
     weights = {b["id"]: b["weight"] for b in pool["blocks"]} if pool else {}
 
     print(f"Пул {POOL}: всего нод {len(ns)}\n")

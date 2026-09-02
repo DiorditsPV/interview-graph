@@ -22,8 +22,13 @@ python3 .claude/skills/interview-verify/check_import.py
 подними (см. §5) или проверь импорт офлайн:
 ```
 cd backend && . .venv/bin/activate && python -c '
-from pathlib import Path; from app.importer import load_content
-ns,errs=load_content(Path("../content")); print(len(ns),"nodes,",len(errs),"errors"); [print(e) for e in errs]'
+from pathlib import Path
+from app.pools import load_pools
+from app.importer import load_pool_content
+pool = load_pools(Path("../content"))["data-engineer"]
+ns, errs = load_pool_content(pool)
+print(len(ns), "nodes,", len(errs), "errors")
+[print(e) for e in errs]'
 ```
 
 ## 2. Backend-тесты

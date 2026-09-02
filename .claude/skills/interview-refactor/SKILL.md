@@ -11,7 +11,7 @@ description: >-
 
 # Скилл: рефакторинг вопросов (сложность · актуальность · подача)
 
-Проект: сервис интервью «граф вопросов». Вопросы — в `content/<block>/*.md|*.json`.
+Проект: сервис интервью «граф вопросов». Вопросы — в `content/<pool>/<block>/*.md|*.json` (пул по умолчанию `data-engineer`).
 
 ## Критично (грабли проекта)
 - Ground truth — через `cat`/`grep`/`/api/graph`, **не Read** (кэш устаревает).
@@ -27,7 +27,7 @@ description: >-
 python3 .claude/skills/interview-refactor/inventory.py
 ```
 Скрипт (stdlib, нужен сервер на :8000) печатает все ноды по группам block/subblock:
-`difficulty · kind · id · [tags] · title`. Полный текст конкретной ноды — `cat content/<block>/<id>.md`.
+`difficulty · kind · id · [tags] · title`. Полный текст конкретной ноды — `cat content/<pool>/<block>/<id>.md`.
 Пул задаётся `POOL=<id>` (по умолчанию `data-engineer`); контент — `content/<pool>/<block>/`.
 
 ### Шаг 2. Оценить по трём осям (выдать список находок ДО правок)
@@ -53,7 +53,8 @@ merge / move / drop)`. Действия с потерей (удаление, о�
 - split — создать новую ноду (см. interview-ideas) + обновить исходную; новые id по схеме соседей.
 - merge/drop — удалить файл(ы), обновить `Q_IDEAS.txt` (убрать `[x]`-строки удалённых id; при merge —
   оставить одну строку).
-- move — сменить `block`/`subblock` (и при необходимости `id`/файл) согласно `PREFERRED_SUB` в `layout.ts`.
+- move — сменить `block`/`subblock` (и при необходимости `id`/файл); порядок и подписи под-колонок —
+  `subblocks` соответствующего блока в `content/<pool>/pool.yaml`.
 
 ### Шаг 5. Проверить
 Прогнать **interview-verify** (import 0 ошибок, pytest, build, smoke). Затем коротко отчитаться: что
