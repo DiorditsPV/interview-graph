@@ -74,6 +74,19 @@ body {
 .topbar strong { color: var(--heading); }
 .appname { margin: 0; font-size: 16px; font-weight: 700; line-height: 1.2; color: var(--heading); }
 .topbar .muted { color: var(--text-faint); font-size: 13px; }
+
+/* ---- страницы кроме доски: тонкая полоса «← Меню · заголовок» + содержимое ---- */
+.page { display: flex; flex-direction: column; min-height: 100vh; background: var(--bg); }
+.pageshell {
+  display: flex; align-items: center; gap: 14px; padding: 10px 16px;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.pageshell__back { color: var(--text-muted); text-decoration: none; font-size: 13px; white-space: nowrap; }
+.pageshell__back:hover { color: var(--text); }
+.pageshell__title { margin: 0; font-size: 16px; font-weight: 700; color: var(--heading); }
+.pageshell__actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+.page__body { flex: 1; padding: 20px 16px; max-width: 1200px; width: 100%; margin: 0 auto; box-sizing: border-box; }
+
 .progress { display: flex; align-items: center; gap: 8px; }
 .progress__track {
   width: 120px; height: 6px; background: var(--border); border-radius: 999px; overflow: hidden;
