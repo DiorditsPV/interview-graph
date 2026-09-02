@@ -487,11 +487,17 @@ def create_session(
             raise HTTPException(status_code=404, detail=f"candidate '{body.candidate_id}' not found")
         candidate_name = cand["name"]
     pool = _pool_or_404(body.pool)
+    interviewer_id = body.interviewer_id
+    if interviewer_id is None:
+        # Интервьюер из UI больше не выбирается (старт сессии живёт на главной): сессии всё равно
+        # нужен проводивший для отчёта и страницы сессий — берём первого интервьюера тенанта (сид «Я»).
+        ivs = db.list_interviewers(tenant)
+        interviewer_id = ivs[0]["id"] if ivs else None
     return db.create_session(
         candidate_name,
         tenant_id=tenant,
         candidate_id=body.candidate_id,
-        interviewer_id=body.interviewer_id,
+        interviewer_id=interviewer_id,
         pool=pool.id,
     )
 
