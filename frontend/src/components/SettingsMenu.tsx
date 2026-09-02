@@ -52,17 +52,22 @@ export function SettingsMenu({
       e.stopImmediatePropagation();
       onClose();
     };
-    // Клик мимо поповера закрывает его. mousedown, а не click: иначе кнопка ⚙ успевала бы
-    // получить свой click и открыть панель заново сразу после закрытия.
+    // Клик мимо закрывает панель. Две тонкости:
+    // 1) «мимо» — вне всего блока .settings (панель + кнопка ⚙): если закрывать и по
+    //    mousedown на кнопке, её click-тоггл срабатывает следом по уже закрытой панели
+    //    и открывает её заново — кнопка «не закрывала» настройки;
+    // 2) capture-фаза: mousedown по канве проглатывает React Flow (d3-zoom гасит
+    //    всплытие), до document в bubble-фазе он не доходит.
     const onDown = (e: MouseEvent) => {
-      const pop = popRef.current;
-      if (pop && !pop.contains(e.target as Node)) onClose();
+      const t = e.target as Element | null;
+      if (t && t.closest(".settings")) return;
+      onClose();
     };
     window.addEventListener("keydown", onKey, { capture: true });
-    document.addEventListener("mousedown", onDown);
+    document.addEventListener("mousedown", onDown, { capture: true });
     return () => {
       window.removeEventListener("keydown", onKey, { capture: true });
-      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("mousedown", onDown, { capture: true });
     };
   }, [onClose]);
 
