@@ -1,14 +1,13 @@
 import type {
   Block,
   Candidate,
-  Comparison,
   Difficulty,
   GraphResponse,
   ImportResult,
   Interviewer,
+  PoolConfig,
   Session,
   SessionMeta,
-  Track,
 } from "./types";
 
 // question-management: правка/создание вопроса банка (бэкенд пишет в БД, не в content/*.md).
@@ -20,6 +19,7 @@ export interface NodeUpdate {
 }
 
 export interface NodeCreate {
+  pool: string;
   block: Block;
   topic: string;
   difficulty: Difficulty;
@@ -54,14 +54,14 @@ async function json<T>(res: Response, opts?: { skipAuthReload?: boolean }): Prom
 }
 
 export const api = {
-  graph: () => fetch(`${BASE}/graph`).then(json<GraphResponse>),
-  weights: () => fetch(`${BASE}/weights`).then(json<Record<string, number>>),
-  tracks: () => fetch(`${BASE}/tracks`).then(json<Track[]>),
-  createSession: (candidate: string, candidateId?: number, interviewerId?: number) =>
+  pools: () => fetch(`${BASE}/pools`).then(json<PoolConfig[]>),
+  graph: (pool: string) =>
+    fetch(`${BASE}/graph?pool=${encodeURIComponent(pool)}`).then(json<GraphResponse>),
+  createSession: (pool: string, candidate: string, candidateId?: number, interviewerId?: number) =>
     fetch(`${BASE}/sessions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ candidate, candidateId, interviewerId }),
+      body: JSON.stringify({ pool, candidate, candidateId, interviewerId }),
     }).then(json<Session>),
   setScore: (sessionId: number, nodeId: string, score: number, note?: string) =>
     fetch(`${BASE}/sessions/${sessionId}/score`, {
@@ -71,14 +71,13 @@ export const api = {
     }).then(json<Session>),
   getSession: (sessionId: number) =>
     fetch(`${BASE}/sessions/${sessionId}`).then(json<Session>),
-  listSessions: () => fetch(`${BASE}/sessions`).then(json<SessionMeta[]>),
-  compareSessions: (ids: number[]) =>
-    fetch(`${BASE}/sessions/compare?ids=${ids.join(",")}`).then(json<Comparison>),
-  importFile: (filename: string, content: string) =>
+  listSessions: (pool?: string) =>
+    fetch(`${BASE}/sessions${pool ? `?pool=${encodeURIComponent(pool)}` : ""}`).then(json<SessionMeta[]>),
+  importFile: (pool: string, filename: string, content: string) =>
     fetch(`${BASE}/import`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ filename, content }),
+      body: JSON.stringify({ pool, filename, content }),
     }).then(json<ImportResult>),
   eventsUrl: (sessionId: number) => `${BASE}/sessions/${sessionId}/events`,
   // question-management CRUD банка вопросов (источник правды — БД на бэкенде).

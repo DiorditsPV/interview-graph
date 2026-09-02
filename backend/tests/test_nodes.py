@@ -68,8 +68,27 @@ def test_create_node_validation_error():
     c = _client()
     # пустой question → 422 (Field min_length=1).
     assert c.post("/api/nodes", json={"block": "python", "topic": "t", "question": ""}).status_code == 422
-    # неизвестный блок → 422.
-    assert c.post("/api/nodes", json={"block": "nope", "topic": "t", "question": "q?"}).status_code == 422
+    # неизвестный блок → 400 (вне таксономии пула, см. test_create_node_block_outside_pool_400).
+    assert c.post("/api/nodes", json={"block": "nope", "topic": "t", "question": "q?"}).status_code == 400
+
+
+def test_create_node_block_outside_pool_400():
+    c = _client()
+    r = c.post("/api/nodes", json={"block": "requirements", "topic": "x", "question": "q?"})
+    assert r.status_code == 400
+    assert "requirements" in r.json()["detail"]
+
+
+def test_create_node_gets_pool():
+    c = _client()
+    r = c.post("/api/nodes", json={"pool": "data-engineer", "block": "python", "topic": "Pooled", "question": "q?"})
+    assert r.status_code == 200, r.text
+    nid = r.json()["id"]
+    try:
+        node = next(n for n in c.get("/api/graph?pool=data-engineer").json()["nodes"] if n["id"] == nid)
+        assert node["pool"] == "data-engineer"
+    finally:
+        c.delete(f"/api/nodes/{nid}")
 
 
 def test_update_node_changes_graph():

@@ -3,29 +3,29 @@
 
 Только stdlib. Нужен поднятый сервер. Запуск:
     python3 .claude/skills/interview-balance/coverage.py
-Env: API_URL (по умолч. http://127.0.0.1:8000/api).
+Env: API_URL (по умолч. http://127.0.0.1:8000/api), POOL (по умолч. data-engineer).
 """
 import json
 import os
 import urllib.request
 from collections import Counter, defaultdict
 
-BASE = os.environ.get("API_URL", "http://127.0.0.1:8000/api")
+POOL = os.environ.get("POOL", "data-engineer")   # id пула (content/<pool>/)
+API_BASE = os.environ.get("API_URL", "http://127.0.0.1:8000/api").rstrip("/")
+GRAPH_URL = f"{API_BASE}/graph?pool={POOL}"
 DIFFS = ["base", "junior", "middle", "senior"]
 
 
-def get(path):
-    return json.load(urllib.request.urlopen(f"{BASE}{path}"))
-
-
 def main():
-    ns = get("/graph")["nodes"]
+    ns = json.load(urllib.request.urlopen(GRAPH_URL))["nodes"]
     try:
-        weights = get("/weights")
+        pools = json.load(urllib.request.urlopen(f"{API_BASE}/pools"))
+        pool = next((p for p in pools if p["id"] == POOL), None)
     except Exception:
-        weights = {}
+        pool = None
+    weights = {b["id"]: b["weight"] for b in pool["blocks"]} if pool else {}
 
-    print(f"Всего нод: {len(ns)}\n")
+    print(f"Пул {POOL}: всего нод {len(ns)}\n")
 
     # матрица subblock × difficulty
     cell = defaultdict(Counter)

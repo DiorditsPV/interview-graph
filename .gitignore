@@ -22,3 +22,5 @@ frontend/dist-demo/
 .claude/*.lock
 .idea
 last_run.json
+# артефакты visual-companion (design-funnel) — сессионные, не для git
+.superpowers/

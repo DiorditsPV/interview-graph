@@ -51,7 +51,7 @@ push в dev ─▶ GitHub Actions (.github/workflows/deploy-dev.yml)
 
 | Путь                                    | Назначение                                                      | Переживает деплой?          |
 | --------------------------------------- | --------------------------------------------------------------- | --------------------------- |
-| `/opt/interview`                        | код + контент (`content/*.md`), venv, собранный `frontend/dist` | нет — перезаписывается      |
+| `/opt/interview`                        | код + контент (`content/<pool>/<block>/*.md`), venv, собранный `frontend/dist` | нет — перезаписывается      |
 | `/var/lib/interview/interview.db`       | SQLite: сессии кандидатов и оценки                              | **да** — данные сохраняются |
 | `/etc/systemd/system/interview.service` | автозапуск/рестарт uvicorn на :8800                             | —                           |
 

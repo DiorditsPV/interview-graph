@@ -16,12 +16,19 @@ description: >-
 python3 .claude/skills/interview-verify/check_import.py
 ```
 Скрипт (stdlib, нужен сервер на :8000) печатает nodes / import errors / distinct tags / empty-tag nodes
-и возвращает код 1 при проблемах (есть ошибки импорта или ноды без тегов). Если сервер не поднят —
+и возвращает код 1 при проблемах (есть ошибки импорта или ноды без тегов).
+Пул задаётся `POOL=<id>` (по умолчанию `data-engineer`); контент — `content/<pool>/<block>/`.
+Если сервер не поднят —
 подними (см. §5) или проверь импорт офлайн:
 ```
 cd backend && . .venv/bin/activate && python -c '
-from pathlib import Path; from app.importer import load_content
-ns,errs=load_content(Path("../content")); print(len(ns),"nodes,",len(errs),"errors"); [print(e) for e in errs]'
+from pathlib import Path
+from app.pools import load_pools
+from app.importer import load_pool_content
+pool = load_pools(Path("../content"))["data-engineer"]
+ns, errs = load_pool_content(pool)
+print(len(ns), "nodes,", len(errs), "errors")
+[print(e) for e in errs]'
 ```
 
 ## 2. Backend-тесты

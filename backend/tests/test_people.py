@@ -7,10 +7,15 @@ tenant-изоляции и миграции старой схемы, не зат
 """
 
 import sqlite3
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 
 from app.db import Database
+from app.pools import load_pools
+from app.seed import seed_pool_if_empty
+
+CONTENT_ROOT = Path(__file__).resolve().parent.parent.parent / "content"
 
 
 def _client() -> TestClient:
@@ -194,3 +199,98 @@ def test_migration_upgrades_old_sessions_schema(tmp_path):
     cand = db2.create_candidate("default", {"name": "Новый"})
     new = db2.create_session("Новый", tenant_id="default", candidate_id=cand["id"])
     assert new["candidate_id"] == cand["id"]
+
+
+def test_migration_adds_pool_to_old_nodes_and_sessions(tmp_path):
+    """БД без столбца pool апгрейдится: старые ноды и сессии получают 'data-engineer'."""
+    path = tmp_path / "old.db"
+    conn = sqlite3.connect(path)
+    conn.executescript(
+        """
+        CREATE TABLE tenants (id TEXT PRIMARY KEY, name TEXT NOT NULL, created_at TEXT NOT NULL);
+        INSERT INTO tenants VALUES ('default', 'default', '2024-01-01T00:00:00');
+        CREATE TABLE nodes (
+            tenant_id TEXT NOT NULL DEFAULT 'default', id TEXT NOT NULL, kind TEXT NOT NULL DEFAULT 'question',
+            block TEXT NOT NULL, subblock TEXT, topic TEXT NOT NULL, title TEXT,
+            difficulty TEXT NOT NULL DEFAULT 'middle', weight INTEGER NOT NULL DEFAULT 1,
+            question TEXT NOT NULL, answer TEXT NOT NULL DEFAULT '', starter_code TEXT,
+            rubric TEXT NOT NULL DEFAULT '[]', tags TEXT NOT NULL DEFAULT '[]',
+            source TEXT NOT NULL DEFAULT 'seed', hidden INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY (tenant_id, id)
+        );
+        INSERT INTO nodes (id, block, topic, question, created_at, updated_at)
+            VALUES ('old-01', 'python', 't', 'q', '2024-01-01T00:00:00', '2024-01-01T00:00:00');
+        CREATE TABLE sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, candidate TEXT NOT NULL, created_at TEXT NOT NULL,
+            tenant_id TEXT NOT NULL DEFAULT 'default', candidate_id INTEGER, interviewer_id INTEGER
+        );
+        INSERT INTO sessions (candidate, created_at) VALUES ('Старый', '2024-01-01T00:00:00');
+        """
+    )
+    conn.commit()
+    conn.close()
+
+    db = Database(path)
+    assert db.count_nodes("default") == 1
+    assert db.count_nodes("default", pool="data-engineer") == 1
+    assert db.count_nodes("default", pool="system-analyst") == 0
+    assert db.get_node("default", "old-01")["pool"] == "data-engineer"
+    assert db.get_session(1, "default")["pool"] == "data-engineer"
+    assert db.list_sessions("default", pool="data-engineer")[0]["candidate"] == "Старый"
+    assert db.list_sessions("default", pool="system-analyst") == []
+    Database(path)  # повторное открытие идемпотентно
+
+
+def test_seed_over_migrated_db_does_not_reseed_existing_pool(tmp_path):
+    """Сид поверх мигрированной БД: старый пул (уже с нодами после миграции) не пересеивается,
+    новый пул засеивается штатной функцией старта seed_pool_if_empty — той же, что main.py
+    вызывает для каждого пула из load_pools(CONTENT_DIR)."""
+    path = tmp_path / "old.db"
+    conn = sqlite3.connect(path)
+    conn.executescript(
+        """
+        CREATE TABLE tenants (id TEXT PRIMARY KEY, name TEXT NOT NULL, created_at TEXT NOT NULL);
+        INSERT INTO tenants VALUES ('default', 'default', '2024-01-01T00:00:00');
+        CREATE TABLE nodes (
+            tenant_id TEXT NOT NULL DEFAULT 'default', id TEXT NOT NULL, kind TEXT NOT NULL DEFAULT 'question',
+            block TEXT NOT NULL, subblock TEXT, topic TEXT NOT NULL, title TEXT,
+            difficulty TEXT NOT NULL DEFAULT 'middle', weight INTEGER NOT NULL DEFAULT 1,
+            question TEXT NOT NULL, answer TEXT NOT NULL DEFAULT '', starter_code TEXT,
+            rubric TEXT NOT NULL DEFAULT '[]', tags TEXT NOT NULL DEFAULT '[]',
+            source TEXT NOT NULL DEFAULT 'seed', hidden INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY (tenant_id, id)
+        );
+        INSERT INTO nodes (id, block, topic, question, created_at, updated_at)
+            VALUES ('old-01', 'python', 't1', 'q1', '2024-01-01T00:00:00', '2024-01-01T00:00:00');
+        INSERT INTO nodes (id, block, topic, question, created_at, updated_at)
+            VALUES ('old-02', 'databases', 't2', 'q2', '2024-01-01T00:00:00', '2024-01-01T00:00:00');
+        CREATE TABLE sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, candidate TEXT NOT NULL, created_at TEXT NOT NULL,
+            tenant_id TEXT NOT NULL DEFAULT 'default', candidate_id INTEGER, interviewer_id INTEGER
+        );
+        INSERT INTO sessions (candidate, created_at) VALUES ('Старый', '2024-01-01T00:00:00');
+        """
+    )
+    conn.commit()
+    conn.close()
+
+    db = Database(path)  # апгрейд схемы: старые ноды/сессии получают pool='data-engineer'
+    old_count = db.count_nodes("default", pool="data-engineer")
+    assert old_count == 2
+
+    pools = load_pools(CONTENT_ROOT)
+    for pool in pools.values():
+        inserted, errors = seed_pool_if_empty(db, "default", pool)
+        assert errors == []
+        if pool.id == "data-engineer":
+            assert inserted == 0, "мигрированный пул не должен пересеиваться"
+        elif pool.id == "system-analyst":
+            assert inserted == 15
+
+    # На ветке feature/pools-frontend SA-пула в content/ ещё нет — проверка выше просто
+    # не сработает для него; отдельно фиксируем это явно, а не через try/except.
+    if "system-analyst" not in pools:
+        assert not (CONTENT_ROOT / "system-analyst").exists()
+
+    # Старый пул не тронут пересевом: то же количество нод, что было после миграции.
+    assert db.count_nodes("default", pool="data-engineer") == old_count

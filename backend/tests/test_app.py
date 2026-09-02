@@ -6,63 +6,64 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from app.importer import load_content
+from app.importer import load_pool_content
 from app.models import Node
-from app.sampler import build_interview, load_tracks, load_weights, node_in_track
+from app.pools import load_pools
+from app.sampler import build_interview
 
-CONTENT = Path(__file__).resolve().parent.parent.parent / "content"
+CONTENT_ROOT = Path(__file__).resolve().parent.parent.parent / "content"
+CONTENT = CONTENT_ROOT / "data-engineer"   # каталог пула по умолчанию
+
+
+def _de():
+    return load_pools(CONTENT_ROOT)["data-engineer"]
 
 
 def test_content_imports_without_errors():
-    nodes, errors = load_content(CONTENT)
+    nodes, errors = load_pool_content(_de())
     assert errors == [], f"import errors: {errors}"
     assert len(nodes) >= 15
+    assert all(n.pool == "data-engineer" for n in nodes)
 
 
 def test_nodes_have_title_and_tags():
-    nodes, _ = load_content(CONTENT)
+    nodes, _ = load_pool_content(_de())
     assert all(n.title for n in nodes), "every node should have a title"
-    # хотя бы часть нод имеет теги
     assert any(n.tags for n in nodes)
 
 
 def test_both_formats_loaded():
-    nodes, _ = load_content(CONTENT)
+    nodes, _ = load_pool_content(_de())
     ids = {n.id for n in nodes}
-    assert "af-orchestration-01" in ids        # markdown
-    assert "domain-01" in ids and "monitoring-01" in ids  # json
+    assert "af-orchestration-01" in ids
+    assert "domain-01" in ids and "monitoring-01" in ids
 
 
 def test_markdown_body_split():
-    nodes, _ = load_content(CONTENT)
+    nodes, _ = load_pool_content(_de())
     node = next(n for n in nodes if n.id == "af-orchestration-01")
     assert node.question and "DAG" in node.question
     assert node.answer and "идемпотентн" in node.answer.lower()
 
 
 def test_task_node_has_starter_and_rubric():
-    nodes, _ = load_content(CONTENT)
+    nodes, _ = load_pool_content(_de())
     task = next(n for n in nodes if n.id == "spark-batch-02")
     assert task.kind == "task"
     assert task.starter_code and "spark.read" in task.starter_code
     assert len(task.rubric) >= 2
 
 
-def test_weights_loaded():
-    w = load_weights(CONTENT)
-    assert w == {"frameworks": 35, "databases": 30, "python": 23, "platform": 12}
-
-
 def test_build_interview_respects_count_and_balance():
-    nodes, _ = load_content(CONTENT)
+    nodes, _ = load_pool_content(_de())
     order = build_interview(nodes, count=10, seed=42)
     assert 1 <= len(order) <= 10
-    assert len(order) == len(set(order))  # без повторов
+    assert len(order) == len(set(order))
 
 
-def test_invalid_node_rejected():
+def test_node_requires_pool():
     with pytest.raises(Exception):
-        Node.model_validate({"id": "x", "block": "BAD", "topic": "t", "question": "q"})
+        Node.model_validate({"id": "x", "block": "python", "topic": "t", "question": "q"})  # нет pool
 
 
 # --- API ---
@@ -103,6 +104,18 @@ def test_api_list_sessions():
     rows = c.get("/api/sessions").json()
     assert isinstance(rows, list) and len(rows) >= 1
     assert all({"id", "candidate", "created_at"} <= set(r) for r in rows)
+
+
+def test_api_session_carries_pool():
+    c = _client()
+    s = c.post("/api/sessions", json={"candidate": "Пулов", "pool": "data-engineer"}).json()
+    assert s["pool"] == "data-engineer"
+    default = c.post("/api/sessions", json={"candidate": "Дефолтов"}).json()
+    assert default["pool"] == "data-engineer"
+    assert c.post("/api/sessions", json={"candidate": "X", "pool": "nope"}).status_code == 404
+    rows = c.get("/api/sessions?pool=data-engineer").json()
+    assert all(r["pool"] == "data-engineer" for r in rows)
+    assert c.get("/api/sessions?pool=nope").status_code == 404
 
 
 def test_api_session_events_snapshot():
@@ -196,38 +209,41 @@ def test_api_interview():
     assert len(r.json()["order"]) <= 8
 
 
-# --- tracks ---
-def test_load_tracks():
-    tracks = load_tracks(CONTENT)
-    ids = {t["id"] for t in tracks}
-    assert {"data-engineer", "backend", "analyst"} <= ids
-    for t in tracks:
-        assert t.get("id") and "label" in t and isinstance(t["include"], list)
-
-
-def test_node_in_track_matcher():
-    nmap = {n.id: n for n in load_content(CONTENT)[0]}
-    inc = ["python", "databases/sql", "frameworks/airflow"]
-    assert node_in_track(nmap["py-lang-01"], inc)          # python (block)
-    assert node_in_track(nmap["sql-01"], inc)              # databases/sql
-    assert node_in_track(nmap["af-orchestration-01"], inc)  # frameworks/airflow
-    assert not node_in_track(nmap["spark-batch-01"], inc)   # frameworks/pyspark — нет
-    assert node_in_track(nmap["sql-01"], [])               # пустой include = все
-
-
-def test_api_tracks_endpoint():
-    r = _client().get("/api/tracks")
+# --- pools ---
+def test_api_pools_lists_data_engineer_with_counts():
+    r = _client().get("/api/pools")
     assert r.status_code == 200
-    assert {"data-engineer", "backend", "analyst"} <= {t["id"] for t in r.json()}
+    pools = {p["id"]: p for p in r.json()}
+    de = pools["data-engineer"]
+    assert de["label"] == "Дата-инженер"
+    assert [b["id"] for b in de["blocks"]] == ["frameworks", "databases", "python", "platform"]
+    assert de["blocks"][0]["subblocks"][0] == {"id": "airflow", "label": "Airflow"}
+    assert de["counts"]["nodes"] >= 15
+    assert isinstance(de["counts"]["sessions"], int)
+    assert "dir" not in de
 
 
-def test_interview_track_scoped():
-    nmap = {n.id: n for n in load_content(CONTENT)[0]}
-    inc = ["databases/sql", "databases/dbms", "python", "platform"]
-    order = _client().post("/api/interview", json={"count": 50, "track": "analyst", "seed": 1}).json()["order"]
-    assert order
-    for nid in order:
-        assert node_in_track(nmap[nid], inc), f"{nid} вне трека analyst"
+def test_api_graph_default_pool_is_data_engineer():
+    c = _client()
+    default = c.get("/api/graph").json()["nodes"]
+    explicit = c.get("/api/graph?pool=data-engineer").json()["nodes"]
+    assert {n["id"] for n in default} == {n["id"] for n in explicit}
+    assert all(n["pool"] == "data-engineer" for n in explicit)
+
+
+def test_api_graph_unknown_pool_404():
+    assert _client().get("/api/graph?pool=nope").status_code == 404
+
+
+def test_api_interview_pool_scoped():
+    c = _client()
+    r = c.post("/api/interview", json={"count": 8, "seed": 1, "pool": "data-engineer"})
+    assert r.status_code == 200
+    ids = r.json()["order"]
+    assert 0 < len(ids) <= 8
+    pool_ids = {n["id"] for n in c.get("/api/graph?pool=data-engineer").json()["nodes"]}
+    assert set(ids) <= pool_ids
+    assert c.post("/api/interview", json={"count": 3, "pool": "nope"}).status_code == 404
 
 
 def test_api_list_sessions_for_resume():
@@ -247,37 +263,6 @@ def test_api_score_note_persists():
     c.post(f"/api/sessions/{sid}/score", json={"nodeId": "sql-01", "score": 4, "note": "хороший ответ"})
     detail = c.get(f"/api/sessions/{sid}").json()
     assert detail["scores"]["sql-01"]["note"] == "хороший ответ"
-
-
-def test_api_compare():
-    c = _client()
-    a = c.post("/api/sessions", json={"candidate": "Cmp-A"}).json()
-    b = c.post("/api/sessions", json={"candidate": "Cmp-B"}).json()
-    c.post(f"/api/sessions/{a['id']}/score", json={"nodeId": "sql-01", "score": 4})
-    c.post(f"/api/sessions/{a['id']}/score", json={"nodeId": "sql-02", "score": 2})
-    c.post(f"/api/sessions/{b['id']}/score", json={"nodeId": "sql-01", "score": 5})
-
-    r = c.get(f"/api/sessions/compare?ids={a['id']},{b['id']}")
-    assert r.status_code == 200
-    data = r.json()
-    assert data["blocks"], "blocks should be non-empty"
-    out = {s["id"]: s for s in data["sessions"]}
-    assert set(out) == {a["id"], b["id"]}
-    # sql-01/sql-02 → блок databases; среднее A = (4+2)/2 = 3.0
-    assert out[a["id"]]["overall"]["avg"] == 3.0
-    assert out[a["id"]]["overall"]["scored"] == 2
-    assert out[a["id"]]["byBlock"]["databases"]["avg"] == 3.0
-    assert out[b["id"]]["byBlock"]["databases"]["avg"] == 5.0
-    # блок без оценок → avg=null, scored=0
-    empty_block = next(bl for bl in data["blocks"] if bl != "databases")
-    assert out[b["id"]]["byBlock"][empty_block]["avg"] is None
-    assert out[b["id"]]["byBlock"][empty_block]["scored"] == 0
-
-
-def test_api_compare_bad_ids():
-    c = _client()
-    assert c.get("/api/sessions/compare?ids=").status_code == 400
-    assert c.get("/api/sessions/compare?ids=abc").status_code == 400
 
 
 def _delete_node(node_id: str):
@@ -355,26 +340,42 @@ def test_api_import_duplicate_id():
     assert (CONTENT / "databases" / "sql-01.md").exists()
 
 
+def test_api_import_rejects_block_outside_pool():
+    c = _client()
+    md = "---\nid: zzz-outside-01\nblock: requirements\ntopic: t\n---\n## Вопрос\nq?\n"
+    r = c.post("/api/import", json={"filename": "x.md", "content": md, "pool": "data-engineer"})
+    data = r.json()
+    assert data["added"] == []
+    assert any("block 'requirements'" in e["error"] for e in data["errors"])
+    assert "zzz-outside-01" not in {n["id"] for n in c.get("/api/graph").json()["nodes"]}
+
+
+def test_api_import_default_pool_and_graph_visibility():
+    c = _client()
+    md = "---\nid: zzz-pooled-01\nblock: python\ntopic: t\n---\n## Вопрос\nq?\n"
+    try:
+        data = c.post("/api/import", json={"filename": "p.md", "content": md}).json()
+        assert any(a["id"] == "zzz-pooled-01" for a in data["added"])
+        node = next(n for n in c.get("/api/graph?pool=data-engineer").json()["nodes"] if n["id"] == "zzz-pooled-01")
+        assert node["pool"] == "data-engineer"
+    finally:
+        _delete_node("zzz-pooled-01")
+
+
 # --- DB как источник правды для банка вопросов (content-store-db) ---
 def test_graph_served_from_db_seed():
-    """Сид из content/*.md наполняет БД; /api/graph отдаёт ноды из БД."""
-    nodes_on_disk, _ = load_content(CONTENT)
-    api_ids = {n["id"] for n in _client().get("/api/graph").json()["nodes"]}
-    disk_ids = {n.id for n in nodes_on_disk}
-    # Все засеяные с диска ноды присутствуют в БД-выдаче (плюс могут быть user-ноды от других тестов).
-    assert disk_ids <= api_ids
-    assert len(api_ids) >= len(disk_ids)
+    nodes_on_disk, _ = load_pool_content(_de())
+    api_ids = {n["id"] for n in _client().get("/api/graph?pool=data-engineer").json()["nodes"]}
+    assert {n.id for n in nodes_on_disk} <= api_ids
 
 
 def test_seed_is_idempotent():
-    """Повторный сид в непустую БД ничего не вставляет (не плодит дубли)."""
     from app.main import db
     from app.tenancy import DEFAULT_TENANT
-    before = db.count_nodes(DEFAULT_TENANT)
-    nodes, _ = load_content(CONTENT)
-    inserted = db.seed_nodes(DEFAULT_TENANT, [n.model_dump() for n in nodes])
-    assert inserted == 0
-    assert db.count_nodes(DEFAULT_TENANT) == before
+    before = db.count_nodes(DEFAULT_TENANT, pool="data-engineer")
+    nodes, _ = load_pool_content(_de())
+    assert db.seed_nodes(DEFAULT_TENANT, [n.model_dump() for n in nodes]) == 0
+    assert db.count_nodes(DEFAULT_TENANT, pool="data-engineer") == before
 
 
 def test_node_crud_and_hidden():

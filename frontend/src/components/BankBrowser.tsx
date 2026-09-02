@@ -2,22 +2,24 @@ import { useEffect, useMemo, useState } from "react";
 import Markdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import remarkGfm from "remark-gfm";
-import { BLOCK_COLOR, BLOCK_LABEL, DIFF_COLOR, type Block, type Difficulty, type Kind, type QNode } from "../types";
-import { BLOCK_ORDER, DIFFS, SUB_LABEL, subOf } from "../layout";
+import { blockColor, blockLabel, blockOrder, subLabel, DIFF_COLOR, type Difficulty, type Kind, type PoolConfig, type QNode } from "../types";
+import { DIFFS, subOf } from "../layout";
 
 const KIND_LABEL: Record<Kind, string> = { question: "вопрос", task: "задача" };
 
 interface Props {
   nodes: QNode[];
-  onClose: () => void;
+  pool: PoolConfig;
+  onClose?: () => void;   // оверлей на доске; на странице банка не передаётся
+  embedded?: boolean;     // true — рендер как содержимое страницы, без overlay-обёртки и Esc
 }
 
 // Полноэкранный оверлей «Все вопросы»: просмотр всего банка (поиск + фильтры + раскрытие
 // вопрос/ответ/критерии). Читает уже загруженный graph; данные/бэк/персист не трогает.
-export function BankBrowser({ nodes, onClose }: Props) {
+export function BankBrowser({ nodes, pool, onClose, embedded }: Props) {
   const [q, setQ] = useState("");
   const [blocks, setBlocks] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(BLOCK_ORDER.map((b) => [b, true])),
+    Object.fromEntries(blockOrder(pool).map((b) => [b, true])),
   );
   const [diffs, setDiffs] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(DIFFS.map((d) => [d, true])),
@@ -28,6 +30,7 @@ export function BankBrowser({ nodes, onClose }: Props) {
   // Escape перехватываем в capture-фазе и гасим дальше: оверлей — верхняя модалка,
   // он должен закрываться первым, не отдавая Escape нижним слушателям (drawer/канва).
   useEffect(() => {
+    if (embedded || !onClose) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.stopImmediatePropagation();
@@ -36,7 +39,7 @@ export function BankBrowser({ nodes, onClose }: Props) {
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [onClose]);
+  }, [onClose, embedded]);
 
   const needle = q.trim().toLowerCase();
   const filtered = useMemo(
@@ -52,7 +55,7 @@ export function BankBrowser({ nodes, onClose }: Props) {
 
   const drank = (d: Difficulty) => DIFFS.indexOf(d);
   const grouped = useMemo(() => {
-    const order: Block[] = [...BLOCK_ORDER];
+    const order: string[] = [...blockOrder(pool)];
     for (const n of filtered) if (!order.includes(n.block)) order.push(n.block);
     return order
       .map((block) => {
@@ -69,7 +72,7 @@ export function BankBrowser({ nodes, onClose }: Props) {
         return { block, count: inBlock.length, subGroups };
       })
       .filter((g) => g.count > 0);
-  }, [filtered]);
+  }, [filtered, pool]);
 
   const toggleOpen = (id: string) =>
     setOpen((s) => {
@@ -80,7 +83,7 @@ export function BankBrowser({ nodes, onClose }: Props) {
     });
 
   return (
-    <div className="bankbrowser" role="dialog" aria-label="Все вопросы" aria-modal="true">
+    <div className={embedded ? "bankbrowser bankbrowser--embedded" : "bankbrowser"} role={embedded ? undefined : "dialog"} aria-label="Все вопросы" aria-modal={embedded ? undefined : "true"}>
       <header className="bankbrowser__bar">
         <strong>Все вопросы</strong>
         <span className="bankbrowser__count">
@@ -99,25 +102,27 @@ export function BankBrowser({ nodes, onClose }: Props) {
         <button className="iconbtn" onClick={() => setOpen(new Set())}>
           Свернуть всё
         </button>
-        <button className="iconbtn bankbrowser__close" onClick={onClose} title="Закрыть (Esc)">
-          ✕
-        </button>
+        {onClose && (
+          <button className="iconbtn bankbrowser__close" onClick={onClose} title="Закрыть (Esc)">
+            ✕
+          </button>
+        )}
       </header>
 
       <div className="bankbrowser__filters">
         <div className="bankbrowser__chips">
-          {BLOCK_ORDER.map((b) => (
+          {blockOrder(pool).map((b) => (
             <button
               key={b}
               className={`fp__chip ${blocks[b] ? "" : "fp__chip--off"}`}
               style={{
-                borderColor: BLOCK_COLOR[b],
-                color: blocks[b] ? "#fff" : BLOCK_COLOR[b],
-                background: blocks[b] ? BLOCK_COLOR[b] : "transparent",
+                borderColor: blockColor(pool, b),
+                color: blocks[b] ? "#fff" : blockColor(pool, b),
+                background: blocks[b] ? blockColor(pool, b) : "transparent",
               }}
               onClick={() => setBlocks((s) => ({ ...s, [b]: !s[b] }))}
             >
-              {BLOCK_LABEL[b]}
+              {blockLabel(pool, b)}
             </button>
           ))}
         </div>
@@ -154,12 +159,12 @@ export function BankBrowser({ nodes, onClose }: Props) {
         {filtered.length === 0 && <p className="bankbrowser__empty">Ничего не найдено</p>}
         {grouped.map((g) => (
           <section key={g.block} className="bankblock">
-            <h2 className="bankblock__head" style={{ borderColor: BLOCK_COLOR[g.block] }}>
-              {BLOCK_LABEL[g.block]} <span className="bankblock__n">{g.count}</span>
+            <h2 className="bankblock__head" style={{ borderColor: blockColor(pool, g.block) }}>
+              {blockLabel(pool, g.block)} <span className="bankblock__n">{g.count}</span>
             </h2>
             {g.subGroups.map((sg) => (
               <div key={sg.sub} className="banksub">
-                <h3 className="banksub__head">{SUB_LABEL[sg.sub] ?? sg.sub}</h3>
+                <h3 className="banksub__head">{subLabel(pool, g.block, sg.sub)}</h3>
                 {sg.items.map((n) => {
                   const isOpen = open.has(n.id);
                   return (

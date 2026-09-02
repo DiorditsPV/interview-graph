@@ -1,0 +1,172 @@
+/* ============================================================================
+   Оформления доски (итог design-funnel, сентябрь 2026).
+
+   Вариант задаётся атрибутом data-design на <html> (state в BoardPage.tsx, выбор — в ⚙
+   настройках, хранится в localStorage). Дефолт — 37 «Брутализм в цвете».
+
+   Правила игры:
+   - карточка вопроса едина для 37/56/57 — жёсткая чёрная рамка с плоской тенью;
+     альтернативы меняют только фон, палитру и обвязку (шапка, HUD, заголовки);
+   - 58 «Изыскания» — исключение: у него свои карточки с тепло-бортом по сложности;
+   - оформления скоупятся на светлую тему (:not([data-theme="dark"])); тёмная схема
+     одна на всех и несёт язык 37 — «тёмный брутализм», см. секцию в конце файла.
+   ========================================================================== */
+
+/* ---------- карточка по умолчанию (37, 56, 57): брутальная ---------- */
+html[data-design="37"]:not([data-theme="dark"]) .qnode,
+html[data-design="56"]:not([data-theme="dark"]) .qnode,
+html[data-design="57"]:not([data-theme="dark"]) .qnode {
+  border: 2px solid #0f0f0f; border-top-width: 4px; border-radius: 0;
+  box-shadow: 3px 3px 0 #0f0f0f;
+}
+html[data-design="37"]:not([data-theme="dark"]) .qnode--current,
+html[data-design="56"]:not([data-theme="dark"]) .qnode--current,
+html[data-design="57"]:not([data-theme="dark"]) .qnode--current {
+  box-shadow: 3px 3px 0 #0f0f0f, 0 0 0 2.5px #0f0f0f;
+}
+html[data-design="37"]:not([data-theme="dark"]) .qnode--selected,
+html[data-design="56"]:not([data-theme="dark"]) .qnode--selected,
+html[data-design="57"]:not([data-theme="dark"]) .qnode--selected {
+  box-shadow: 3px 3px 0 #0f0f0f, 0 0 0 3px #6e6e6e;
+}
+html[data-design="37"]:not([data-theme="dark"]) .qnode__diff,
+html[data-design="56"]:not([data-theme="dark"]) .qnode__diff,
+html[data-design="57"]:not([data-theme="dark"]) .qnode__diff,
+html[data-design="37"]:not([data-theme="dark"]) .qnode__grade,
+html[data-design="56"]:not([data-theme="dark"]) .qnode__grade,
+html[data-design="57"]:not([data-theme="dark"]) .qnode__grade,
+html[data-design="37"]:not([data-theme="dark"]) .qnode__topic,
+html[data-design="56"]:not([data-theme="dark"]) .qnode__topic,
+html[data-design="57"]:not([data-theme="dark"]) .qnode__topic,
+html[data-design="37"]:not([data-theme="dark"]) .tagchip,
+html[data-design="56"]:not([data-theme="dark"]) .tagchip,
+html[data-design="57"]:not([data-theme="dark"]) .tagchip { border-radius: 0; }
+
+/* ============================ 37 · Брутализм в цвете (дефолт) ============================
+   Жёсткие чёрные рамки, нулевые радиусы, плашки направлений в их семантических
+   цветах (цвета блоков из pool.yaml), контрастная монохромная обвязка. */
+html[data-design="37"]:not([data-theme="dark"]) {
+  --bg: #f2f3f5; --surface: #fff; --panel-bg: rgba(255, 255, 255, .97);
+  --border: #0f0f0f; --border-strong: #0f0f0f;
+  --heading: #000; --text: #141414; --text-muted: #3a3a3a; --text-faint: #6e6e6e;
+  --hover: #e8e8ea; --tag-bg: #fff; --tag-fg: #000; --accent: #000;
+  --shadow: rgba(0, 0, 0, 0); --shadow-strong: rgba(0, 0, 0, .3);
+}
+html[data-design="37"]:not([data-theme="dark"]) button,
+html[data-design="37"]:not([data-theme="dark"]) .hud,
+html[data-design="37"]:not([data-theme="dark"]) .bgroup,
+html[data-design="37"]:not([data-theme="dark"]) .bgroup__header,
+html[data-design="37"]:not([data-theme="dark"]) .subhead { border-radius: 0; }
+html[data-design="37"]:not([data-theme="dark"]) .bgroup__header {
+  font-weight: 800; text-transform: uppercase; letter-spacing: .05em;
+}
+/* плашки направлений: цвет считает BlockGroupNode (plateColor — затемнение цвета блока, пока
+   белый текст не даст ≥ 4.5:1 WCAG AA) и кладёт в --plate. !important — инлайновый полупрозрачный фон. */
+html[data-design="37"]:not([data-theme="dark"]) .bgroup__header { background: var(--plate) !important; color: #fff !important; }
+html[data-design="37"]:not([data-theme="dark"]) .topbar { border-bottom: 2px solid #0f0f0f; }
+html[data-design="37"]:not([data-theme="dark"]) .hud { border: 2px solid #0f0f0f; box-shadow: 2.5px 2.5px 0 #0f0f0f; }
+
+/* ============================ 56 · Атлас ============================
+   Тёплая топобумага с крупной сеткой, коричневая обвязка, заголовки капителью.
+   Карточки — дефолтные брутальные (см. блок выше). */
+html[data-design="56"]:not([data-theme="dark"]) {
+  --bg: #fbfaf6; --surface: #fffefa; --panel-bg: rgba(255, 254, 250, .97);
+  --border: #6b6350; --border-strong: #2b2620;
+  --heading: #2b2620; --text: #3b352a; --text-muted: #77705f; --text-faint: #9c957f;
+  --hover: #f0ebdd; --tag-bg: #f0ecdf; --tag-fg: #5d5640; --accent: #2b2620;
+  --shadow: rgba(43, 38, 32, 0); --shadow-strong: rgba(43, 38, 32, .35);
+}
+html[data-design="56"]:not([data-theme="dark"]) body {
+  background-image:
+    linear-gradient(rgba(70, 61, 40, .07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(70, 61, 40, .07) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+html[data-design="56"]:not([data-theme="dark"]) .bgroup__header,
+html[data-design="56"]:not([data-theme="dark"]) .subhead__name {
+  text-transform: uppercase; letter-spacing: .06em; font-weight: 800;
+}
+html[data-design="56"]:not([data-theme="dark"]) .hud {
+  border: 1.8px solid #2b2620; box-shadow: 2px 2px 0 rgba(43, 38, 32, .8); border-radius: 4px;
+}
+html[data-design="56"]:not([data-theme="dark"]) .topbar { border-bottom: 1.8px solid #2b2620; }
+
+/* ============================ 57 · Полевой журнал ============================
+   Миллиметровка: мелкая синяя сетка, синяя обвязка, всё измеряемое — моно.
+   Карточки — дефолтные брутальные (см. блок выше). */
+html[data-design="57"]:not([data-theme="dark"]) {
+  --bg: #fbfdff; --surface: #fff; --panel-bg: rgba(255, 255, 255, .97);
+  --border: #6d83b8; --border-strong: #1e3a8a;
+  --heading: #1e3a8a; --text: #22315c; --text-muted: #5b6b8c; --text-faint: #8b98b8;
+  --hover: #e8eefb; --tag-bg: #e8eefb; --tag-fg: #1e3a8a; --accent: #1d4ed8;
+  --shadow: rgba(30, 58, 138, 0); --shadow-strong: rgba(30, 58, 138, .3);
+}
+html[data-design="57"]:not([data-theme="dark"]) body {
+  background-image:
+    linear-gradient(rgba(29, 78, 216, .10) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(29, 78, 216, .10) 1px, transparent 1px);
+  background-size: 9px 9px;
+}
+html[data-design="57"]:not([data-theme="dark"]) .qnode__diff,
+html[data-design="57"]:not([data-theme="dark"]) .qnode__grade,
+html[data-design="57"]:not([data-theme="dark"]) .progress__label,
+html[data-design="57"]:not([data-theme="dark"]) .hud {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+html[data-design="57"]:not([data-theme="dark"]) .hud {
+  border: 1.8px solid #1e3a8a; border-radius: 0; box-shadow: 2px 2px 0 #1e3a8a;
+}
+html[data-design="57"]:not([data-theme="dark"]) .bgroup { border-radius: 0; }
+html[data-design="57"]:not([data-theme="dark"]) .topbar { border-bottom: 1.8px solid #1e3a8a; }
+
+/* ============================ 58 · Изыскания ============================
+   Изолинии на зеленоватой бумаге. Единственный вариант со СВОИМИ карточками:
+   тепло сложности — левый борт и чип, скругления прежние. */
+html[data-design="58"]:not([data-theme="dark"]) {
+  --bg: #f8faf7; --surface: #fff; --panel-bg: rgba(255, 255, 255, .97);
+  --border: #cfdacd; --border-strong: #9fb39c;
+  --heading: #243c22; --text: #33402f; --text-muted: #7c8b7b; --text-faint: #a3b1a2;
+  --hover: #edf3ec; --tag-bg: #eaf1e8; --tag-fg: #4a614a; --accent: #3a5a40;
+  --shadow: rgba(36, 60, 34, .07); --shadow-strong: rgba(36, 60, 34, .25);
+}
+html[data-design="58"]:not([data-theme="dark"]) body {
+  background-image: repeating-radial-gradient(ellipse 140% 100% at 80% -30%,
+    transparent 0 21px, rgba(60, 92, 58, .09) 21px 22px);
+}
+/* тепло сложности: левый борт карточки — :has() по чипу внутри */
+html[data-design="58"]:not([data-theme="dark"]) .qnode { border-left-width: 3px; }
+html[data-design="58"]:not([data-theme="dark"]) .qnode:has(.qnode__diff[data-diff="base"]) { border-left-color: #7db3e8; }
+html[data-design="58"]:not([data-theme="dark"]) .qnode:has(.qnode__diff[data-diff="junior"]) { border-left-color: #72c39b; }
+html[data-design="58"]:not([data-theme="dark"]) .qnode:has(.qnode__diff[data-diff="middle"]) { border-left-color: #e0a53f; }
+html[data-design="58"]:not([data-theme="dark"]) .qnode:has(.qnode__diff[data-diff="senior"]) { border-left-color: #d96f45; }
+/* та же шкала в чипах вместо дефолтной сине-красной */
+html[data-design="58"]:not([data-theme="dark"]) .qnode__diff[data-diff="base"] { background: #e4eefb; color: #2d5f96; }
+html[data-design="58"]:not([data-theme="dark"]) .qnode__diff[data-diff="junior"] { background: #e2f4ea; color: #2a6e4c; }
+html[data-design="58"]:not([data-theme="dark"]) .qnode__diff[data-diff="middle"] { background: #faefd9; color: #8a6210; }
+html[data-design="58"]:not([data-theme="dark"]) .qnode__diff[data-diff="senior"] { background: #fae5dc; color: #96421f; }
+html[data-design="58"]:not([data-theme="dark"]) .bgroup__header { letter-spacing: .05em; }
+
+/* ============================ Тёмная тема · тёмный брутализм ============================
+   Тёмная схема едина для всех оформлений и несёт язык 37: нулевые радиусы, рамка
+   вместо тени (тень в тёмной не читается — Atlassian elevation), плашки направлений
+   сплошным 700-рядом. Токены лестницы высот — в styles.css ([data-theme="dark"]). */
+html[data-theme="dark"] .qnode {
+  border-width: 1.5px; border-top-width: 4px; border-radius: 0; box-shadow: none;
+}
+html[data-theme="dark"] .qnode--current { box-shadow: 0 0 0 2.5px var(--accent); }
+html[data-theme="dark"] .qnode--selected { box-shadow: 0 0 0 3px #7e90a7; }
+html[data-theme="dark"] .qnode__diff,
+html[data-theme="dark"] .qnode__grade,
+html[data-theme="dark"] .qnode__topic,
+html[data-theme="dark"] .tagchip,
+html[data-theme="dark"] button,
+html[data-theme="dark"] .hud,
+html[data-theme="dark"] .bgroup,
+html[data-theme="dark"] .bgroup__header,
+html[data-theme="dark"] .subhead { border-radius: 0; }
+html[data-theme="dark"] .bgroup__header {
+  font-weight: 800; text-transform: uppercase; letter-spacing: .05em;
+}
+html[data-theme="dark"] .bgroup__header { background: var(--plate) !important; color: #fff !important; }
+html[data-theme="dark"] .hud { border: 1.5px solid var(--border); }
+html[data-theme="dark"] .topbar { border-bottom: 1.5px solid var(--border); }
