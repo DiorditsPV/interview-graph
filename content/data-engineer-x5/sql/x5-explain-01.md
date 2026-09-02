@@ -9,7 +9,7 @@ tags:
 - monitoring
 title: Что смотреть в EXPLAIN ANALYZE
 topic: explain-analyze
-weight: 3
+weight: 1
 ---
 
 ## Вопрос
