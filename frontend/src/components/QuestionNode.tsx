@@ -1,9 +1,10 @@
 import { type NodeProps } from "@xyflow/react";
 import { memo } from "react";
-import { BLOCK_COLOR, type QNode } from "../types";
+import { type QNode } from "../types";
 
 export interface QuestionNodeData {
   node: QNode;
+  color: string;
   score?: number;
   current?: boolean;
   dimmed?: boolean;
@@ -14,8 +15,7 @@ export interface QuestionNodeData {
 // Компактная карточка: короткий заголовок (title) вместо полного текста вопроса —
 // полный текст/код живёт в drawer. Теги показываем чипами.
 function QuestionNodeImpl({ data, selected }: NodeProps) {
-  const { node, score, current, dimmed, hidden } = data as QuestionNodeData;
-  const color = BLOCK_COLOR[node.block];
+  const { node, color, score, current, dimmed, hidden } = data as QuestionNodeData;
   const isTask = node.kind === "task";
   const heading = node.title || node.question;
 

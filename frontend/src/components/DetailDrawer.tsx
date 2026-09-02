@@ -2,11 +2,12 @@ import { useEffect, useState } from "react";
 import Markdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import remarkGfm from "remark-gfm";
-import { BLOCK_COLOR, BLOCK_LABEL, type Difficulty, type QNode } from "../types";
+import { blockColor, blockLabel, type Difficulty, type PoolConfig, type QNode } from "../types";
 import type { NodeUpdate } from "../api";
 
 interface Props {
   node: QNode | null;
+  pool: PoolConfig;
   score?: number;
   note?: string;
   fullscreen: boolean;
@@ -23,7 +24,7 @@ interface Props {
 const DIFF_OPTS: Difficulty[] = ["base", "junior", "middle", "senior"];
 
 // Немодальный drawer: полный текст вопроса/ответа. Закрывается с клавиатуры (Esc).
-export function DetailDrawer({ node, score, note, fullscreen, hidden, onToggleHide, onScore, onNote, onDelete, onUpdate, onToggleFullscreen, onClose }: Props) {
+export function DetailDrawer({ node, pool, score, note, fullscreen, hidden, onToggleHide, onScore, onNote, onDelete, onUpdate, onToggleFullscreen, onClose }: Props) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<{ title: string; difficulty: Difficulty; question: string; answer: string }>(
     { title: "", difficulty: "middle", question: "", answer: "" },
@@ -44,7 +45,7 @@ export function DetailDrawer({ node, score, note, fullscreen, hidden, onToggleHi
   }, [onClose, editing]);
 
   if (!node) return null;
-  const color = BLOCK_COLOR[node.block];
+  const color = blockColor(pool, node.block);
 
   const startEdit = () => {
     setDraft({ title: node.title ?? "", difficulty: node.difficulty, question: node.question, answer: node.answer });
@@ -70,7 +71,7 @@ export function DetailDrawer({ node, score, note, fullscreen, hidden, onToggleHi
     >
       <header className="drawer__bar" style={{ borderTopColor: color }}>
         <span className="drawer__badge" style={{ background: color }}>
-          {BLOCK_LABEL[node.block]} · {node.topic}
+          {blockLabel(pool, node.block)} · {node.topic}
         </span>
         <span className="drawer__diff" data-diff={node.difficulty}>
           {node.kind === "task" ? "🛠 задача" : "❓ вопрос"} · {node.difficulty}

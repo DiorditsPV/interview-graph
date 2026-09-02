@@ -1,10 +1,11 @@
 import { memo } from "react";
-import { BLOCK_COLOR, hexA, lighten, type Block } from "../types";
+import { hexA, lighten } from "../types";
 import { HEADER_H, SUPER_H } from "../layout";
 
 export interface SubHeadNodeData {
-  block: Block;
+  block: string;
   label: string;
+  color: string;
   width: number;
   count: number;
   dark: boolean;
@@ -14,8 +15,7 @@ export interface SubHeadNodeData {
 
 // Заголовок под-колонки (технологии) внутри блока + лёгкая заливка под ним.
 function SubHeadNodeImpl({ data }: { data: SubHeadNodeData }) {
-  const { block, label, width, count, done, dark } = data;
-  const color = BLOCK_COLOR[block];
+  const { label, color, width, count, done, dark } = data;
   const fg = dark ? lighten(color, 0.6) : color;
   return (
     <div
