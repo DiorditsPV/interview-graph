@@ -24,10 +24,13 @@ Dev (hot reload): `uvicorn app.main:app --reload --port 8000` (из `backend/`, 
 ## Карта репозитория
 - `backend/app/` — `models.py` (pydantic `Node`, `extra="forbid"`), `importer.py` (.md+.json через
   python-frontmatter), `sampler.py` (веса блоков), `db.py` (SQLite сессии/оценки), `main.py` (FastAPI).
-- `frontend/src/` — `App.tsx` (состояние, `buildNodes`, панели/HUD, клавиатура, тема, реестр `nodeTypes`),
+- `frontend/src/` — `router.ts`/`Router.tsx` (hash-роутер: `#/`, `#/board/<pool>`, `#/bank/<pool>`,
+  `#/candidates`, `#/sessions`, `#/connect`), `pages/BoardPage.tsx` (доска пула: состояние, `buildNodes`,
+  шапка, панель ⚙), `pages/` (`HomePage`, `BankPage`, `CandidatesPage`, `SessionsPage`, `ConnectPage`),
   `api.ts` (обёртки над `/api`), `layout.ts` (`swimlaneLayout`, `PREFERRED_SUB`, `SUB_LABEL`, `DIFFS`,
-  константы), `types.ts` (`QNode`, `Block/Difficulty/Kind`, `BLOCK_COLOR/LABEL`, `DIFF_COLOR`),
-  `report.ts` (HTML-отчёт), `styles.css` (CSS-переменные тем), `main.tsx`.
+  константы), `types.ts` (`QNode`, `PoolConfig` + `blockOrder/blockLabel/blockColor/subLabel` вместо
+  констант, `Block/Difficulty/Kind`, `DIFF_COLOR`), `report.ts` (HTML-отчёт), `styles.css`
+  (CSS-переменные тем), `main.tsx`.
   `components/` — узлы канвы (QuestionNode, BlockGroupNode, SubHeadNode, BandsNode, GuidesNode) и
   оверлеи/панели (DetailDrawer, BankBrowser, UploadModal, CompareModal, ShortcutsHelp).
   Тесты: `frontend/smoke.mjs`, `frontend/screenshot.mjs`.
@@ -63,7 +66,7 @@ databases → `sql|dbms|storage|formats`; python и platform — одна кол
   architecture, orchestration, optimization, partitioning, deployment, storage, streaming, consistency,
   data-modeling, quality, distributed, sql, monitoring, memory, file-formats, domain, concurrency.
 - `Node` имеет `extra="forbid"` → новое поле ноды = правка `models.py` + `types.ts` + миграция контента.
-- Новый тип ноды на канве = регистрация в `nodeTypes` (App.tsx).
+- Новый тип ноды на канве = регистрация в `nodeTypes` (BoardPage.tsx).
 - Изменения контента не требуют пересборки фронта (данные грузятся из `/api/graph` в рантайме);
   изменения `frontend/src` — требуют `npm run build`.
 
