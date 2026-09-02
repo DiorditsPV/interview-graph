@@ -1,29 +1,50 @@
 /* ============================================================================
-   ВРЕМЕННОЕ (design-funnel): предпросмотр четырёх финалистов редизайна вживую.
-   Вариант включается атрибутом data-design на <html> (?design=NN или переключатель
-   в левом нижнем углу, см. main.tsx). Только светлая тема: в тёмной все варианты
-   отключаются (:not([data-theme="dark"])) — адаптацию под тёмную получит финалист.
-   После выбора финалиста файл заменяется настоящими токенами и УДАЛЯЕТСЯ.
-   Номера вариантов — сквозные из воронки: 37, 56, 57, 58.
+   Оформления доски (итог design-funnel, сентябрь 2026).
+
+   Вариант задаётся атрибутом data-design на <html> (state в App.tsx, выбор — в ⚙
+   настройках, хранится в localStorage). Дефолт — 37 «Брутализм в цвете».
+
+   Правила игры:
+   - карточка вопроса едина для 37/56/57 — жёсткая чёрная рамка с плоской тенью;
+     альтернативы меняют только фон, палитру и обвязку (шапка, HUD, заголовки);
+   - 58 «Изыскания» — исключение: у него свои карточки с тепло-бортом по сложности;
+   - всё скоупится на светлую тему (:not([data-theme="dark"])) — тёмная пока живёт
+     на прежних токенах, её адаптация под 37 — отдельный дизайн-проход.
    ========================================================================== */
 
-/* ---------- переключатель (виден всегда, пока живёт превью) ---------- */
-.dp-bar {
-  position: fixed; left: 10px; bottom: 10px; z-index: 80;
-  display: flex; gap: 4px; padding: 4px;
-  background: rgba(20, 20, 20, .78); border-radius: 8px; backdrop-filter: blur(4px);
-  font: 11px/1 system-ui, sans-serif;
+/* ---------- карточка по умолчанию (37, 56, 57): брутальная ---------- */
+html[data-design="37"]:not([data-theme="dark"]) .qnode,
+html[data-design="56"]:not([data-theme="dark"]) .qnode,
+html[data-design="57"]:not([data-theme="dark"]) .qnode {
+  border: 2px solid #0f0f0f; border-top-width: 4px; border-radius: 0;
+  box-shadow: 3px 3px 0 #0f0f0f;
 }
-.dp-bar button {
-  border: 1px solid transparent; border-radius: 5px; background: transparent;
-  color: #d7dae0; padding: 4px 8px; cursor: pointer; font-weight: 600;
+html[data-design="37"]:not([data-theme="dark"]) .qnode--current,
+html[data-design="56"]:not([data-theme="dark"]) .qnode--current,
+html[data-design="57"]:not([data-theme="dark"]) .qnode--current {
+  box-shadow: 3px 3px 0 #0f0f0f, 0 0 0 2.5px #0f0f0f;
 }
-.dp-bar button:hover { background: rgba(255, 255, 255, .12); }
-.dp-bar button.on { background: #fff; color: #111; }
+html[data-design="37"]:not([data-theme="dark"]) .qnode--selected,
+html[data-design="56"]:not([data-theme="dark"]) .qnode--selected,
+html[data-design="57"]:not([data-theme="dark"]) .qnode--selected {
+  box-shadow: 3px 3px 0 #0f0f0f, 0 0 0 3px #6e6e6e;
+}
+html[data-design="37"]:not([data-theme="dark"]) .qnode__diff,
+html[data-design="56"]:not([data-theme="dark"]) .qnode__diff,
+html[data-design="57"]:not([data-theme="dark"]) .qnode__diff,
+html[data-design="37"]:not([data-theme="dark"]) .qnode__grade,
+html[data-design="56"]:not([data-theme="dark"]) .qnode__grade,
+html[data-design="57"]:not([data-theme="dark"]) .qnode__grade,
+html[data-design="37"]:not([data-theme="dark"]) .qnode__topic,
+html[data-design="56"]:not([data-theme="dark"]) .qnode__topic,
+html[data-design="57"]:not([data-theme="dark"]) .qnode__topic,
+html[data-design="37"]:not([data-theme="dark"]) .tagchip,
+html[data-design="56"]:not([data-theme="dark"]) .tagchip,
+html[data-design="57"]:not([data-theme="dark"]) .tagchip { border-radius: 0; }
 
-/* ============================ 37 · Брутализм в цвете ============================
-   Жёсткие чёрные рамки с плоской тенью, нулевые радиусы, плашки направлений
-   в их же семантических цветах (BLOCK_COLOR). */
+/* ============================ 37 · Брутализм в цвете (дефолт) ============================
+   Жёсткие чёрные рамки, нулевые радиусы, плашки направлений в их семантических
+   цветах (BLOCK_COLOR), контрастная монохромная обвязка. */
 html[data-design="37"]:not([data-theme="dark"]) {
   --bg: #f2f3f5; --surface: #fff; --panel-bg: rgba(255, 255, 255, .97);
   --border: #0f0f0f; --border-strong: #0f0f0f;
@@ -31,20 +52,7 @@ html[data-design="37"]:not([data-theme="dark"]) {
   --hover: #e8e8ea; --tag-bg: #fff; --tag-fg: #000; --accent: #000;
   --shadow: rgba(0, 0, 0, 0); --shadow-strong: rgba(0, 0, 0, .3);
 }
-html[data-design="37"]:not([data-theme="dark"]) .qnode {
-  border: 2px solid #0f0f0f; border-top-width: 4px; border-radius: 0;
-  box-shadow: 3px 3px 0 #0f0f0f;
-}
-html[data-design="37"]:not([data-theme="dark"]) .qnode--current {
-  box-shadow: 3px 3px 0 #0f0f0f, 0 0 0 2.5px #0f0f0f;
-}
-html[data-design="37"]:not([data-theme="dark"]) .qnode--selected { box-shadow: 3px 3px 0 #0f0f0f, 0 0 0 3px #6e6e6e; }
-html[data-design="37"]:not([data-theme="dark"]) .qnode__diff,
-html[data-design="37"]:not([data-theme="dark"]) .qnode__grade,
-html[data-design="37"]:not([data-theme="dark"]) .qnode__topic,
-html[data-design="37"]:not([data-theme="dark"]) .tagchip,
 html[data-design="37"]:not([data-theme="dark"]) button,
-html[data-design="37"]:not([data-theme="dark"]) .mb,
 html[data-design="37"]:not([data-theme="dark"]) .hud,
 html[data-design="37"]:not([data-theme="dark"]) .bgroup,
 html[data-design="37"]:not([data-theme="dark"]) .bgroup__header,
@@ -61,8 +69,8 @@ html[data-design="37"]:not([data-theme="dark"]) .topbar { border-bottom: 2px sol
 html[data-design="37"]:not([data-theme="dark"]) .hud { border: 2px solid #0f0f0f; box-shadow: 2.5px 2.5px 0 #0f0f0f; }
 
 /* ============================ 56 · Атлас ============================
-   Тёплая топобумага с крупной сеткой, тёмно-коричневые рамки с плоской тенью,
-   заголовки капителью. */
+   Тёплая топобумага с крупной сеткой, коричневая обвязка, заголовки капителью.
+   Карточки — дефолтные брутальные (см. блок выше). */
 html[data-design="56"]:not([data-theme="dark"]) {
   --bg: #fbfaf6; --surface: #fffefa; --panel-bg: rgba(255, 254, 250, .97);
   --border: #6b6350; --border-strong: #2b2620;
@@ -76,13 +84,6 @@ html[data-design="56"]:not([data-theme="dark"]) body {
     linear-gradient(90deg, rgba(70, 61, 40, .07) 1px, transparent 1px);
   background-size: 22px 22px;
 }
-html[data-design="56"]:not([data-theme="dark"]) .qnode {
-  border: 1.8px solid #2b2620; border-top-width: 4px; border-radius: 2px;
-  box-shadow: 2.5px 2.5px 0 rgba(43, 38, 32, .8);
-}
-html[data-design="56"]:not([data-theme="dark"]) .qnode--current {
-  box-shadow: 2.5px 2.5px 0 rgba(43, 38, 32, .8), 0 0 0 2px #2b2620;
-}
 html[data-design="56"]:not([data-theme="dark"]) .bgroup__header,
 html[data-design="56"]:not([data-theme="dark"]) .subhead__name {
   text-transform: uppercase; letter-spacing: .06em; font-weight: 800;
@@ -93,7 +94,8 @@ html[data-design="56"]:not([data-theme="dark"]) .hud {
 html[data-design="56"]:not([data-theme="dark"]) .topbar { border-bottom: 1.8px solid #2b2620; }
 
 /* ============================ 57 · Полевой журнал ============================
-   Миллиметровка: мелкая синяя сетка, чертёжные синие рамки, всё измеряемое — моно. */
+   Миллиметровка: мелкая синяя сетка, синяя обвязка, всё измеряемое — моно.
+   Карточки — дефолтные брутальные (см. блок выше). */
 html[data-design="57"]:not([data-theme="dark"]) {
   --bg: #fbfdff; --surface: #fff; --panel-bg: rgba(255, 255, 255, .97);
   --border: #6d83b8; --border-strong: #1e3a8a;
@@ -106,13 +108,6 @@ html[data-design="57"]:not([data-theme="dark"]) body {
     linear-gradient(rgba(29, 78, 216, .10) 1px, transparent 1px),
     linear-gradient(90deg, rgba(29, 78, 216, .10) 1px, transparent 1px);
   background-size: 9px 9px;
-}
-html[data-design="57"]:not([data-theme="dark"]) .qnode {
-  border: 1.8px solid #1e3a8a; border-top-width: 4px; border-radius: 0;
-  box-shadow: 2px 2px 0 #1e3a8a;
-}
-html[data-design="57"]:not([data-theme="dark"]) .qnode--current {
-  box-shadow: 2px 2px 0 #1e3a8a, 0 0 0 2px #1d4ed8;
 }
 html[data-design="57"]:not([data-theme="dark"]) .qnode__diff,
 html[data-design="57"]:not([data-theme="dark"]) .qnode__grade,
@@ -127,7 +122,8 @@ html[data-design="57"]:not([data-theme="dark"]) .bgroup { border-radius: 0; }
 html[data-design="57"]:not([data-theme="dark"]) .topbar { border-bottom: 1.8px solid #1e3a8a; }
 
 /* ============================ 58 · Изыскания ============================
-   Изолинии на зеленоватой бумаге, тепло сложности — борт и чип карточки. */
+   Изолинии на зеленоватой бумаге. Единственный вариант со СВОИМИ карточками:
+   тепло сложности — левый борт и чип, скругления прежние. */
 html[data-design="58"]:not([data-theme="dark"]) {
   --bg: #f8faf7; --surface: #fff; --panel-bg: rgba(255, 255, 255, .97);
   --border: #cfdacd; --border-strong: #9fb39c;
