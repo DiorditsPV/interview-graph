@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api } from "../api";
+import { useT } from "../i18n";
 import type { PoolConfig } from "../types";
 
 // Создание направления (название, описание, набор вопросов = существующее направление, чьи
@@ -12,6 +13,7 @@ export function PoolFormModal({ mode, pools, pool, onClose, onSaved }: {
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const t = useT();
   const [label, setLabel] = useState(pool?.label ?? "");
   const [desc, setDesc] = useState(pool?.description ?? "");
   const [preset, setPreset] = useState(pools[0]?.id ?? "");
@@ -25,7 +27,7 @@ export function PoolFormModal({ mode, pools, pool, onClose, onSaved }: {
       else if (pool) await api.updatePool(pool.id, { label: label.trim(), description: desc.trim() });
       onSaved();
     } catch {
-      alert(mode === "create" ? "Не удалось создать направление" : "Не удалось сохранить направление");
+      alert(mode === "create" ? t("Не удалось создать направление") : t("Не удалось сохранить направление"));
       setBusy(false);
     }
   };
@@ -33,9 +35,9 @@ export function PoolFormModal({ mode, pools, pool, onClose, onSaved }: {
   return (
     <div className="modal" onClick={onClose}>
       <div className="modal__card poolform" onClick={(e) => e.stopPropagation()}>
-        <h3>{mode === "create" ? "Новое направление" : `Направление · ${pool?.label ?? ""}`}</h3>
+        <h3>{mode === "create" ? t("Новое направление") : t("Направление · {label}", { label: pool?.label ?? "" })}</h3>
         <label className="drawer__field">
-          Название
+          {t("Название")}
           <input
             className="poolform__label"
             value={label}
@@ -45,16 +47,16 @@ export function PoolFormModal({ mode, pools, pool, onClose, onSaved }: {
           />
         </label>
         <label className="drawer__field">
-          Описание
+          {t("Описание")}
           <input className="poolform__desc" value={desc} onChange={(e) => setDesc(e.target.value)} />
         </label>
         {mode === "create" && (
           <label className="drawer__field">
-            Набор вопросов
+            {t("Набор вопросов")}
             <select className="pool-preset" value={preset} onChange={(e) => setPreset(e.target.value)}>
               {pools.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.label} · {p.counts?.nodes ?? 0} вопросов
+                  {p.label} · {t("{n} вопросов", { n: p.counts?.nodes ?? 0 })}
                 </option>
               ))}
             </select>
@@ -62,9 +64,9 @@ export function PoolFormModal({ mode, pools, pool, onClose, onSaved }: {
         )}
         <div className="addform__btns">
           <button className="btn--primary poolform__submit" onClick={submit} disabled={busy || !label.trim()}>
-            {mode === "create" ? "Создать" : "Сохранить"}
+            {mode === "create" ? t("Создать") : t("Сохранить")}
           </button>
-          <button className="iconbtn" onClick={onClose}>Отмена</button>
+          <button className="iconbtn" onClick={onClose}>{t("Отмена")}</button>
         </div>
       </div>
     </div>

@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
+import { useT } from "../i18n";
 import type { ImportResult } from "../types";
 
 // Загрузка .md/.json вопросов: drag-and-drop или выбор файла. Валидные новые ноды сохраняются на бэке,
 // после чего доска перезагружается (onImported). Esc/клик-по-фону закрывают (Esc — на оверлее).
 export function UploadModal({ pool, onClose, onImported }: { pool: string; onClose: () => void; onImported: () => void }) {
+  const t = useT();
   const [result, setResult] = useState<ImportResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [dragActive, setDragActive] = useState(false);
@@ -45,8 +47,8 @@ export function UploadModal({ pool, onClose, onImported }: { pool: string; onClo
     <div className="upload-modal" onClick={onClose}>
       <div className="upload-modal__card" onClick={(e) => e.stopPropagation()}>
         <div className="upload-modal__head">
-          <strong>Загрузить вопросы</strong>
-          <button className="upload-modal__close" onClick={onClose} title="Закрыть (Esc)">
+          <strong>{t("Загрузить вопросы")}</strong>
+          <button className="upload-modal__close" onClick={onClose} title={t("Закрыть (Esc)")}>
             ✕
           </button>
         </div>
@@ -65,7 +67,7 @@ export function UploadModal({ pool, onClose, onImported }: { pool: string; onClo
             handleFiles(e.dataTransfer.files);
           }}
         >
-          {busy ? "Загрузка…" : "Перетащите .md / .json сюда или нажмите для выбора"}
+          {busy ? t("Загрузка…") : t("Перетащите .md / .json сюда или нажмите для выбора")}
           <input
             ref={inputRef}
             type="file"
@@ -80,7 +82,7 @@ export function UploadModal({ pool, onClose, onImported }: { pool: string; onClo
           <div className="upload-result">
             {result.added.length > 0 && (
               <div className="upload-result__ok">
-                Добавлено: {result.added.length}
+                {t("Добавлено: {n}", { n: result.added.length })}
                 <ul>
                   {result.added.map((a) => (
                     <li key={a.path}>
@@ -92,7 +94,7 @@ export function UploadModal({ pool, onClose, onImported }: { pool: string; onClo
             )}
             {result.errors.length > 0 && (
               <div className="upload-result__err">
-                Ошибки: {result.errors.length}
+                {t("Ошибки: {n}", { n: result.errors.length })}
                 <ul>
                   {result.errors.map((e, i) => (
                     <li key={i}>

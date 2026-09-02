@@ -29,14 +29,18 @@ export function HomePage({
 
   const remove = async (p: PoolConfig) => {
     const ok = window.confirm(
-      `Удалить направление «${p.label}»? Вопросы (${p.counts?.nodes ?? 0}) будут удалены, сессии (${p.counts?.sessions ?? 0}) останутся в истории.`,
+      t("Удалить направление «{label}»? Вопросы ({nodes}) будут удалены, сессии ({sessions}) останутся в истории.", {
+        label: p.label,
+        nodes: p.counts?.nodes ?? 0,
+        sessions: p.counts?.sessions ?? 0,
+      }),
     );
     if (!ok) return;
     try {
       await api.deletePool(p.id);
       onChanged();
     } catch {
-      alert("Не удалось удалить направление");
+      alert(t("Не удалось удалить направление"));
     }
   };
 
@@ -53,7 +57,7 @@ export function HomePage({
 
         <h2 className="home__h2">{t("Направления")}</h2>
         {pools.length === 0 ? (
-          <p className="muted">Нет ни одного пула: положите каталог с `pool.yaml` в `content/`.</p>
+          <p className="muted">{t("Нет ни одного пула: положите каталог с `pool.yaml` в `content/`.")}</p>
         ) : (
           <div className="home__pools">
             {pools.map((p) => (
@@ -63,7 +67,7 @@ export function HomePage({
                 <a className="poolcard__label" href={href.board(p.id)}>{p.label}</a>
                 {p.description && <div className="poolcard__desc">{p.description}</div>}
                 <div className="poolcard__meta">
-                  {p.counts?.nodes ?? 0} вопросов · {p.counts?.sessions ?? 0} сессий
+                  {t("{nodes} вопросов · {sessions} сессий", { nodes: p.counts?.nodes ?? 0, sessions: p.counts?.sessions ?? 0 })}
                 </div>
                 <div className="poolcard__blocks">
                   {p.blocks.map((b) => (
@@ -75,13 +79,13 @@ export function HomePage({
                   <button className="poolcard__start btn--primary" onClick={() => setStartPool(p.id)}>
                     {t("Начать интервью")}
                   </button>
-                  <a className="poolcard__bank" href={href.bank(p.id)}>банк вопросов →</a>
+                  <a className="poolcard__bank" href={href.bank(p.id)}>{t("банк вопросов →")}</a>
                   <span className="poolcard__manage">
                     <button className="poolcard__edit iconbtn btn--quiet" onClick={() => setModal({ mode: "edit", pool: p })}>
-                      изменить
+                      {t("изменить")}
                     </button>
                     <button className="poolcard__delete iconbtn btn--quiet" onClick={() => remove(p)}>
-                      удалить
+                      {t("удалить")}
                     </button>
                   </span>
                 </div>
@@ -90,7 +94,7 @@ export function HomePage({
             ))}
             {/* Новое направление всегда из пресета — без единого пула создавать не из чего. */}
             <button className="poolcard poolcard--new" onClick={() => setModal({ mode: "create" })}>
-              + Новое направление
+              {t("+ Новое направление")}
             </button>
           </div>
         )}
@@ -110,16 +114,16 @@ export function HomePage({
         <h2 className="home__h2">{t("Разделы")}</h2>
         <div className="home__sections">
           <a className="menucard" href={href.candidates}>
-            <strong>Кандидаты</strong>
-            <span>Справочник кандидатов и интервьюеров</span>
+            <strong>{t("Кандидаты")}</strong>
+            <span>{t("Справочник кандидатов и интервьюеров")}</span>
           </a>
           <a className="menucard" href={href.sessions}>
-            <strong>Сессии</strong>
-            <span>Все проведённые интервью, отчёты</span>
+            <strong>{t("Сессии")}</strong>
+            <span>{t("Все проведённые интервью, отчёты")}</span>
           </a>
           <a className="menucard" href={href.connect}>
-            <strong>Подключение</strong>
-            <span>Присоединиться к идущей live-сессии</span>
+            <strong>{t("Подключение")}</strong>
+            <span>{t("Присоединиться к идущей live-сессии")}</span>
           </a>
         </div>
       </main>

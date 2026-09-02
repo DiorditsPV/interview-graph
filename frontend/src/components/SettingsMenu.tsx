@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useT } from "../i18n";
 
 // Боковая панель настроек (⚙ в шапке доски), выезжает слева — справа живут фильтры
 // и drawer вопроса. Шапка оставляет себе ход интервью; всё, что настраивают редко —
@@ -51,6 +52,7 @@ function Chip({ on, onClick, title, className = "", children }: {
 }
 
 export function SettingsMenu({ settings: s, onClose }: { settings: DisplaySettings; onClose: () => void }) {
+  const t = useT();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
@@ -72,15 +74,15 @@ export function SettingsMenu({ settings: s, onClose }: { settings: DisplaySettin
   }, [onClose]);
 
   return (
-    <div className="setdrawer" role="dialog" aria-label="Настройки" aria-modal="false">
+    <div className="setdrawer" role="dialog" aria-label={t("Настройки")} aria-modal="false">
       <div className="setdrawer__head">
-        <strong>Настройки</strong>
-        <button className="setdrawer__close" onClick={onClose} title="Закрыть (Esc)">✕</button>
+        <strong>{t("Настройки")}</strong>
+        <button className="setdrawer__close" onClick={onClose} title={t("Закрыть (Esc)")}>✕</button>
       </div>
 
       <div className="settings__group">
-        <div className="settings__title">Оформление</div>
-        <div className="settings__chips" role="radiogroup" aria-label="Оформление доски">
+        <div className="settings__title">{t("Оформление")}</div>
+        <div className="settings__chips" role="radiogroup" aria-label={t("Оформление доски")}>
           {DESIGNS.map(([id, label]) => (
             <button key={id} className={`tb__toggle ${s.design === id ? "tb__toggle--on" : ""}`}
               onClick={() => s.onSetDesign(id)} role="radio" aria-checked={s.design === id}>
@@ -91,40 +93,40 @@ export function SettingsMenu({ settings: s, onClose }: { settings: DisplaySettin
       </div>
 
       <div className="settings__group">
-        <div className="settings__title">Тема</div>
+        <div className="settings__title">{t("Цветовая тема")}</div>
         <div className="settings__chips">
-          <Chip className="themebtn" on={s.theme === "dark"} onClick={s.onToggleTheme} title="Выбор запоминается">Тёмная тема</Chip>
+          <Chip className="themebtn" on={s.theme === "dark"} onClick={s.onToggleTheme} title={t("Выбор запоминается")}>{t("Тёмная тема")}</Chip>
         </div>
       </div>
 
       <div className="settings__group">
-        <div className="settings__title">Холст</div>
-        <div className="settings__chips" role="group" aria-label="Отображение холста">
-          <Chip on={s.bgDots} onClick={s.onToggleBgDots}>Точки на фоне</Chip>
-          <Chip on={s.guidesV} onClick={s.onToggleGuidesV} title="Границы блоков">Вертикальные направляющие</Chip>
-          <Chip on={s.guidesH} onClick={s.onToggleGuidesH} title="Уровни Base / Junior / Middle / Senior">Горизонтальные направляющие</Chip>
+        <div className="settings__title">{t("Холст")}</div>
+        <div className="settings__chips" role="group" aria-label={t("Отображение холста")}>
+          <Chip on={s.bgDots} onClick={s.onToggleBgDots}>{t("Точки на фоне")}</Chip>
+          <Chip on={s.guidesV} onClick={s.onToggleGuidesV} title={t("Границы блоков")}>{t("Вертикальные направляющие")}</Chip>
+          <Chip on={s.guidesH} onClick={s.onToggleGuidesH} title={t("Уровни Base / Junior / Middle / Senior")}>{t("Горизонтальные направляющие")}</Chip>
         </div>
       </div>
 
       <div className="settings__group">
-        <div className="settings__title">Панели</div>
-        <div className="settings__chips" role="group" aria-label="Панели">
-          <Chip on={s.agendaOpen} onClick={s.onToggleAgenda} title="Сайдбар со списком вопросов">Агенда</Chip>
-          <Chip on={s.showHidden} onClick={s.onToggleHidden} title="Показывать вопросы, убранные с доски">
-            Скрытые вопросы{s.hiddenCount ? ` (${s.hiddenCount})` : ""}
+        <div className="settings__title">{t("Панели")}</div>
+        <div className="settings__chips" role="group" aria-label={t("Панели")}>
+          <Chip on={s.agendaOpen} onClick={s.onToggleAgenda} title={t("Сайдбар со списком вопросов")}>{t("Агенда")}</Chip>
+          <Chip on={s.showHidden} onClick={s.onToggleHidden} title={t("Показывать вопросы, убранные с доски")}>
+            {t("Скрытые вопросы")}{s.hiddenCount ? ` (${s.hiddenCount})` : ""}
           </Chip>
-          <Chip on={s.showTimer} onClick={s.onToggleTimer} title="Время на вопрос и на сессию в нижней панели">Таймер</Chip>
+          <Chip on={s.showTimer} onClick={s.onToggleTimer} title={t("Время на вопрос и на сессию в нижней панели")}>{t("Таймер")}</Chip>
         </div>
       </div>
 
       <div className="settings__group">
-        <div className="settings__title">Банк вопросов</div>
-        <a className="setdrawer__act" href={s.bankHref}>Открыть банк направления →</a>
+        <div className="settings__title">{t("Банк вопросов")}</div>
+        <a className="setdrawer__act" href={s.bankHref}>{t("Открыть банк направления →")}</a>
       </div>
 
       <div className="settings__group">
-        <div className="settings__title">Справка</div>
-        <button className="setdrawer__act helpbtn" onClick={() => { onClose(); s.onShowHelp(); }}>Горячие клавиши</button>
+        <div className="settings__title">{t("Справка")}</div>
+        <button className="setdrawer__act helpbtn" onClick={() => { onClose(); s.onShowHelp(); }}>{t("Горячие клавиши")}</button>
       </div>
     </div>
   );
