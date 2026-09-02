@@ -57,10 +57,11 @@ docker compose down              # остановить (данные остаю
 docker compose down -v           # снести вместе с данными
 ```
 
-Логин — `owner@interview.local` / `interview-local`. Известный пароль задан в
-`compose.yaml` намеренно: owner-аккаунт сидится в БД один раз, а том постоянный, так что
-случайный пароль означал бы «после первого старта войти уже нельзя». Свой пароль —
-`INTERVIEW_OWNER_PASSWORD=<пароль> docker compose up -d`.
+Логин — `admin` / `admin`. Известные креды заданы в `compose.yaml` намеренно: owner
+сидится в БД один раз, а том постоянный, так что случайные означали бы «после первого
+старта войти уже нельзя». Свои — `INTERVIEW_OWNER_EMAIL=<логин>
+INTERVIEW_OWNER_PASSWORD=<пароль> docker compose up -d`; сменить на уже поднятом сервисе —
+только с пересозданием тома (`docker compose down -v`).
 
 Если `:8000` занят (например, там уже крутится `./run.sh`) —
 `INTERVIEW_PORT=8080 docker compose up -d`.

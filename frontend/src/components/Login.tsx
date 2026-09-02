@@ -37,6 +37,11 @@ export function Login({ onLogin }: { onLogin: () => void }) {
       <form
         className="login__card"
         onSubmit={submit}
+        // Логин на бэкенде — непрозрачная строка (LoginIn.email: str, min_length=1), а не
+        // обязательно адрес: INTERVIEW_OWNER_EMAIL может быть и «admin». type="email"
+        // оставлен ради подсказки клавиатуры, но браузерную проверку формата снимаем,
+        // иначе такой аккаунт нельзя ввести в форму.
+        noValidate
         style={{
           display: "flex",
           flexDirection: "column",

@@ -15,7 +15,10 @@ services:
       # Без явного пароля owner генерится случайным на каждом старте, а в БД сидится
       # один раз при первом. С постоянным томом это значит «после первого старта войти
       # уже нельзя»: новый пароль против старого хеша. Поэтому известный дефолт.
-      INTERVIEW_OWNER_PASSWORD: "${INTERVIEW_OWNER_PASSWORD:-interview-local}"
+      # Оба креда сидятся в БД ОДИН раз при первом старте: чтобы сменить их на уже
+      # поднятом сервисе, нужен `docker compose down -v` (пересоздать том).
+      INTERVIEW_OWNER_EMAIL: "${INTERVIEW_OWNER_EMAIL:-admin}"
+      INTERVIEW_OWNER_PASSWORD: "${INTERVIEW_OWNER_PASSWORD:-admin}"
     volumes:
       # Именованный том: переживает пересборку образа и docker compose down.
       - interview-db:/data
