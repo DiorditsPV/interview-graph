@@ -40,6 +40,40 @@ const poolCards = await page.locator(".poolcard").count();
 if (poolCards < 1) fail("main menu shows no pools");
 const deCard = page.locator('.poolcard[data-pool="data-engineer"]');
 if ((await deCard.count()) !== 1) fail("data-engineer pool card missing on main menu");
+// 0c. CRUD направлений (pool-crud): создать из пресета DE → карточка с тем же числом вопросов →
+//     переименовать → удалить (confirm принимается). Всё на главной, до ухода на доску.
+const deMeta = await deCard.locator(".poolcard__meta").innerText();
+await page.locator(".poolcard--new").click();
+await page.waitForSelector(".poolform", { timeout: 3000 });
+await page.fill(".poolform__label", "Smoke Pool");
+await page.locator(".pool-preset").selectOption("data-engineer");
+await page.locator(".poolform__submit").click();
+await page.waitForSelector('.poolcard[data-pool="smoke-pool"]', { timeout: 10000 });
+const smokeMeta = await page.locator('.poolcard[data-pool="smoke-pool"] .poolcard__meta').innerText();
+if (smokeMeta.split("·")[0].trim() !== deMeta.split("·")[0].trim()) fail(`preset copy mismatch: "${smokeMeta}" vs "${deMeta}"`);
+await page.locator('.poolcard[data-pool="smoke-pool"] .poolcard__edit').click();
+await page.waitForSelector(".poolform", { timeout: 3000 });
+await page.fill(".poolform__label", "Smoke Pool 2");
+await page.locator(".poolform__submit").click();
+await page.waitForFunction(
+  () => document.querySelector('.poolcard[data-pool="smoke-pool"] .poolcard__label')?.textContent === "Smoke Pool 2",
+  null,
+  { timeout: 5000 },
+);
+page.once("dialog", (d) => d.accept());
+await page.locator('.poolcard[data-pool="smoke-pool"] .poolcard__delete').click();
+await page.waitForSelector('.poolcard[data-pool="smoke-pool"]', { state: "detached", timeout: 5000 });
+console.log("OK: pool create from preset / rename / delete");
+
+// 0d. RU/EN (i18n): переключатель на главной меняет опорные подписи и возвращает обратно
+//     (язык хранится в localStorage — обязательно вернуть RU, остальные шаги идут по русским строкам).
+await page.locator(".langswitch").first().click();
+await page.waitForFunction(() => document.querySelector(".home__h2")?.textContent === "Tracks", null, { timeout: 3000 });
+if ((await page.locator(".poolcard__start").first().innerText()) !== "Start interview") fail("EN: start button not translated");
+await page.locator(".langswitch").first().click();
+await page.waitForFunction(() => document.querySelector(".home__h2")?.textContent === "Направления", null, { timeout: 3000 });
+console.log("OK: RU/EN switch");
+
 // Кликаем по самой ссылке-«растяжке» (.poolcard__label), а не по всей карточке: внутри есть ещё
 // сиблинг .poolcard__bank (ссылка на банк) — клик по центру div'а рискует попасть мимо доски.
 await deCard.locator(".poolcard__label").click();
@@ -251,55 +285,52 @@ const tagsAgain = await page.locator(".fp__tag").count();
 if (tagsAgain !== tagsBefore) fail(`tag panel did not restore (${tagsAgain} vs ${tagsBefore})`);
 console.log(`OK: tag panel collapse toggle (${tagsBefore} ⇄ 0)`);
 
-// 10. people-schema: старт сессии через пикер кандидата (ввод имени → создаётся карточка) +
-//     дефолтный интервьюер преселектится и показывается в шапке активной сессии.
-//     Затем оценка текущего через HUD персистится в сессию.
-// Дефолтный интервьюер засеян на бэкенде → селектор интервьюера присутствует.
-const ivPick = page.locator(".iv-pick");
-if ((await ivPick.count()) < 1) fail("interviewer picker (.iv-pick) missing at session start");
-// Имя нового кандидата в специальный input (несколько input'ов: имя/позиция/грейд).
-await page.locator(".session input[placeholder='Кандидат…']").fill("Cmp Bot");
-await page.locator(".session input[placeholder^='Грейд']").fill("middle");
-await page.locator(".session button", { hasText: "Начать сессию" }).click();
-await page.waitForSelector(".session__active", { timeout: 3000 });
+// 10. Старт сессии с главной (home-session-start): «Начать интервью» на карточке DE → форма
+//     кандидата (имя + грейд) → доска с ?session=<id> и активной сессией. Затем оценка в HUD.
+await page.goto(URL + "#/", { waitUntil: "load" });
+await page.waitForSelector('.poolcard[data-pool="data-engineer"] .poolcard__start', { timeout: 10000 });
+await page.locator('.poolcard[data-pool="data-engineer"] .poolcard__start').click();
+await page.waitForSelector(".poolcard__form", { timeout: 3000 });
+await page.locator(".poolcard__form input[placeholder='Кандидат…']").fill("Cmp Bot");
+await page.locator(".poolcard__form input[placeholder^='Грейд']").fill("middle");
+await page.locator(".poolcard__form button", { hasText: "Начать" }).click();
+await page.waitForFunction(() => /^#\/board\/data-engineer\?session=\d+/.test(location.hash), null, { timeout: 5000 });
+await page.waitForSelector(".session__active", { timeout: 5000 });
 const activeHdr = await page.locator(".session__active").innerText();
 if (!activeHdr.includes("Cmp Bot")) fail(`active session missing candidate: "${activeHdr}"`);
-if (!activeHdr.includes("🎤")) fail(`active session missing interviewer marker: "${activeHdr}"`);
-console.log(`OK: session start picks candidate + interviewer (${activeHdr.replace(/\s+/g, " ").slice(0, 50)})`);
+console.log(`OK: session starts from main menu (${activeHdr.replace(/\s+/g, " ").slice(0, 50)})`);
+// Доска смонтирована заново — текущего вопроса нет, HUD появляется после клика по ноде.
+await page.waitForSelector(".qnode", { timeout: 10000 });
+await page.locator(".qnode__title", { hasText: "ROW_NUMBER" }).first().click();
 await page.waitForSelector(".hud__score .scorebtn", { timeout: 3000 });
 await page.locator(".hud__score .scorebtn").nth(2).click(); // 3/5 → персист в сессию
 await page.waitForTimeout(400);
 
-// 11. Resume ПОСЛЕДНЕЙ: создать сессию+оценку через API → reload → выбрать в .loadsess.
-// NB: после шага 10 активна live-сессия + открыт SSE-поток, а ссылка несёт ?session=<id>,
-// поэтому reload авто-подключается к ней (фича live-session-sync) и держит соединение → networkidle
-// не наступит. Используем "load" и затем выходим из авто-подключённой сессии («Выйти»), чтобы
-// открылся выпадающий список .loadsess (он рендерится только вне активной сессии).
+// 11. Возобновление сессии: создать сессию+оценку через API → страница «Сессии» → «Открыть»
+//     → доска подключается по ?session= и восстанавливает оценки. «Загрузить сессию» с доски убран.
 const sid = (await (await page.request.post(URL + "api/sessions", { data: { candidate: "SmokeResume" } })).json()).id;
 await page.request.post(`${URL}api/sessions/${sid}/score`, { data: { nodeId: "sql-01", score: 5 } });
-await page.reload({ waitUntil: "load" });
-// reload авто-подключается к ?session=<id> (live-session-sync) → дождаться и выйти, чтобы
-// показался выпадающий .loadsess (рендерится только вне активной сессии).
-await page.waitForTimeout(500);
-const leaveBtn = page.locator(".session button", { hasText: "Выйти" });
-if (await leaveBtn.count()) {
-  await leaveBtn.click();
-  await page.waitForTimeout(200);
-}
-await page.waitForSelector(".loadsess", { timeout: 5000 });
-await page.locator(".loadsess").selectOption(String(sid));
-await page.waitForSelector(".session__active", { timeout: 3000 });
+await page.goto(URL + "#/sessions", { waitUntil: "load" });
+await page.waitForSelector(`tr[data-session="${sid}"] a.iconbtn`, { timeout: 10000 });
+await page.locator(`tr[data-session="${sid}"] a.iconbtn`, { hasText: "Открыть" }).click();
+await page.waitForSelector(".session__active", { timeout: 5000 });
 const active = await page.locator(".session__active").innerText();
 if (!active.includes("SmokeResume")) fail(`resume did not load session: ${active}`);
 const scoredCount = await page.locator(".qnode--scored").count();
 if (scoredCount < 1) fail("resume did not restore scores onto the board");
-console.log(`OK: session resume restores scores (${scoredCount} scored)`);
+// В активной сессии на месте «Скачать» и «Выйти»; после «Выйти» доска без сессии ведёт на форму старта.
+if ((await page.locator(".session .dlbtn").count()) !== 1) fail("download button missing in active session");
+await page.locator(".session button", { hasText: "Выйти" }).click();
+await page.waitForSelector(".session__start", { timeout: 3000 });
+const startHref = await page.locator(".session__start").getAttribute("href");
+if (!startHref?.startsWith("#/?start=data-engineer")) fail(`board without session must link to start form, got ${startHref}`);
+console.log(`OK: session resume restores scores (${scoredCount} scored), no-session board links to start form`);
 
 // --- pools-main-menu: 13/15/17 остаются на доске (banks/help-модалка/агенда работают только там);
 // 12/14/16/18 (банк) выполняются после перехода на страницу #/bank/<pool> — см. ниже.
 
 // 13. Шпаргалка горячих клавиш: «?» открывает оверлей, Esc закрывает.
-// (После resume фокус на <select class="loadsess">, не в input/textarea — «?» доходит до обработчика.)
+// (После «Выйти» кнопка размонтирована, фокус на body, не в input/textarea — «?» доходит до обработчика.)
 await page.keyboard.press("?");
 await page.waitForSelector(".help-modal", { timeout: 3000 });
 const helpText = await page.locator(".help-modal").innerText();

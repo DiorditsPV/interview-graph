@@ -58,7 +58,7 @@ export function SessionsPage({ pools }: { pools: PoolConfig[] }) {
           </tbody>
         </table>
       </div>
-      {rows.length === 0 && <p className="muted">Сессий пока нет — начните интервью с доски направления.</p>}
+      {rows.length === 0 && <p className="muted">Сессий пока нет — начните интервью с главной.</p>}
     </PageShell>
   );
 }
