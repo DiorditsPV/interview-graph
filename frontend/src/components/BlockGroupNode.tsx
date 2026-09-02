@@ -30,6 +30,7 @@ function BlockGroupNodeImpl({ data }: { data: BlockGroupNodeData }) {
     >
       <div
         className="bgroup__header"
+        data-block={block}
         style={{ height: SUPER_H, background: hexA(color, dark ? 0.12 : 0.16), color: label }}
       >
         <span className="bgroup__name">{BLOCK_LABEL[block]}</span>
