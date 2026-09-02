@@ -160,7 +160,7 @@ button:disabled:hover { background: var(--surface); }
 .settings__group { display: flex; flex-direction: column; gap: 8px; }
 .settings__title {
   font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
-  color: var(--text-faint);
+  color: var(--text-muted);
 }
 /* Чипы в столбик: в поповере есть место на полные подписи вместо «Верт.»/«Гор.». */
 .settings__chips { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
@@ -641,7 +641,7 @@ kbd {
 .poolcard__label::after { content: ""; position: absolute; inset: 0; }
 .poolcard:focus-within { border-color: var(--accent); }
 .poolcard__desc { font-size: 13px; color: var(--text-muted); }
-.poolcard__meta { font-size: 12px; color: var(--text-faint); }
+.poolcard__meta { font-size: 12px; color: var(--text-muted); }
 .poolcard__blocks { display: flex; flex-wrap: wrap; gap: 4px; }
 .poolcard__block { font-size: 11px; color: #fff; padding: 1px 7px; border-radius: 4px; }
 .poolcard__bank { margin-top: 4px; font-size: 12px; color: var(--accent); text-decoration: none; position: relative; z-index: 1; align-self: flex-start; }
@@ -664,7 +664,7 @@ kbd {
 .table-wrap { width: 100%; overflow-x: auto; }
 .table { width: 100%; min-width: max-content; border-collapse: collapse; font-size: 14px; background: var(--surface); border: 1px solid var(--border); }
 .table th, .table td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
-.table th { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-faint); }
+.table th { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); }
 .table__link { display: block; font-size: 12px; color: var(--accent); text-decoration: none; }
 .table__edit input { width: 100%; padding: 4px 6px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--surface); color: var(--text); }
 a.iconbtn { text-decoration: none; display: inline-block; }
