@@ -497,7 +497,8 @@ if (await page.locator('.poolcard[data-pool="system-analyst"]').count()) {
   await page.goto(URL + "#/board/system-analyst", { waitUntil: "load" });
   await page.waitForSelector(".bgroup__header", { timeout: 10000 });
   const heads = await page.locator(".bgroup__header").allInnerTexts();
-  if (!heads.some((h) => h.includes("Требования"))) fail(`SA board lacks its own blocks: ${heads.join(" | ")}`);
+  // регистронезависимо: дефолтный дизайн 37 переводит .bgroup__header в uppercase CSS'ом
+  if (!heads.some((h) => h.toLowerCase().includes("требования"))) fail(`SA board lacks its own blocks: ${heads.join(" | ")}`);
   console.log(`OK: system-analyst board has its own blocks (${heads.length})`);
 }
 
