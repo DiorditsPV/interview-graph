@@ -57,7 +57,7 @@ body {
 
 .app { display: flex; flex-direction: column; height: 100vh; }
 
-/* ---- topbar (три ряда: поток интервью → служебное → работа с банком) ---- */
+/* ---- topbar (два ряда: где мы → ход интервью) ---- */
 .topbar {
   display: flex; flex-direction: column; gap: 6px;
   padding: 8px 16px; background: var(--surface); border-bottom: 1px solid var(--border);
@@ -67,12 +67,11 @@ body {
 .topbar__row--utility { padding-top: 6px; border-top: 1px solid var(--border); }
 .topbar__row--utility .iconbtn,
 .topbar__row--utility .tb__toggle { font-size: 13px; }
-/* ряд 3 — правки контента, а не ход интервью: тот же тихий регистр, что и служебный ряд */
-.topbar__row--content { padding-top: 6px; border-top: 1px solid var(--border); }
-.topbar__row--content .iconbtn { font-size: 13px; }
-.contentbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .topbar strong { color: var(--heading); }
 .appname { margin: 0; font-size: 16px; font-weight: 700; line-height: 1.2; color: var(--heading); }
+.topbar__back { color: var(--text-muted); text-decoration: none; font-size: 13px; white-space: nowrap; }
+.topbar__back:hover { color: var(--text); }
+.topbar__settings { margin-left: auto; }
 .topbar .muted { color: var(--text-faint); font-size: 13px; }
 
 /* ---- страницы кроме доски: тонкая полоса «← Меню · заголовок» + содержимое ---- */
