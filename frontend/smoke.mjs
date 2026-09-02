@@ -11,6 +11,17 @@ const errors = [];
 page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
 page.on("pageerror", (e) => errors.push(String(e)));
 
+// topbar-settings: тумблеры отображения уехали из шапки в поповер под ⚙, поэтому каждое
+// переключение = открыть панель → кликнуть чип → закрыть. Esc глушится самим поповером
+// в capture-фазе, так что открытый drawer от него не закроется.
+async function toggleSetting(label) {
+  await page.locator(".setbtn").click();
+  await page.waitForSelector(".settings__pop", { timeout: 3000 });
+  await page.locator(".settings__pop .tb__toggle", { hasText: label }).click();
+  await page.keyboard.press("Escape");
+  await page.waitForSelector(".settings__pop", { state: "detached", timeout: 3000 });
+}
+
 await page.goto(URL, { waitUntil: "networkidle" });
 
 // 0. auth-identity (#36): доска за гейтом — логинимся owner'ом (дефолтные сид-креды).
@@ -105,22 +116,27 @@ const afterNext = await page.locator(".hud__title").innerText();
 if (afterNext === beforeNext) fail("«Дальше» stuck on leaf node");
 console.log("OK: «Дальше» advances from a leaf node");
 
-// 6b. Панель отображения (левая часть шапки): иконки-тумблеры направляющих и точек-фона.
-const tbBtns = await page.locator(".topbar .toolbar .tb__toggle").count();
-if (tbBtns < 3) fail(`display toolbar buttons missing in topbar (got ${tbBtns})`);
+// 6b. Настройки отображения (topbar-settings): панель под ⚙ открывается и содержит тумблеры
+// направляющих, точек-фона, агенды, скрытых и таймера.
+await page.locator(".setbtn").click();
+await page.waitForSelector(".settings__pop", { timeout: 3000 });
+const tbBtns = await page.locator(".settings__pop .tb__toggle").count();
+if (tbBtns < 6) fail(`display toggles missing in settings popover (got ${tbBtns})`);
+await page.keyboard.press("Escape");
+await page.waitForSelector(".settings__pop", { state: "detached", timeout: 3000 });
 const vBefore = await page.locator(".guides__v").count();
 if (vBefore !== 0) fail(`vertical guides should be off by default (got ${vBefore})`);
-await page.locator(".tb__toggle", { hasText: "Верт" }).click(); // включить вертикальные
+await toggleSetting("Верт"); // включить вертикальные
 await page.waitForTimeout(200);
 const vAfter = await page.locator(".guides__v").count();
 if (vAfter < 1) fail("vertical guides did not toggle on");
 const bgDefault = await page.locator(".react-flow__background").count();
 if (bgDefault !== 0) fail(`background should be off by default (got ${bgDefault})`);
-await page.locator(".tb__toggle", { hasText: "Точки" }).click(); // включить точки
+await toggleSetting("Точки"); // включить точки
 await page.waitForTimeout(200);
 const bgDots = await page.locator(".react-flow__background").count();
 if (bgDots < 1) fail("dots background not shown after toggling icon");
-console.log("OK: display toolbar (icons) toggles guides + dots grid (default off)");
+console.log(`OK: settings popover (${tbBtns} toggles) switches guides + dots grid (default off)`);
 
 // 7. Скачивание результатов: кнопка отдаёт .html-файл.
 const [dl] = await Promise.all([
@@ -140,7 +156,7 @@ if (after === before) fail(`theme toggle did not change theme (${before} → ${a
 console.log(`OK: theme toggles (${before} → ${after})`);
 
 // --- Накопленные проверки фич. Порядок важен (объяснения у каждой):
-//  локально-стейтовые (note/timer/search/unscored/progress) → compare (стартует свою сессию)
+//  локально-стейтовые (note/timer/search/unscored/progress) → сессия (стартует свою)
 //  → resume ПОСЛЕДНЕЙ (делает page.reload(), стирающий всё накопленное состояние).
 
 // 9. Заметка на ноду: ввод в drawer переживает закрытие/повторное открытие.
@@ -159,14 +175,18 @@ const restored = await page.locator(".drawer__note").inputValue();
 if (restored !== noteText) fail(`note not retained across reopen: "${restored}"`);
 console.log("OK: node note retained across reopen");
 
-// 9b. Таймер: HUD показывает M:SS и инкрементируется (есть текущий вопрос с прошлых шагов).
+// 9b. Таймер: по умолчанию скрыт (topbar-settings), включается тумблером в ⚙ — и тикает.
+if ((await page.locator(".hud__timer").count()) !== 0) fail("HUD timer must be hidden by default");
+await toggleSetting("Таймер");
 await page.waitForSelector(".hud__timer", { timeout: 3000 });
 const tmr1 = (await page.locator(".hud__timer").first().innerText()).trim();
 if (!/\d+:\d{2}/.test(tmr1)) fail(`timer format wrong: "${tmr1}"`);
 await page.waitForTimeout(1300);
 const tmr2 = (await page.locator(".hud__timer").first().innerText()).trim();
 if (tmr2 === tmr1) fail(`timer not ticking (${tmr1} == ${tmr2})`);
-console.log(`OK: HUD timer ticks (${tmr1} → ${tmr2})`);
+await toggleSetting("Таймер"); // вернуть в скрытое состояние (дефолт)
+if ((await page.locator(".hud__timer").count()) !== 0) fail("HUD timer did not hide again");
+console.log(`OK: HUD timer hidden by default, ticks when enabled (${tmr1} → ${tmr2})`);
 
 // 9c. Поиск по вопросам: запрос гасит несовпавшие ноды; очистка убирает гашение.
 // (После клавиатурных проверок: фокус уходит в input — дальше body-клавиатура не нужна.)
@@ -204,7 +224,7 @@ if (!(fillPct > 0)) fail(`progress fill not advanced after scoring: "${fillW}"`)
 console.log(`OK: progress bar (${progLabel}, fill ${fillW})`);
 
 // 9f. UX-полировка: HUD-прогресс+топик, чип переполнения тегов, свёртка панели тегов.
-// (ДО compare/resume: нужен активный HUD текущего вопроса — после resume-reload его нет.)
+// (ДО старта сессии/resume: нужен активный HUD текущего вопроса — после resume-reload его нет.)
 await page.waitForSelector(".hud__progress", { timeout: 3000 });
 const hudProg = await page.locator(".hud__progress").innerText();
 if (!hudProg.includes("/")) fail(`HUD progress missing fraction: "${hudProg}"`);
@@ -229,7 +249,7 @@ console.log(`OK: tag panel collapse toggle (${tagsBefore} ⇄ 0)`);
 
 // 10. people-schema: старт сессии через пикер кандидата (ввод имени → создаётся карточка) +
 //     дефолтный интервьюер преселектится и показывается в шапке активной сессии.
-//     Затем оценка текущего через HUD → модалка-сравнения агрегирует.
+//     Затем оценка текущего через HUD персистится в сессию.
 // Дефолтный интервьюер засеян на бэкенде → селектор интервьюера присутствует.
 const ivPick = page.locator(".iv-pick");
 if ((await ivPick.count()) < 1) fail("interviewer picker (.iv-pick) missing at session start");
@@ -245,17 +265,9 @@ console.log(`OK: session start picks candidate + interviewer (${activeHdr.replac
 await page.waitForSelector(".hud__score .scorebtn", { timeout: 3000 });
 await page.locator(".hud__score .scorebtn").nth(2).click(); // 3/5 → персист в сессию
 await page.waitForTimeout(400);
-await page.locator(".cmpbtn").click();
-await page.waitForSelector(".cmp-modal", { timeout: 3000 });
-await page.locator(".cmp-modal__item input[type=checkbox]").first().check();
-await page.locator(".cmp-modal__run").click();
-await page.waitForSelector(".cmp-table", { timeout: 3000 });
-const cmpText = await page.locator(".cmp-table").innerText();
-if (!cmpText.includes("Cmp Bot")) fail(`compare table missing candidate: "${cmpText}"`);
-console.log("OK: candidate compare table renders (Cmp Bot)");
 
 // 11. Resume ПОСЛЕДНЕЙ: создать сессию+оценку через API → reload → выбрать в .loadsess.
-// NB: после compare (шаг 10) активна live-сессия + открыт SSE-поток, а ссылка несёт ?session=<id>,
+// NB: после шага 10 активна live-сессия + открыт SSE-поток, а ссылка несёт ?session=<id>,
 // поэтому reload авто-подключается к ней (фича live-session-sync) и держит соединение → networkidle
 // не наступит. Используем "load" и затем выходим из авто-подключённой сессии («Выйти»), чтобы
 // открылся выпадающий список .loadsess (он рендерится только вне активной сессии).
@@ -315,7 +327,7 @@ await page.keyboard.press("Escape");
 await page.waitForSelector(".upload-modal", { state: "detached", timeout: 3000 });
 
 // 15. Сайдбар-агенда: тоггл показывает список вопросов; клик по пункту делает ноду текущей (HUD).
-await page.locator(".tb__toggle", { hasText: "Агенда" }).click();
+await toggleSetting("Агенда");
 await page.waitForSelector(".interview", { timeout: 3000 });
 const ivCount = await page.locator(".interview .ivbtn").count();
 if (ivCount < 5) fail(`agenda has too few items: ${ivCount}`);
@@ -326,7 +338,7 @@ if (!agHud || agHud.length < 2) fail(`agenda click did not set current question:
 console.log(`OK: agenda sidebar (${ivCount} items, click → HUD "${agHud.slice(0, 30)}")`);
 
 // 16. Экран «Все вопросы» (bank-browser): открыть, список всего банка, поиск, раскрытие, закрытие.
-await page.locator(".session .iconbtn", { hasText: "Все вопросы" }).click();
+await page.locator(".contentbar .bankscreenbtn").click();
 await page.waitForSelector(".bankbrowser", { timeout: 5000 });
 const bankRows = await page.locator(".bankrow").count();
 if (bankRows < nodeCount) fail(`bank shows fewer rows (${bankRows}) than canvas nodes (${nodeCount})`);
@@ -346,11 +358,15 @@ await page.waitForTimeout(200);
 if ((await page.locator(".bankbrowser").count()) !== 0) fail("bank screen did not close on Esc");
 console.log("OK: bank screen closes on Esc");
 
-// 17. topbar-redeclutter: разгруженная шапка — ровно два ряда, панель отображения внутри шапки.
+// 17. topbar-settings: шапка в три ряда (интервью / служебное / работа с банком), тумблеры
+// отображения ушли под ⚙, «Сравнить» удалена.
 const topRows = await page.locator(".topbar > .topbar__row").count();
-if (topRows !== 2) fail(`expected 2 topbar rows, got ${topRows}`);
-if ((await page.locator(".topbar .toolbar").count()) !== 1) fail("display toolbar must stay inside topbar");
-console.log(`OK: decluttered topbar (${topRows} rows, toolbar nested)`);
+if (topRows !== 3) fail(`expected 3 topbar rows, got ${topRows}`);
+if ((await page.locator(".topbar .contentbar .bankscreenbtn").count()) !== 1)
+  fail("question-management buttons must live in the content row");
+if ((await page.locator(".topbar .setbtn").count()) !== 1) fail("settings button missing in topbar");
+if ((await page.locator(".cmpbtn").count()) !== 0) fail("compare button must be gone");
+console.log(`OK: topbar (${topRows} rows, settings popover, no compare)`);
 
 // 18. question-management: добавить вопрос через форму шапки → доска растёт (бэкенд пишет в БД).
 const qBeforeAdd = await page.locator(".qnode").count();
@@ -381,11 +397,11 @@ await page.locator(".drawer__hide").click();
 await page.waitForTimeout(250);
 const dimAfterHide = await page.locator(".qnode--dimmed").count();
 if (dimAfterHide <= dimBeforeHide) fail(`hide did not dim node (${dimBeforeHide}→${dimAfterHide})`);
-await page.locator(".tb__toggle", { hasText: "Скрытые" }).click();
+await toggleSetting("Скрытые");
 await page.waitForTimeout(250);
 const hiddenMark = await page.locator(".qnode--hidden").count();
 if (hiddenMark < 1) fail("no .qnode--hidden marker after show-hidden");
-await page.locator(".tb__toggle", { hasText: "Скрытые" }).click(); // спрятать обратно
+await toggleSetting("Скрытые"); // спрятать обратно
 await page.locator(".drawer__hide").click(); // вернуть карточку на доску
 await page.waitForTimeout(150);
 console.log(`OK: hide dims (${dimBeforeHide}→${dimAfterHide}), show-hidden marks (${hiddenMark})`);

@@ -14,7 +14,7 @@ import { api, type NodeCreate, type NodeUpdate } from "./api";
 import { BandsNode } from "./components/BandsNode";
 import { BankBrowser } from "./components/BankBrowser";
 import { BlockGroupNode } from "./components/BlockGroupNode";
-import { CompareModal } from "./components/CompareModal";
+import { SettingsMenu } from "./components/SettingsMenu";
 import { DetailDrawer } from "./components/DetailDrawer";
 import { GuidesNode } from "./components/GuidesNode";
 import { QuestionNode } from "./components/QuestionNode";
@@ -270,7 +270,7 @@ export default function App() {
     return v ? Number(v) : null;
   });
   const [questionStart, setQuestionStart] = useState<number>(() => Date.now());
-  const [compareOpen, setCompareOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [tagsCollapsed, setTagsCollapsed] = useState(false);
@@ -295,6 +295,8 @@ export default function App() {
   const [guidesH, setGuidesH] = useState<boolean>(() => localStorage.getItem("guidesH") === "1");
   const [guidesV, setGuidesV] = useState<boolean>(() => localStorage.getItem("guidesV") === "1");
   const [agendaOpen, setAgendaOpen] = useState<boolean>(() => localStorage.getItem("agendaOpen") === "1");
+  // Таймер в HUD по умолчанию скрыт: во время интервью он тикает в поле зрения и давит.
+  const [showTimer, setShowTimer] = useState<boolean>(() => localStorage.getItem("showTimer") === "1");
   // Панель фильтров лежит поверх канвы: без сворачивания она съедает правую треть доски.
   const [filtersOpen, setFiltersOpen] = useState<boolean>(
     () => localStorage.getItem("filtersOpen") !== "0",
@@ -309,6 +311,7 @@ export default function App() {
   useEffect(() => localStorage.setItem("guidesV", guidesV ? "1" : "0"), [guidesV]);
   useEffect(() => localStorage.setItem("track", activeTrack), [activeTrack]);
   useEffect(() => localStorage.setItem("agendaOpen", agendaOpen ? "1" : "0"), [agendaOpen]);
+  useEffect(() => localStorage.setItem("showTimer", showTimer ? "1" : "0"), [showTimer]);
   useEffect(() => localStorage.setItem("filtersOpen", filtersOpen ? "1" : "0"), [filtersOpen]);
   // hide-local: персист набора скрытых id.
   useEffect(() => localStorage.setItem("hiddenIds", JSON.stringify([...hiddenIds])), [hiddenIds]);
@@ -839,49 +842,6 @@ export default function App() {
 
         {/* topbar-redeclutter, ряд 2 — служебное: отображение холста, контент/аналитика, переключатели */}
         <div className="topbar__row topbar__row--utility">
-        <div className="toolbar" role="group" aria-label="Отображение холста">
-          <button
-            className={`tb__toggle ${bgVariant === "dots" ? "tb__toggle--on" : ""}`}
-            onClick={() => setBgVariant((v) => (v === "dots" ? "off" : "dots"))}
-            aria-pressed={bgVariant === "dots"}
-            title={
-              bgVariant === "dots"
-                ? "Точки на фоне включены — нажмите, чтобы убрать"
-                : "Точки на фоне выключены — нажмите, чтобы показать"
-            }
-          >
-            Точки
-          </button>
-          <button
-            className={`tb__toggle ${guidesV ? "tb__toggle--on" : ""}`}
-            onClick={() => setGuidesV((v) => !v)}
-            title="Вертикальные направляющие (границы блоков)"
-          >
-            Верт.
-          </button>
-          <button
-            className={`tb__toggle ${guidesH ? "tb__toggle--on" : ""}`}
-            onClick={() => setGuidesH((v) => !v)}
-            title="Горизонтальные направляющие (уровни Base/Junior/Middle/Senior)"
-          >
-            Гор.
-          </button>
-          <button
-            className={`tb__toggle ${agendaOpen ? "tb__toggle--on" : ""}`}
-            onClick={() => setAgendaOpen((v) => !v)}
-            title="Сайдбар-агенда: список вопросов с переходом"
-          >
-            Агенда
-          </button>
-          <button
-            className={`tb__toggle ${showHidden ? "tb__toggle--on" : ""}`}
-            onClick={() => setShowHidden((v) => !v)}
-            title={`Скрытые вопросы (${hiddenIds.size}) — показать/спрятать`}
-          >
-            Скрытые{hiddenIds.size ? ` (${hiddenIds.size})` : ""}
-          </button>
-        </div>
-
         <div className="session">
           {session ? (
             <>
@@ -959,7 +919,6 @@ export default function App() {
                   {interviewers.map((iv) => (
                     <option key={iv.id} value={iv.id}>
                       {iv.name}
-                      {iv.role ? ` · ${iv.role}` : ""}
                     </option>
                   ))}
                 </select>
@@ -997,28 +956,6 @@ export default function App() {
               )}
             </>
           )}
-          <button
-            className="iconbtn addbtn btn--quiet"
-            onClick={() => setAddOpen(true)}
-            title="Добавить вопрос в банк"
-          >
-            Добавить вопрос
-          </button>
-          <button
-            className="iconbtn uploadbtn btn--quiet"
-            onClick={() => setUploadOpen(true)}
-            title="Загрузить вопросы (.md/.json)"
-          >
-            Загрузить
-          </button>
-          <button
-            className="iconbtn bankscreenbtn btn--quiet"
-            onClick={() => setShowBank(true)}
-            disabled={graph.length === 0}
-            title="Открыть экран со всеми вопросами банка"
-          >
-            Все вопросы
-          </button>
           <span className="session__sep" aria-hidden="true" />
           <button
             className="iconbtn dlbtn"
@@ -1038,21 +975,6 @@ export default function App() {
             </button>
           )}
           <button
-            className="iconbtn cmpbtn"
-            onClick={() => setCompareOpen(true)}
-            title="Сравнить кандидатов по блокам"
-          >
-            Сравнить
-          </button>
-          <button
-            className="iconbtn bankbtn btn--quiet"
-            onClick={() => downloadBank(graph)}
-            disabled={graph.length === 0}
-            title="Скачать весь банк вопросов (HTML)"
-          >
-            Банк
-          </button>
-          <button
             className="iconbtn helpbtn btn--quiet"
             onClick={() => setHelpOpen(true)}
             title="Горячие клавиши (?)"
@@ -1066,7 +988,74 @@ export default function App() {
           >
             {theme === "dark" ? "☀️" : "🌙"}
           </button>
+          <div className="settings">
+            <button
+              className={`iconbtn setbtn btn--quiet ${settingsOpen ? "setbtn--on" : ""}`}
+              onClick={() => setSettingsOpen((v) => !v)}
+              aria-expanded={settingsOpen}
+              aria-haspopup="dialog"
+              title="Настройки отображения"
+            >
+              ⚙
+            </button>
+            {settingsOpen && (
+              <SettingsMenu
+                onClose={() => setSettingsOpen(false)}
+                settings={{
+                  bgDots: bgVariant === "dots",
+                  onToggleBgDots: () => setBgVariant((v) => (v === "dots" ? "off" : "dots")),
+                  guidesV,
+                  onToggleGuidesV: () => setGuidesV((v) => !v),
+                  guidesH,
+                  onToggleGuidesH: () => setGuidesH((v) => !v),
+                  agendaOpen,
+                  onToggleAgenda: () => setAgendaOpen((v) => !v),
+                  showHidden,
+                  onToggleHidden: () => setShowHidden((v) => !v),
+                  hiddenCount: hiddenIds.size,
+                  showTimer,
+                  onToggleTimer: () => setShowTimer((v) => !v),
+                }}
+              />
+            )}
+          </div>
         </div>
+        </div>
+
+        {/* ряд 3 — работа с банком вопросов: правки контента, а не ход интервью */}
+        <div className="topbar__row topbar__row--content">
+          <div className="contentbar" role="group" aria-label="Работа с вопросами">
+            <button
+              className="iconbtn addbtn btn--quiet"
+              onClick={() => setAddOpen(true)}
+              title="Добавить вопрос в банк"
+            >
+              Добавить вопрос
+            </button>
+            <button
+              className="iconbtn uploadbtn btn--quiet"
+              onClick={() => setUploadOpen(true)}
+              title="Загрузить вопросы (.md/.json)"
+            >
+              Загрузить
+            </button>
+            <button
+              className="iconbtn bankscreenbtn btn--quiet"
+              onClick={() => setShowBank(true)}
+              disabled={graph.length === 0}
+              title="Открыть экран со всеми вопросами банка"
+            >
+              Все вопросы
+            </button>
+            <button
+              className="iconbtn bankbtn btn--quiet"
+              onClick={() => downloadBank(graph)}
+              disabled={graph.length === 0}
+              title="Скачать весь банк вопросов (HTML)"
+            >
+              Банк
+            </button>
+          </div>
         </div>
       </header>
 
@@ -1275,10 +1264,12 @@ export default function App() {
                     <span className="hud__title" title={currentNode.question}>
                       {currentNode.title || currentNode.question}
                     </span>
-                    <span className="hud__timer" title="Время на вопрос · вся сессия">
-                      ⏱ {mmss(now - questionStart)}
-                      {sessionStart != null && ` · ${mmss(now - sessionStart)}`}
-                    </span>
+                    {showTimer && (
+                      <span className="hud__timer" title="Время на вопрос · вся сессия">
+                        ⏱ {mmss(now - questionStart)}
+                        {sessionStart != null && ` · ${mmss(now - sessionStart)}`}
+                      </span>
+                    )}
                     <span className="hud__progress">
                       {scored}/{graph.length} · {currentNode.topic}
                     </span>
@@ -1329,7 +1320,6 @@ export default function App() {
           }}
         />
       </div>
-      {compareOpen && <CompareModal onClose={() => setCompareOpen(false)} />}
       {helpOpen && <ShortcutsHelp onClose={() => setHelpOpen(false)} />}
       {uploadOpen && (
         <UploadModal onClose={() => setUploadOpen(false)} onImported={loadGraph} />

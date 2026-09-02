@@ -53,7 +53,7 @@ body {
 
 .app { display: flex; flex-direction: column; height: 100vh; }
 
-/* ---- topbar (topbar-redeclutter: два ряда — поток интервью + служебное) ---- */
+/* ---- topbar (три ряда: поток интервью → служебное → работа с банком) ---- */
 .topbar {
   display: flex; flex-direction: column; gap: 6px;
   padding: 8px 16px; background: var(--surface); border-bottom: 1px solid var(--border);
@@ -63,6 +63,10 @@ body {
 .topbar__row--utility { padding-top: 6px; border-top: 1px solid var(--border); }
 .topbar__row--utility .iconbtn,
 .topbar__row--utility .tb__toggle { font-size: 13px; }
+/* ряд 3 — правки контента, а не ход интервью: тот же тихий регистр, что и служебный ряд */
+.topbar__row--content { padding-top: 6px; border-top: 1px solid var(--border); }
+.topbar__row--content .iconbtn { font-size: 13px; }
+.contentbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .topbar strong { color: var(--heading); }
 .appname { margin: 0; font-size: 16px; font-weight: 700; line-height: 1.2; color: var(--heading); }
 .topbar .muted { color: var(--text-faint); font-size: 13px; }
@@ -118,11 +122,26 @@ button:disabled:hover { background: var(--surface); }
 .dlbtn:not(:disabled):hover { background: var(--accent); color: #fff; }
 .session__sep { width: 1px; align-self: stretch; margin: 2px 4px; background: var(--border); }
 
-/* ---- панель отображения холста (левая часть шапки) ---- */
-.toolbar {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  margin-left: 14px; padding-left: 14px; border-left: 1px solid var(--border);
+/* ---- настройки отображения: поповер под ⚙ в шапке ----
+   z-index между канвой (5) и модалками (50): всплывает над доской, но не над оверлеями. */
+.settings { position: relative; display: inline-flex; }
+.setbtn--on { background: var(--hover); color: var(--text); border-color: var(--border); }
+.settings__pop {
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 40;
+  min-width: 260px; padding: 14px;
+  display: flex; flex-direction: column; gap: 14px;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: 0 8px 32px var(--shadow-strong);
 }
+.settings__group { display: flex; flex-direction: column; gap: 8px; }
+.settings__title {
+  font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text-faint);
+}
+/* Чипы в столбик: в поповере есть место на полные подписи вместо «Верт.»/«Гор.». */
+.settings__chips { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+
 .tb__field { display: flex; align-items: center; gap: 6px; }
 .tb__lbl { font-size: 13px; color: var(--text-muted); }
 .tb__select {

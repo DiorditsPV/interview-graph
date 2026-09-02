@@ -40,7 +40,7 @@ Dev (hot reload): `uvicorn app.main:app --reload --port 8000` (из `backend/`, 
 Граф/контент: `GET /api/graph` (ноды + ошибки импорта), `GET /api/weights`, `GET /api/tracks`,
 `POST /api/import`, `POST/PUT/DELETE /api/nodes`. Интервью/сессии: `POST /api/interview`,
 `POST /api/sessions`, `GET /api/sessions`, `GET /api/sessions/{id}`, `POST /api/sessions/{id}/score`,
-`GET /api/sessions/compare`, `GET /api/sessions/{id}/events` (SSE). Люди: `GET/POST/PUT /api/candidates`,
+`GET /api/sessions/{id}/events` (SSE). Люди: `GET/POST/PUT /api/candidates`,
 `GET/POST /api/interviewers`. Служебное: `GET /api/health`. Полные схемы — Swagger UI на `/docs`.
 
 ## Модель ноды и формат контента

@@ -245,26 +245,13 @@ async function main() {
 
   // 5. Банк вопросов: поиск по всем 61 вопросу с раскрытием ответа.
   await page.keyboard.press("Escape");
-  await page.locator(".session button", { hasText: "Все вопросы" }).click();
+  await page.locator(".contentbar .bankscreenbtn").click();
   await page.waitForSelector(".bankbrowser", { timeout: 5000 });
   await page.locator(".bankbrowser__search").fill("spark");
   await settle(page, 400);
   await page.locator(".bankrow", { hasText: "Shuffle в Spark" }).first().click();
   await settle(page, 500);
   await shot(page, "05-bank.png");
-  await page.keyboard.press("Escape");
-
-  // 6. Сравнение кандидатов по блокам (на фоне — доска целиком, а не зум предыдущего кадра).
-  await open("dark");
-  await frameBoard(page, { zoomOut: 1 });
-  await page.locator(".cmpbtn").click();
-  await page.waitForSelector(".cmp-modal", { timeout: 5000 });
-  for (const name of ["Кандидат А · демо", "Кандидат Б · демо"])
-    await page.locator(".cmp-modal__item", { hasText: name }).first().locator("input").check();
-  await page.locator(".cmp-modal__run").click();
-  await page.waitForSelector(".cmp-table", { timeout: 5000 });
-  await settle(page, 500);
-  await shot(page, "06-compare.png");
   await page.keyboard.press("Escape");
 
   // 7. Светлая тема.

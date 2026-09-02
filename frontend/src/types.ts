@@ -101,23 +101,6 @@ export interface SessionSummary {
   created_at: string;
 }
 
-// Агрегат сравнения кандидатов (GET /api/sessions/compare).
-export interface BlockAgg {
-  avg: number | null;
-  scored: number;
-}
-export interface SessionAgg {
-  id: number;
-  candidate: string;
-  created_at: string;
-  overall: BlockAgg;
-  byBlock: Record<string, BlockAgg>;
-}
-export interface Comparison {
-  blocks: Block[];
-  sessions: SessionAgg[];
-}
-
 export const BLOCK_LABEL: Record<Block, string> = {
   frameworks: "Фреймворки",
   databases: "Базы данных",

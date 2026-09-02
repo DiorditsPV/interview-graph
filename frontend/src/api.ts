@@ -1,7 +1,6 @@
 import type {
   Block,
   Candidate,
-  Comparison,
   Difficulty,
   GraphResponse,
   ImportResult,
@@ -72,8 +71,6 @@ export const api = {
   getSession: (sessionId: number) =>
     fetch(`${BASE}/sessions/${sessionId}`).then(json<Session>),
   listSessions: () => fetch(`${BASE}/sessions`).then(json<SessionMeta[]>),
-  compareSessions: (ids: number[]) =>
-    fetch(`${BASE}/sessions/compare?ids=${ids.join(",")}`).then(json<Comparison>),
   importFile: (filename: string, content: string) =>
     fetch(`${BASE}/import`, {
       method: "POST",
