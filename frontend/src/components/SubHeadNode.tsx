@@ -16,7 +16,7 @@ export interface SubHeadNodeData {
 function SubHeadNodeImpl({ data }: { data: SubHeadNodeData }) {
   const { block, label, width, count, done, dark } = data;
   const color = BLOCK_COLOR[block];
-  const fg = dark ? lighten(color, 0.5) : color;
+  const fg = dark ? lighten(color, 0.6) : color;
   return (
     <div
       className="subhead"
@@ -24,9 +24,9 @@ function SubHeadNodeImpl({ data }: { data: SubHeadNodeData }) {
         width,
         height: HEADER_H,
         marginTop: SUPER_H,
-        background: hexA(color, dark ? 0.07 : 0.1),
+        background: hexA(color, dark ? 0.16 : 0.1),
         color: fg,
-        borderTop: `1px solid ${hexA(color, 0.22)}`,
+        borderTop: `1px solid ${hexA(color, dark ? 0.45 : 0.22)}`,
       }}
     >
       <span className="subhead__name">{label}</span>

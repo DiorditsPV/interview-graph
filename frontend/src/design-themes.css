@@ -8,8 +8,8 @@
    - карточка вопроса едина для 37/56/57 — жёсткая чёрная рамка с плоской тенью;
      альтернативы меняют только фон, палитру и обвязку (шапка, HUD, заголовки);
    - 58 «Изыскания» — исключение: у него свои карточки с тепло-бортом по сложности;
-   - всё скоупится на светлую тему (:not([data-theme="dark"])) — тёмная пока живёт
-     на прежних токенах, её адаптация под 37 — отдельный дизайн-проход.
+   - оформления скоупятся на светлую тему (:not([data-theme="dark"])); тёмная схема
+     одна на всех и несёт язык 37 — «тёмный брутализм», см. секцию в конце файла.
    ========================================================================== */
 
 /* ---------- карточка по умолчанию (37, 56, 57): брутальная ---------- */
@@ -60,11 +60,12 @@ html[data-design="37"]:not([data-theme="dark"]) .subhead { border-radius: 0; }
 html[data-design="37"]:not([data-theme="dark"]) .bgroup__header {
   font-weight: 800; text-transform: uppercase; letter-spacing: .05em;
 }
-/* плашки направлений: инлайновый полупрозрачный фон перекрываем цветом блока */
-html[data-design="37"]:not([data-theme="dark"]) .bgroup__header[data-block="frameworks"] { background: #2563eb !important; color: #fff !important; }
-html[data-design="37"]:not([data-theme="dark"]) .bgroup__header[data-block="databases"] { background: #16a34a !important; color: #fff !important; }
-html[data-design="37"]:not([data-theme="dark"]) .bgroup__header[data-block="python"] { background: #d97706 !important; color: #fff !important; }
-html[data-design="37"]:not([data-theme="dark"]) .bgroup__header[data-block="platform"] { background: #9333ea !important; color: #fff !important; }
+/* плашки направлений: 700-ряд, а не BLOCK_COLOR-600 — белый текст на 600-зелёном
+   и 600-янтарном давал 3.2–3.3:1 (ниже порога 4.5); на 700-ряде — 5.0–7.0. */
+html[data-design="37"]:not([data-theme="dark"]) .bgroup__header[data-block="frameworks"] { background: #1d4ed8 !important; color: #fff !important; }
+html[data-design="37"]:not([data-theme="dark"]) .bgroup__header[data-block="databases"] { background: #15803d !important; color: #fff !important; }
+html[data-design="37"]:not([data-theme="dark"]) .bgroup__header[data-block="python"] { background: #b45309 !important; color: #fff !important; }
+html[data-design="37"]:not([data-theme="dark"]) .bgroup__header[data-block="platform"] { background: #7e22ce !important; color: #fff !important; }
 html[data-design="37"]:not([data-theme="dark"]) .topbar { border-bottom: 2px solid #0f0f0f; }
 html[data-design="37"]:not([data-theme="dark"]) .hud { border: 2px solid #0f0f0f; box-shadow: 2.5px 2.5px 0 #0f0f0f; }
 
@@ -147,3 +148,31 @@ html[data-design="58"]:not([data-theme="dark"]) .qnode__diff[data-diff="junior"]
 html[data-design="58"]:not([data-theme="dark"]) .qnode__diff[data-diff="middle"] { background: #faefd9; color: #8a6210; }
 html[data-design="58"]:not([data-theme="dark"]) .qnode__diff[data-diff="senior"] { background: #fae5dc; color: #96421f; }
 html[data-design="58"]:not([data-theme="dark"]) .bgroup__header { letter-spacing: .05em; }
+
+/* ============================ Тёмная тема · тёмный брутализм ============================
+   Тёмная схема едина для всех оформлений и несёт язык 37: нулевые радиусы, рамка
+   вместо тени (тень в тёмной не читается — Atlassian elevation), плашки направлений
+   сплошным 700-рядом. Токены лестницы высот — в styles.css ([data-theme="dark"]). */
+html[data-theme="dark"] .qnode {
+  border-width: 1.5px; border-top-width: 4px; border-radius: 0; box-shadow: none;
+}
+html[data-theme="dark"] .qnode--current { box-shadow: 0 0 0 2.5px var(--accent); }
+html[data-theme="dark"] .qnode--selected { box-shadow: 0 0 0 3px #7e90a7; }
+html[data-theme="dark"] .qnode__diff,
+html[data-theme="dark"] .qnode__grade,
+html[data-theme="dark"] .qnode__topic,
+html[data-theme="dark"] .tagchip,
+html[data-theme="dark"] button,
+html[data-theme="dark"] .hud,
+html[data-theme="dark"] .bgroup,
+html[data-theme="dark"] .bgroup__header,
+html[data-theme="dark"] .subhead { border-radius: 0; }
+html[data-theme="dark"] .bgroup__header {
+  font-weight: 800; text-transform: uppercase; letter-spacing: .05em;
+}
+html[data-theme="dark"] .bgroup__header[data-block="frameworks"] { background: #1d4ed8 !important; color: #fff !important; }
+html[data-theme="dark"] .bgroup__header[data-block="databases"] { background: #15803d !important; color: #fff !important; }
+html[data-theme="dark"] .bgroup__header[data-block="python"] { background: #b45309 !important; color: #fff !important; }
+html[data-theme="dark"] .bgroup__header[data-block="platform"] { background: #7e22ce !important; color: #fff !important; }
+html[data-theme="dark"] .hud { border: 1.5px solid var(--border); }
+html[data-theme="dark"] .topbar { border-bottom: 1.5px solid var(--border); }
