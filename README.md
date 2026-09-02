@@ -112,8 +112,10 @@ cd frontend && npm run dev      # http://localhost:5173
 
 ## Контент
 
-Вопросы лежат в `content/<блок>/*.md` или `*.json`. Блоки: `frameworks`, `databases`,
-`python`, `platform`. Веса блоков (балансировка) — в `content/weights.yaml`.
+Вопросы живут в пулах направлений: `content/<pool>/pool.yaml` задаёт блоки (порядок колонок,
+подписи, цвета, под-колонки, веса), `content/<pool>/<block>/*.md|*.json` — сами вопросы.
+Сейчас есть `data-engineer` (Фреймворки · Базы данных · Python · Платформа); новый пул —
+новый каталог с `pool.yaml`.
 
 ### Формат Markdown
 
@@ -121,7 +123,7 @@ cd frontend && npm run dev      # http://localhost:5173
 ---
 id: spark-shuffle-01
 kind: question            # question | task
-block: frameworks         # frameworks | databases | python | platform
+block: frameworks         # один из blocks[].id в pool.yaml
 subblock: pyspark         # (опц.) под-колонка внутри блока
 title: Shuffle в Spark    # короткий заголовок для карточки
 topic: distributed-batch
@@ -149,8 +151,8 @@ tags: [spark, optimization]
 
 | метод | путь                       | назначение                                                              |
 | ----- | -------------------------- | ----------------------------------------------------------------------- |
-| GET   | `/api/graph`               | ноды + ошибки импорта                                                   |
-| GET   | `/api/weights`             | веса блоков                                                             |
+| GET   | `/api/graph?pool=<id>`     | ноды + ошибки импорта                                                   |
+| GET   | `/api/pools`               | пулы с блоками и счётчиками                                             |
 | POST  | `/api/interview`           | собрать набор вопросов пропорц. весам (`{count, difficulties?, seed?}`) |
 | POST  | `/api/sessions`            | создать сессию кандидата                                                |
 | POST  | `/api/sessions/{id}/score` | выставить оценку (`{nodeId, score}`)                                    |

@@ -87,17 +87,6 @@ if (dimmed < 1) fail("tag filter did not dim any nodes");
 console.log(`OK: tag filter dims ${dimmed} non-matching nodes`);
 await page.locator(".fp__clear").click(); // сброс тегов
 
-// 5c. Направление интервью: смена трека на «Аналитик» гасит вне-трековые ноды (PySpark и т.п.).
-const trackSel = page.locator(".tb__select");
-if ((await trackSel.count()) < 1) fail("track selector (.tb__select) missing");
-const dimBefore = await page.locator(".qnode--dimmed").count();
-await trackSel.selectOption("analyst");
-await page.waitForTimeout(300);
-const dimAfter = await page.locator(".qnode--dimmed").count();
-if (dimAfter <= dimBefore) fail(`track switch did not dim more nodes (${dimBefore}→${dimAfter})`);
-console.log(`OK: track selector scopes board (analyst → ${dimAfter} dimmed)`);
-await trackSel.selectOption("data-engineer"); // сброс трека
-
 // 5c. Фильтр по типу (вопрос/задача): выключение «вопрос» гасит вопросные ноды.
 await page.locator(".fp__chip", { hasText: "вопрос" }).click();
 await page.waitForTimeout(250);

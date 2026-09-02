@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS tenants (
 );
 CREATE TABLE IF NOT EXISTS nodes (
     tenant_id    TEXT NOT NULL DEFAULT 'default' REFERENCES tenants(id),
+    pool         TEXT NOT NULL DEFAULT 'data-engineer',  -- id пула (content/<pool>/)
     id           TEXT NOT NULL,
     kind         TEXT NOT NULL DEFAULT 'question',
     block        TEXT NOT NULL,
@@ -88,7 +89,8 @@ CREATE TABLE IF NOT EXISTS candidates (
 CREATE TABLE IF NOT EXISTS sessions (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     candidate  TEXT NOT NULL,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    pool       TEXT NOT NULL DEFAULT 'data-engineer'
 );
 CREATE TABLE IF NOT EXISTS scores (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -126,6 +128,7 @@ class Database:
         with self._conn() as conn:
             conn.executescript(_SCHEMA)
             self._migrate_sessions(conn)
+            self._migrate_nodes(conn)
 
     @staticmethod
     def _migrate_sessions(conn: sqlite3.Connection) -> None:
@@ -146,6 +149,18 @@ class Database:
             conn.execute("ALTER TABLE sessions ADD COLUMN candidate_id INTEGER")
         if "interviewer_id" not in cols:
             conn.execute("ALTER TABLE sessions ADD COLUMN interviewer_id INTEGER")
+        if "pool" not in cols:
+            conn.execute("ALTER TABLE sessions ADD COLUMN pool TEXT NOT NULL DEFAULT 'data-engineer'")
+
+    @staticmethod
+    def _migrate_nodes(conn: sqlite3.Connection) -> None:
+        """Пулы направлений: столбец nodes.pool. Старые строки — бывший единственный банк,
+        то есть 'data-engineer'. Индекс создаём здесь, а не в _SCHEMA: на старой БД столбца
+        ещё нет в момент executescript."""
+        cols = {r["name"] for r in conn.execute("PRAGMA table_info(nodes)").fetchall()}
+        if "pool" not in cols:
+            conn.execute("ALTER TABLE nodes ADD COLUMN pool TEXT NOT NULL DEFAULT 'data-engineer'")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_nodes_tenant_pool ON nodes(tenant_id, pool)")
 
     def _conn(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.path)
@@ -246,19 +261,24 @@ class Database:
             conn.execute("DELETE FROM auth_sessions WHERE token = ?", (token,))
 
     # --- nodes (банк вопросов, per-tenant) ---
-    def count_nodes(self, tenant_id: str) -> int:
+    def count_nodes(self, tenant_id: str, pool: Optional[str] = None) -> int:
+        sql, args = "SELECT COUNT(*) FROM nodes WHERE tenant_id = ?", [tenant_id]
+        if pool is not None:
+            sql += " AND pool = ?"
+            args.append(pool)
         with self._conn() as conn:
-            return conn.execute(
-                "SELECT COUNT(*) FROM nodes WHERE tenant_id = ?", (tenant_id,)
-            ).fetchone()[0]
+            return conn.execute(sql, args).fetchone()[0]
 
-    def list_nodes(self, tenant_id: str, include_hidden: bool = True) -> List[Dict]:
-        sql = "SELECT * FROM nodes WHERE tenant_id = ?"
+    def list_nodes(self, tenant_id: str, pool: Optional[str] = None, include_hidden: bool = True) -> List[Dict]:
+        sql, args = "SELECT * FROM nodes WHERE tenant_id = ?", [tenant_id]
+        if pool is not None:
+            sql += " AND pool = ?"
+            args.append(pool)
         if not include_hidden:
             sql += " AND hidden = 0"
         sql += " ORDER BY block, subblock, id"
         with self._conn() as conn:
-            rows = conn.execute(sql, (tenant_id,)).fetchall()
+            rows = conn.execute(sql, args).fetchall()
         return [_row_to_node(r) for r in rows]
 
     def get_node(self, tenant_id: str, node_id: str) -> Optional[Dict]:
@@ -278,11 +298,12 @@ class Database:
             conn.execute(
                 """
                 INSERT INTO nodes (
-                    tenant_id, id, kind, block, subblock, topic, title, difficulty,
+                    tenant_id, id, pool, kind, block, subblock, topic, title, difficulty,
                     weight, question, answer, starter_code, rubric, tags, source,
                     hidden, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(tenant_id, id) DO UPDATE SET
+                    pool=excluded.pool,
                     kind=excluded.kind, block=excluded.block, subblock=excluded.subblock,
                     topic=excluded.topic, title=excluded.title, difficulty=excluded.difficulty,
                     weight=excluded.weight, question=excluded.question, answer=excluded.answer,
@@ -290,7 +311,8 @@ class Database:
                     tags=excluded.tags, updated_at=excluded.updated_at
                 """,
                 (
-                    tenant_id, node["id"], node.get("kind", "question"), node["block"],
+                    tenant_id, node["id"], node.get("pool", "data-engineer"),
+                    node.get("kind", "question"), node["block"],
                     node.get("subblock"), node["topic"], node.get("title"),
                     node.get("difficulty", "middle"), int(node.get("weight", 1)),
                     node["question"], node.get("answer", ""), node.get("starter_code"),
@@ -327,13 +349,14 @@ class Database:
                 cur = conn.execute(
                     """
                     INSERT OR IGNORE INTO nodes (
-                        tenant_id, id, kind, block, subblock, topic, title, difficulty,
+                        tenant_id, id, pool, kind, block, subblock, topic, title, difficulty,
                         weight, question, answer, starter_code, rubric, tags, source,
                         hidden, created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'seed', 0, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'seed', 0, ?, ?)
                     """,
                     (
-                        tenant_id, node["id"], node.get("kind", "question"), node["block"],
+                        tenant_id, node["id"], node.get("pool", "data-engineer"),
+                        node.get("kind", "question"), node["block"],
                         node.get("subblock"), node["topic"], node.get("title"),
                         node.get("difficulty", "middle"), int(node.get("weight", 1)),
                         node["question"], node.get("answer", ""), node.get("starter_code"),
@@ -452,14 +475,15 @@ class Database:
         tenant_id: str = "default",
         candidate_id: Optional[int] = None,
         interviewer_id: Optional[int] = None,
+        pool: str = "data-engineer",
     ) -> Dict:
         with self._conn() as conn:
             cur = conn.execute(
                 """
-                INSERT INTO sessions (candidate, tenant_id, candidate_id, interviewer_id, created_at)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO sessions (candidate, tenant_id, candidate_id, interviewer_id, pool, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
                 """,
-                (candidate, tenant_id, candidate_id, interviewer_id, _now()),
+                (candidate, tenant_id, candidate_id, interviewer_id, pool, _now()),
             )
             sid = cur.lastrowid
         return self.get_session(sid, tenant_id)
@@ -477,13 +501,21 @@ class Database:
             ).fetchall()
         return [dict(r) for r in rows]
 
-    def list_sessions(self, tenant_id: str) -> List[Dict]:
+    def list_sessions(self, tenant_id: str, pool: Optional[str] = None) -> List[Dict]:
+        sql, args = "SELECT * FROM sessions WHERE tenant_id = ?", [tenant_id]
+        if pool is not None:
+            sql += " AND pool = ?"
+            args.append(pool)
+        sql += " ORDER BY created_at DESC"
         with self._conn() as conn:
-            rows = conn.execute(
-                "SELECT * FROM sessions WHERE tenant_id = ? ORDER BY created_at DESC",
-                (tenant_id,),
-            ).fetchall()
+            rows = conn.execute(sql, args).fetchall()
         return [dict(r) for r in rows]
+
+    def count_sessions(self, tenant_id: str, pool: str) -> int:
+        with self._conn() as conn:
+            return conn.execute(
+                "SELECT COUNT(*) FROM sessions WHERE tenant_id = ? AND pool = ?", (tenant_id, pool)
+            ).fetchone()[0]
 
     def get_session(self, session_id: int, tenant_id: str) -> Optional[Dict]:
         """Сессия по id в пределах тенанта (изоляция: чужой тенант → None)."""

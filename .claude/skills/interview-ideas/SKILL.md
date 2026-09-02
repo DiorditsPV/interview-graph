@@ -10,7 +10,8 @@ description: >-
 # Скилл: идеи вопросов (добавить / развернуть / реализовать)
 
 Проект: локальный сервис интервью «граф вопросов». Идеи живут в `Q_IDEAS.txt` (реестр-леджер),
-готовые вопросы — в `content/<block>/*.md|*.json`. Сервер обычно поднят на `http://localhost:8000`.
+готовые вопросы — в `content/<pool>/<block>/*.md|*.json` (пул по умолчанию `data-engineer`).
+Сервер обычно поднят на `http://localhost:8000`.
 
 ## Критично (грабли проекта)
 - **НЕ доверяй Read-инструменту для файлов `content/` и `Q_IDEAS.txt`** — он отдаёт устаревший кэш
@@ -32,7 +33,8 @@ description: >-
 ## Таксономия размещения
 - `block` ∈ frameworks | databases | python | platform.
 - `subblock`: frameworks → `airflow|pyspark|dbt|streaming`; databases → `sql|dbms|storage|formats`;
-  python и platform — без subblock (одна колонка). Порядок задаётся в `frontend/src/layout.ts` (`PREFERRED_SUB`).
+  python и platform — без subblock (одна колонка). Порядок и подписи под-колонок — `subblocks`
+  соответствующего блока в `content/<pool>/pool.yaml`.
 - `difficulty`: **base** = «как устроено X / обзор» (идёт над junior), далее junior → middle → senior.
 - `tags`: только из 17 сквозных концептов — architecture, orchestration, optimization, partitioning,
   deployment, storage, streaming, consistency, data-modeling, quality, distributed, sql, monitoring,
@@ -57,7 +59,7 @@ description: >-
    `block`/`subblock`/`topic`/`difficulty`/`weight`/`title`/`tags` (≤3 из 17).
 2. Напиши `question` и **содержательный** `answer` (как у существующих нод — конкретно, по делу,
    с примерами на стеке команды). Для задач — `starterCode` + `rubric` + `## Эталон`.
-3. Создай файл `content/<block>/<id>.md` (через `python-frontmatter`, нормализованный формат) или
+3. Создай файл `content/<pool>/<block>/<id>.md` (через `python-frontmatter`, нормализованный формат) или
    добавь объект в существующий `.json`.
 4. В `Q_IDEAS.txt` помени идею: `- [x] <title> — <difficulty> (<id>)` (id в скобках обязателен — по нему дедуп).
 5. Прогони **interview-verify**.
@@ -69,6 +71,7 @@ python3 .claude/skills/interview-ideas/regen_ledger.py
 Скрипт (stdlib, нужен сервер на :8000) пересобирает `[x]`-реестр из `/api/graph` (ground truth),
 группирует по block/subblock, сортирует base<junior<middle<senior и **сохраняет** текущие `[ ]`-идеи.
 Env `API_URL` переопределяет адрес. Пиши `Q_IDEAS.txt` в корне проекта.
+Пул задаётся `POOL=<id>` (по умолчанию `data-engineer`); контент — `content/<pool>/<block>/`.
 
 ## Подсказка по содержанию
 Стек команды (X5, дата-инженерия): Python, Airflow, Spark/PySpark, Flink, Trino, ClickHouse, Kafka,

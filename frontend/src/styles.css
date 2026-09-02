@@ -21,22 +21,26 @@
   --accent: #2563eb;
 }
 [data-theme="dark"] {
-  --bg: #0f172a;
-  --surface: #1e293b;
-  --panel-bg: rgba(30, 41, 59, 0.96);
-  --text: #e2e8f0;
-  --heading: #f1f5f9;
-  --text-muted: #94a3b8;
-  --text-faint: #64748b;
-  --border: #334155;
-  --border-strong: #475569;
-  --hover: #334155;
-  --scored-bg: rgba(22, 163, 74, 0.16);
-  --star-empty: #475569;
-  --scored-border: rgba(34, 197, 94, 0.45);
-  --tag-bg: rgba(99, 102, 241, 0.2);
-  --tag-fg: #c7d2fe;
-  --code-inline-bg: #334155;
+  /* Лестница высот (Atlassian elevation): тени в тёмной не читаются, высоту кодирует
+     светлота — канва утоплена, карточки/панели приподняты и заметно светлее.
+     Пары посчитаны по WCAG: surface/bg 1.97 (порог соседних областей 1.9),
+     border/bg 4.04 (графика ≥3), text/surface 8.4, muted/surface 5.05 (≥4.5). */
+  --bg: #0d1524;
+  --surface: #364862;
+  --panel-bg: rgba(54, 72, 98, 0.96);
+  --text: #eaeff5;
+  --heading: #f5f8fc;
+  --text-muted: #aebccf;
+  --text-faint: #8194ab;
+  --border: #66788f;
+  --border-strong: #7e90a7;
+  --hover: #43587a;
+  --scored-bg: rgba(34, 197, 94, 0.2);
+  --star-empty: #66788f;
+  --scored-border: rgba(74, 222, 128, 0.55);
+  --tag-bg: rgba(129, 140, 248, 0.24);
+  --tag-fg: #cdd6ff;
+  --code-inline-bg: #243348;
   --shadow: rgba(0, 0, 0, 0.45);
   --shadow-strong: rgba(0, 0, 0, 0.6);
   --accent: #60a5fa;

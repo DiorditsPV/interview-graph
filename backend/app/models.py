@@ -10,7 +10,9 @@ from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-Block = Literal["frameworks", "databases", "python", "platform"]
+# Блок — строка: допустимые значения задаёт pool.yaml пула, проверяет импортёр
+# (validate_against_pool), а не схема — у каждого пула своя таксономия.
+Block = str
 Difficulty = Literal["base", "junior", "middle", "senior"]
 Kind = Literal["question", "task"]
 
@@ -22,7 +24,8 @@ class Node(BaseModel):
 
     id: str
     kind: Kind = "question"
-    block: Block
+    pool: str = Field(min_length=1)  # id пула (content/<pool>/); ставит импортёр по каталогу, не frontmatter
+    block: str = Field(min_length=1)
     subblock: Optional[str] = None  # под-блок внутри блока (напр. airflow/pyspark/dbt)
     topic: str
     title: Optional[str] = None  # короткий заголовок для карточки (полный текст — в drawer)

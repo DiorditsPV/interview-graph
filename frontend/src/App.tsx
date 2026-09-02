@@ -297,6 +297,12 @@ export default function App() {
   const [agendaOpen, setAgendaOpen] = useState<boolean>(() => localStorage.getItem("agendaOpen") === "1");
   // Таймер в HUD по умолчанию скрыт: во время интервью он тикает в поле зрения и давит.
   const [showTimer, setShowTimer] = useState<boolean>(() => localStorage.getItem("showTimer") === "1");
+  // Оформление доски (итог design-funnel): дефолт — 37 «Брутализм в цвете»,
+  // альтернативы переключаются в ⚙. Применяется атрибутом data-design (design-themes.css).
+  const [design, setDesign] = useState<string>(() => {
+    const v = localStorage.getItem("design");
+    return v && ["37", "56", "57", "58"].includes(v) ? v : "37";
+  });
   // Панель фильтров лежит поверх канвы: без сворачивания она съедает правую треть доски.
   const [filtersOpen, setFiltersOpen] = useState<boolean>(
     () => localStorage.getItem("filtersOpen") !== "0",
@@ -312,6 +318,10 @@ export default function App() {
   useEffect(() => localStorage.setItem("track", activeTrack), [activeTrack]);
   useEffect(() => localStorage.setItem("agendaOpen", agendaOpen ? "1" : "0"), [agendaOpen]);
   useEffect(() => localStorage.setItem("showTimer", showTimer ? "1" : "0"), [showTimer]);
+  useEffect(() => {
+    document.documentElement.dataset.design = design;
+    localStorage.setItem("design", design);
+  }, [design]);
   useEffect(() => localStorage.setItem("filtersOpen", filtersOpen ? "1" : "0"), [filtersOpen]);
   // hide-local: персист набора скрытых id.
   useEffect(() => localStorage.setItem("hiddenIds", JSON.stringify([...hiddenIds])), [hiddenIds]);
@@ -1015,6 +1025,8 @@ export default function App() {
                   hiddenCount: hiddenIds.size,
                   showTimer,
                   onToggleTimer: () => setShowTimer((v) => !v),
+                  design,
+                  onSetDesign: setDesign,
                 }}
               />
             )}

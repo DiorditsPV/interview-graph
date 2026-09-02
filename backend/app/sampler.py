@@ -9,10 +9,7 @@ from __future__ import annotations
 
 import random
 from collections import defaultdict
-from pathlib import Path
 from typing import Dict, List, Optional
-
-import yaml
 
 from .models import Node
 
@@ -25,71 +22,17 @@ DEFAULT_BLOCK_WEIGHTS: Dict[str, int] = {
 }
 
 
-def load_weights(content_dir: Path) -> Dict[str, int]:
-    """Загрузить веса блоков из content/weights.yaml (с фолбэком на дефолт)."""
-    path = content_dir / "weights.yaml"
-    if not path.exists():
-        return dict(DEFAULT_BLOCK_WEIGHTS)
-    try:
-        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-        blocks = data.get("blocks", {})
-        weights = {k: int(v) for k, v in blocks.items()}
-        return weights or dict(DEFAULT_BLOCK_WEIGHTS)
-    except (yaml.YAMLError, ValueError, OSError):
-        return dict(DEFAULT_BLOCK_WEIGHTS)
-
-
-# Дефолтные треки (фолбэк, если нет content/tracks.yaml).
-DEFAULT_TRACKS: List[Dict] = [
-    {"id": "data-engineer", "label": "Дата-инженер", "include": []},
-    {
-        "id": "backend",
-        "label": "Бэкенд-разработчик",
-        "include": ["python", "platform", "databases/sql", "databases/dbms", "databases/storage", "frameworks/airflow"],
-    },
-    {"id": "analyst", "label": "Аналитик", "include": ["databases/sql", "databases/dbms", "python", "platform"]},
-]
-
-
-def load_tracks(content_dir: Path) -> List[Dict]:
-    """Загрузить направления интервью из content/tracks.yaml (с фолбэком на дефолт)."""
-    path = content_dir / "tracks.yaml"
-    if not path.exists():
-        return [dict(t) for t in DEFAULT_TRACKS]
-    try:
-        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-        out = [
-            {"id": t["id"], "label": t.get("label", t["id"]), "include": list(t.get("include") or [])}
-            for t in (data.get("tracks") or [])
-            if t.get("id")
-        ]
-        return out or [dict(t) for t in DEFAULT_TRACKS]
-    except (yaml.YAMLError, ValueError, KeyError, OSError):
-        return [dict(t) for t in DEFAULT_TRACKS]
-
-
-def node_in_track(node: Node, include: Optional[List[str]]) -> bool:
-    """Входит ли нода в трек: include пуст ИЛИ совпал block / "block/subblock"."""
-    if not include:
-        return True
-    if node.block in include:
-        return True
-    return bool(node.subblock and f"{node.block}/{node.subblock}" in include)
-
-
 def build_interview(
     nodes: List[Node],
     count: int = 20,
     difficulties: Optional[List[str]] = None,
     block_weights: Optional[Dict[str, int]] = None,
-    track_include: Optional[List[str]] = None,
     seed: Optional[int] = None,
 ) -> List[str]:
     """Собрать интервью: вернуть упорядоченный список id нод.
 
     Кол-во вопросов на блок пропорционально весам блоков; внутри блока выбор
-    взвешен по полю weight ноды. Фильтры: уровни сложности (difficulties) и
-    охват трека (track_include).
+    взвешен по полю weight ноды. Фильтры: уровни сложности (difficulties).
     """
     rng = random.Random(seed)
     block_weights = block_weights or DEFAULT_BLOCK_WEIGHTS
@@ -97,8 +40,6 @@ def build_interview(
     pool = nodes
     if difficulties:
         pool = [n for n in pool if n.difficulty in difficulties]
-    if track_include:
-        pool = [n for n in pool if node_in_track(n, track_include)]
     if not pool:
         return []
 

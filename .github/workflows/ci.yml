@@ -49,15 +49,24 @@ jobs:
         working-directory: backend
         run: pip install -r requirements.txt
 
-      # --- 3. Импорт контента: 0 ошибок (офлайн, без сервера) ---
+      # --- 3. Импорт контента: 0 ошибок по каждому пулу (офлайн, без сервера) ---
       - name: Content import check
         working-directory: backend
         run: |
-          python -c "import sys; from pathlib import Path; from app.importer import load_content; \
-          ns, errs = load_content(Path('../content')); \
-          print(f'{len(ns)} nodes, {len(errs)} errors'); \
-          [print('ERR:', e) for e in errs]; \
-          sys.exit(1 if errs else 0)"
+          python - <<'PY'
+          import sys
+          from pathlib import Path
+          from app.pools import load_pools
+          from app.importer import load_pool_content
+          errs = []
+          for pool in load_pools(Path("../content")).values():
+              nodes, e = load_pool_content(pool)
+              print(f"{pool.id}: {len(nodes)} nodes, {len(e)} errors")
+              errs += e
+          for e in errs:
+              print("ERR:", e)
+          sys.exit(1 if errs else 0)
+          PY
 
       # --- 4. Backend-тесты ---
       - name: Pytest

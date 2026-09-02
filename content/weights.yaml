@@ -1,8 +1,0 @@
-# Веса блоков (% банка вопросов) — из измеренного дисбаланса репозиториев
-# /Users/user/dev/projects/work. Балансировка задаётся данными, не хардкодом.
-# Sampler выбирает вопросы пропорционально этим весам.
-blocks:
-  frameworks: 35   # Airflow 16 · Spark 13 · стриминг (Kafka/Flink) 6
-  databases:  30   # SQL 10 · OLAP/CH 5 · OLTP/PG 5 · Trino+Hive 5 · хранение/форматы 5
-  python:     23   # язык 8 · данные (pandas/numpy) 8 · валидация+тесты 7
-  platform:   12   # Docker/K8s 4 · CI/CD 3 · домен 3 · мониторинг/lineage 2

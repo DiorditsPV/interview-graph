@@ -194,3 +194,43 @@ def test_migration_upgrades_old_sessions_schema(tmp_path):
     cand = db2.create_candidate("default", {"name": "Новый"})
     new = db2.create_session("Новый", tenant_id="default", candidate_id=cand["id"])
     assert new["candidate_id"] == cand["id"]
+
+
+def test_migration_adds_pool_to_old_nodes_and_sessions(tmp_path):
+    """БД без столбца pool апгрейдится: старые ноды и сессии получают 'data-engineer'."""
+    path = tmp_path / "old.db"
+    conn = sqlite3.connect(path)
+    conn.executescript(
+        """
+        CREATE TABLE tenants (id TEXT PRIMARY KEY, name TEXT NOT NULL, created_at TEXT NOT NULL);
+        INSERT INTO tenants VALUES ('default', 'default', '2024-01-01T00:00:00');
+        CREATE TABLE nodes (
+            tenant_id TEXT NOT NULL DEFAULT 'default', id TEXT NOT NULL, kind TEXT NOT NULL DEFAULT 'question',
+            block TEXT NOT NULL, subblock TEXT, topic TEXT NOT NULL, title TEXT,
+            difficulty TEXT NOT NULL DEFAULT 'middle', weight INTEGER NOT NULL DEFAULT 1,
+            question TEXT NOT NULL, answer TEXT NOT NULL DEFAULT '', starter_code TEXT,
+            rubric TEXT NOT NULL DEFAULT '[]', tags TEXT NOT NULL DEFAULT '[]',
+            source TEXT NOT NULL DEFAULT 'seed', hidden INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY (tenant_id, id)
+        );
+        INSERT INTO nodes (id, block, topic, question, created_at, updated_at)
+            VALUES ('old-01', 'python', 't', 'q', '2024-01-01T00:00:00', '2024-01-01T00:00:00');
+        CREATE TABLE sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, candidate TEXT NOT NULL, created_at TEXT NOT NULL,
+            tenant_id TEXT NOT NULL DEFAULT 'default', candidate_id INTEGER, interviewer_id INTEGER
+        );
+        INSERT INTO sessions (candidate, created_at) VALUES ('Старый', '2024-01-01T00:00:00');
+        """
+    )
+    conn.commit()
+    conn.close()
+
+    db = Database(path)
+    assert db.count_nodes("default") == 1
+    assert db.count_nodes("default", pool="data-engineer") == 1
+    assert db.count_nodes("default", pool="system-analyst") == 0
+    assert db.get_node("default", "old-01")["pool"] == "data-engineer"
+    assert db.get_session(1, "default")["pool"] == "data-engineer"
+    assert db.list_sessions("default", pool="data-engineer")[0]["candidate"] == "Старый"
+    assert db.list_sessions("default", pool="system-analyst") == []
+    Database(path)  # повторное открытие идемпотентно
