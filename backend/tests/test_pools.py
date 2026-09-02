@@ -111,3 +111,42 @@ def test_validate_against_pool_ok_without_subblock(tmp_path):
     pool = load_pools(tmp_path)["demo"]
     node = Node(id="b-1", pool="demo", block="beta", topic="t", question="q")
     validate_against_pool(node, pool)  # не бросает
+
+
+# --- pool-crud: пул как данные (таблица pools), slug из названия ---
+import json
+
+from app.pools import PoolConfigError, blocks_to_json, parse_blocks, pool_from_row, slug_from_label
+
+
+def test_parse_blocks_and_json_roundtrip(tmp_path):
+    _mk(tmp_path, "demo", VALID)
+    cfg = load_pools(tmp_path)["demo"]
+    raw = json.loads(blocks_to_json(cfg.blocks))
+    assert raw[0]["subblocks"] == [{"id": "a1", "label": "A1"}, {"id": "a2", "label": "A2"}]
+    assert raw[1]["subblocks"] == []
+    assert parse_blocks(raw) == cfg.blocks
+
+
+def test_pool_from_row_has_no_dir():
+    row = {"id": "x", "label": "X", "description": "", "blocks": [{"id": "a", "label": "A", "color": "#000000", "weight": 1}]}
+    cfg = pool_from_row(row)
+    assert cfg.id == "x" and cfg.dir is None and cfg.block_ids == {"a"}
+    assert cfg.to_dict()["blocks"][0]["subblocks"] == []
+
+
+def test_pool_from_row_validates():
+    with pytest.raises(PoolConfigError):
+        pool_from_row({"id": "x", "label": "X", "description": "", "blocks": []})
+    with pytest.raises(PoolConfigError):
+        pool_from_row({"id": "x", "label": "X", "description": "", "blocks": [{"id": "a", "label": "A", "color": "red", "weight": 1}]})
+
+
+@pytest.mark.parametrize("label,slug", [
+    ("Аналитик данных", "analitik-dannyh"),
+    ("Data Engineer X5", "data-engineer-x5"),
+    ("  Щи & Ёж  ", "schi-ezh"),
+    ("!!!", "pool"),
+])
+def test_slug_from_label(label, slug):
+    assert slug_from_label(label) == slug
