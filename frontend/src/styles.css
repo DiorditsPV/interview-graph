@@ -143,14 +143,19 @@ button:disabled:hover { background: var(--surface); }
    z-index между канвой (5) и модалками (50): всплывает над доской, но не над оверлеями. */
 .settings { position: relative; display: inline-flex; }
 .setbtn--on { background: var(--hover); color: var(--text); border-color: var(--border); }
-.settings__pop {
-  position: absolute; top: calc(100% + 8px); right: 0; z-index: 40;
-  min-width: 260px; padding: 14px;
-  display: flex; flex-direction: column; gap: 14px;
+.setdrawer {
+  position: fixed; left: 0; top: 0; bottom: 0; z-index: 45; width: 304px; max-width: 88vw;
+  display: flex; flex-direction: column; gap: 18px; padding: 16px; overflow-y: auto;
   background: var(--surface); color: var(--text);
-  border: 1px solid var(--border); border-radius: 12px;
-  box-shadow: 0 8px 32px var(--shadow-strong);
+  border-right: 1px solid var(--border); box-shadow: 0 0 40px var(--shadow-strong);
 }
+.setdrawer__head { display: flex; align-items: center; justify-content: space-between; }
+.setdrawer__close { padding: 2px 8px; line-height: 1; }
+.setdrawer__act {
+  display: block; width: 100%; text-align: left; padding: 8px 10px; text-decoration: none;
+  border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); font: inherit;
+}
+.setdrawer__act:hover { background: var(--hover); }
 .settings__group { display: flex; flex-direction: column; gap: 8px; }
 .settings__title {
   font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
