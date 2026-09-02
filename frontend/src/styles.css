@@ -630,16 +630,19 @@ kbd {
 .home__h2 { margin: 18px 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--text-faint); }
 .home__pools { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
 .poolcard {
+  position: relative;
   display: flex; flex-direction: column; gap: 8px; padding: 16px; text-decoration: none; color: var(--text);
   background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
 }
 .poolcard:hover { background: var(--hover); }
-.poolcard__label { font-size: 18px; font-weight: 800; color: var(--heading); }
+.poolcard__label { font-size: 18px; font-weight: 800; color: var(--heading); text-decoration: none; }
+.poolcard__label::after { content: ""; position: absolute; inset: 0; }
+.poolcard:focus-within { border-color: var(--accent); }
 .poolcard__desc { font-size: 13px; color: var(--text-muted); }
 .poolcard__meta { font-size: 12px; color: var(--text-faint); }
 .poolcard__blocks { display: flex; flex-wrap: wrap; gap: 4px; }
 .poolcard__block { font-size: 11px; color: #fff; padding: 1px 7px; border-radius: 4px; }
-.poolcard__bank { margin-top: 4px; font-size: 12px; color: var(--accent); }
+.poolcard__bank { margin-top: 4px; font-size: 12px; color: var(--accent); text-decoration: none; position: relative; z-index: 1; align-self: flex-start; }
 .home__sections { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
 .menucard {
   display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; text-decoration: none; color: var(--text);

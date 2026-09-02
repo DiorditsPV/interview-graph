@@ -18,8 +18,10 @@ export function HomePage({ pools, notice }: { pools: PoolConfig[]; notice?: stri
         ) : (
           <div className="home__pools">
             {pools.map((p) => (
-              <a key={p.id} className="poolcard" href={href.board(p.id)} data-pool={p.id}>
-                <div className="poolcard__label">{p.label}</div>
+              <div key={p.id} className="poolcard" data-pool={p.id}>
+                {/* Ссылка-«растяжка»: её ::after накрывает всю карточку — клик в любом месте открывает
+                    доску. Ссылка на банк — сиблинг с z-index выше. Обе — настоящие <a>, в tab-порядке. */}
+                <a className="poolcard__label" href={href.board(p.id)}>{p.label}</a>
                 {p.description && <div className="poolcard__desc">{p.description}</div>}
                 <div className="poolcard__meta">
                   {p.counts?.nodes ?? 0} вопросов · {p.counts?.sessions ?? 0} сессий
@@ -29,10 +31,8 @@ export function HomePage({ pools, notice }: { pools: PoolConfig[]; notice?: stri
                     <span key={b.id} className="poolcard__block" style={{ background: b.color }}>{b.label}</span>
                   ))}
                 </div>
-                <span className="poolcard__bank" onClick={(e) => { e.preventDefault(); window.location.hash = href.bank(p.id); }}>
-                  банк вопросов →
-                </span>
-              </a>
+                <a className="poolcard__bank" href={href.bank(p.id)}>банк вопросов →</a>
+              </div>
             ))}
           </div>
         )}
