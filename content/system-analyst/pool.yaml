@@ -1,0 +1,32 @@
+# Стартовый пул «Системный аналитик»: каркас таксономии + сид из ~15 вопросов.
+# Качество — стартовый набор, который правится через банк (#/bank/system-analyst).
+id: system-analyst
+label: Системный аналитик
+description: Требования, моделирование процессов и данных, SQL, интеграции
+blocks:
+  - id: requirements
+    label: Требования
+    color: "#2563eb"
+    weight: 35
+    subblocks:
+      - { id: elicitation,   label: Сбор }
+      - { id: analysis,      label: Анализ и приоритизация }
+      - { id: documentation, label: Документирование }
+  - id: modeling
+    label: Моделирование
+    color: "#9333ea"
+    weight: 25
+    subblocks:
+      - { id: process, label: Процессы (BPMN) }
+      - { id: uml,     label: UML и структуры }
+  - id: data
+    label: Данные
+    color: "#16a34a"
+    weight: 25
+    subblocks:
+      - { id: sql,        label: SQL }
+      - { id: data-model, label: Модель данных }
+  - id: integration
+    label: Интеграции
+    color: "#d97706"
+    weight: 15
