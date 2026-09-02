@@ -1,0 +1,33 @@
+# Пул «Дата-инженер» — бывший единственный банк. Порядок блоков = порядок колонок,
+# порядок subblocks = порядок под-колонок (бывший PREFERRED_SUB во фронте),
+# weight = доля блока в наборе интервью в % (бывший weights.yaml).
+id: data-engineer
+label: Дата-инженер
+description: Airflow и Spark, SQL и хранилища, Python, платформа
+blocks:
+  - id: frameworks
+    label: Фреймворки
+    color: "#2563eb"
+    weight: 35
+    subblocks:
+      - { id: airflow,   label: Airflow }
+      - { id: pyspark,   label: PySpark }
+      - { id: dbt,       label: dbt }
+      - { id: streaming, label: Streaming }
+  - id: databases
+    label: Базы данных
+    color: "#16a34a"
+    weight: 30
+    subblocks:
+      - { id: sql,     label: SQL }
+      - { id: dbms,    label: СУБД и движки }
+      - { id: storage, label: Хранилища }
+      - { id: formats, label: Форматы }
+  - id: python
+    label: Python
+    color: "#d97706"
+    weight: 23
+  - id: platform
+    label: Платформа
+    color: "#9333ea"
+    weight: 12

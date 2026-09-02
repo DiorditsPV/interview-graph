@@ -10,7 +10,8 @@ from app.importer import load_content
 from app.models import Node
 from app.sampler import build_interview, load_tracks, load_weights, node_in_track
 
-CONTENT = Path(__file__).resolve().parent.parent.parent / "content"
+CONTENT_ROOT = Path(__file__).resolve().parent.parent.parent / "content"
+CONTENT = CONTENT_ROOT / "data-engineer"   # каталог пула по умолчанию
 
 
 def test_content_imports_without_errors():
