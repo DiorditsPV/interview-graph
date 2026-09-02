@@ -55,6 +55,23 @@ async function json<T>(res: Response, opts?: { skipAuthReload?: boolean }): Prom
 
 export const api = {
   pools: () => fetch(`${BASE}/pools`).then(json<PoolConfig[]>),
+  // pool-crud: направления живут в БД; пресет = существующее направление (колонки + вопросы копируются).
+  createPool: (data: { label: string; description?: string; preset: string }) =>
+    fetch(`${BASE}/pools`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }).then(json<PoolConfig>),
+  updatePool: (id: string, fields: { label?: string; description?: string }) =>
+    fetch(`${BASE}/pools/${encodeURIComponent(id)}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(fields),
+    }).then(json<PoolConfig>),
+  deletePool: (id: string) =>
+    fetch(`${BASE}/pools/${encodeURIComponent(id)}`, { method: "DELETE" }).then(
+      json<{ deleted: string; nodes_removed: number; sessions_kept: number }>,
+    ),
   graph: (pool: string) =>
     fetch(`${BASE}/graph?pool=${encodeURIComponent(pool)}`).then(json<GraphResponse>),
   createSession: (pool: string, candidate: string, candidateId?: number, interviewerId?: number) =>
