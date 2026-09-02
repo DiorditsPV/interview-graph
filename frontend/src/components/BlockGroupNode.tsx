@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { darken, hexA, lighten } from "../types";
+import { hexA, lighten, plateColor } from "../types";
 import { SUPER_H } from "../layout";
 
 export interface BlockGroupNodeData {
@@ -45,8 +45,8 @@ function BlockGroupNodeImpl({ data }: { data: BlockGroupNodeData }) {
           height: SUPER_H,
           background: hexA(color, dark ? 0.12 : 0.16),
           color: fg,
-          // плашка 37/тёмной темы: 700-ряд из цвета блока (design-themes.css → var(--plate))
-          ["--plate" as string]: darken(color, 0.15),
+          // плашка 37/тёмной темы: затемнение цвета блока до контраста белого ≥ 4.5:1 (design-themes.css → var(--plate))
+          ["--plate" as string]: plateColor(color),
         }}
       >
         <span className="bgroup__name">{blockLabel}</span>

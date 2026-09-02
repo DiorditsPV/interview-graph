@@ -60,8 +60,8 @@ html[data-design="37"]:not([data-theme="dark"]) .subhead { border-radius: 0; }
 html[data-design="37"]:not([data-theme="dark"]) .bgroup__header {
   font-weight: 800; text-transform: uppercase; letter-spacing: .05em;
 }
-/* плашки направлений: 700-ряд из цвета блока считает BlockGroupNode (darken .15) и кладёт
-   в --plate; белый текст на нём 5.0–7.0:1. !important — инлайновый полупрозрачный фон. */
+/* плашки направлений: цвет считает BlockGroupNode (plateColor — затемнение цвета блока, пока
+   белый текст не даст ≥ 4.5:1 WCAG AA) и кладёт в --plate. !important — инлайновый полупрозрачный фон. */
 html[data-design="37"]:not([data-theme="dark"]) .bgroup__header { background: var(--plate) !important; color: #fff !important; }
 html[data-design="37"]:not([data-theme="dark"]) .topbar { border-bottom: 2px solid #0f0f0f; }
 html[data-design="37"]:not([data-theme="dark"]) .hud { border: 2px solid #0f0f0f; box-shadow: 2.5px 2.5px 0 #0f0f0f; }

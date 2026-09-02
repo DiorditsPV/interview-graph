@@ -152,14 +152,26 @@ export function lighten(hex: string, amount: number): string {
   return `rgb(${r}, ${g}, ${b})`;
 }
 
-// Затемнить цвет блока — для плашек заголовков (700-ряд из 600-го, см. design-themes.css).
-export function darken(hex: string, amount: number): string {
+// Относительная яркость sRGB (WCAG 2.x); контраст с белым = 1.05 / (L + 0.05).
+function relLuminance(r: number, g: number, b: number): number {
+  const ch = (v: number) => {
+    const s = v / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * ch(r) + 0.7152 * ch(g) + 0.0722 * ch(b);
+}
+
+/** Цвет плашки заголовка блока: затемняем цвет блока (от 0.15 шагом 0.05), пока белый текст
+ *  не даст ≥ 4.5:1 (WCAG AA). Синему/фиолетовому хватает 0.15 (700-ряд), зелёному/янтарному
+ *  нужно 0.2 — так плашка держит AA для любых цветов из pool.yaml. */
+export function plateColor(hex: string): string {
   const h = hex.replace("#", "");
-  const mix = (c: number) => Math.round(c * (1 - amount));
-  const r = mix(parseInt(h.slice(0, 2), 16));
-  const g = mix(parseInt(h.slice(2, 4), 16));
-  const b = mix(parseInt(h.slice(4, 6), 16));
-  return `rgb(${r}, ${g}, ${b})`;
+  const base = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+  for (let amount = 0.15; amount <= 0.61; amount += 0.05) {
+    const [r, g, b] = base.map((c) => Math.round(c * (1 - amount)));
+    if (1.05 / (relLuminance(r, g, b) + 0.05) >= 4.5) return `rgb(${r}, ${g}, ${b})`;
+  }
+  return "#000";
 }
 
 export function hexA(hex: string, alpha: number): string {
