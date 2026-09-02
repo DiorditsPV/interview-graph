@@ -71,7 +71,7 @@ const profile = (nodes, strength, coverage, salt, forceIds = []) => {
 
 async function seed() {
   await login();
-  const { nodes } = await api("GET", "/api/graph");
+  const { nodes } = await api("GET", "/api/graph?pool=data-engineer");
   const existing = await api("GET", "/api/candidates");
   const byName = new Map(existing.map((c) => [c.name, c]));
 
@@ -92,7 +92,7 @@ async function seed() {
   };
 
   // Идемпотентно: повторный прогон переиспользует сессию кандидата, а не плодит новые.
-  const sessions = await api("GET", "/api/sessions");
+  const sessions = await api("GET", "/api/sessions?pool=data-engineer");
   const run = async (cand, strength, coverage, salt, forceIds = []) => {
     const prev = sessions.find((s) => s.candidate === cand.name);
     if (prev) {

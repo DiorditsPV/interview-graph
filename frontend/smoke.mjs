@@ -207,7 +207,6 @@ if (dimCleared >= dimSearch) fail(`clearing search did not remove dim (${dimSear
 console.log(`OK: question search dims ${dimSearch}, clears to ${dimCleared}`);
 
 // 9d. «Только неоценённые»: оценённая на шаге 4 нода (ROW_NUMBER) гаснет при включении тумблера.
-// (dimUnscoredAfter — не dimAfter: тот уже объявлен в track-проверке выше.)
 const unscoredBtn = page.locator(".fp__chip", { hasText: "Только неоценённые" });
 await unscoredBtn.click();
 await page.waitForTimeout(250);
@@ -445,9 +444,11 @@ console.log(`OK: delete confirms + dismiss non-destructive (${qBeforeDel} nodes)
 
 // 21. draft-autosave: оценка без активной сессии переживает перезагрузку (ПОСЛЕДНЕЙ — делает reload).
 // Снимаем возможный ?session из URL (resume-шаг мог его выставить), чтобы сессии точно не было.
+// id сессии живёт в hash (#/board/data-engineer?session=N), а не в location.search — пишем hash напрямую.
 await page.evaluate(() => {
-  const u = new URL(location.href); u.searchParams.delete("session"); history.replaceState(null, "", u.toString());
+  location.hash = "#/board/data-engineer";
 });
+await page.waitForSelector(".qnode", { timeout: 10000 });
 await page.keyboard.press("Escape"); // закрыть drawer
 await page.locator(".qnode__title", { hasText: "ROW_NUMBER" }).first().click();
 await page.waitForSelector(".drawer__scoring .scorebtn", { timeout: 3000 });
