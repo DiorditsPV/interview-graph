@@ -3,7 +3,8 @@ import type { PoolConfig } from "../types";
 
 // Главное меню: направления как входы на доски + разделы (кандидаты, сессии, подключение).
 // Пулов может не быть вовсе (content/ без pool.yaml) — говорим об этом, а не рисуем пустоту.
-export function HomePage({ pools, notice }: { pools: PoolConfig[]; notice?: string }) {
+// startPool — пул из deep-link #/?start=<pool>: форма старта интервью открывается сразу.
+export function HomePage({ pools, notice }: { pools: PoolConfig[]; notice?: string; startPool?: string | null }) {
   return (
     <div className="page home">
       <header className="pageshell">
