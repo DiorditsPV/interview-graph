@@ -1,12 +1,14 @@
 // Типы соответствуют ответу бэкенда (FastAPI сериализует по alias → camelCase).
 
-export type Block = "frameworks" | "databases" | "python" | "platform";
+// Блок — строка: таксономию задаёт pool.yaml пула (см. PoolConfig), а не union-тип.
+export type Block = string;
 export type Difficulty = "base" | "junior" | "middle" | "senior";
 export type Kind = "question" | "task";
 
 export interface QNode {
   id: string;
   kind: Kind;
+  pool: string;
   block: Block;
   subblock?: string | null;
   topic: string;
@@ -25,18 +27,39 @@ export interface ImportErr {
   error: string;
 }
 
-// Направление интервью (трек/роль) — профиль-охват над block/subblock.
-export interface Track {
+// Пул направления — зеркало content/<pool>/pool.yaml (GET /api/pools).
+export interface SubblockCfg {
   id: string;
   label: string;
-  include: string[];
+}
+export interface BlockCfg {
+  id: string;
+  label: string;
+  color: string; // семантический цвет блока (600-ряд)
+  weight: number;
+  subblocks: SubblockCfg[];
+}
+export interface PoolConfig {
+  id: string;
+  label: string;
+  description: string;
+  blocks: BlockCfg[];
+  counts?: { nodes: number; sessions: number };
 }
 
-// Нода входит в трек: include пуст ИЛИ совпал block / "block/subblock".
-export function nodeInTrack(n: QNode, include: string[]): boolean {
-  if (!include.length) return true;
-  if (include.includes(n.block)) return true;
-  return !!n.subblock && include.includes(`${n.block}/${n.subblock}`);
+const FALLBACK_COLOR = "#64748b";
+
+export function blockOrder(pool: PoolConfig): string[] {
+  return pool.blocks.map((b) => b.id);
+}
+export function blockLabel(pool: PoolConfig, block: string): string {
+  return pool.blocks.find((b) => b.id === block)?.label ?? block;
+}
+export function blockColor(pool: PoolConfig, block: string): string {
+  return pool.blocks.find((b) => b.id === block)?.color ?? FALLBACK_COLOR;
+}
+export function subLabel(pool: PoolConfig, block: string, sub: string): string {
+  return pool.blocks.find((b) => b.id === block)?.subblocks.find((s) => s.id === sub)?.label ?? sub;
 }
 
 export interface GraphResponse {
@@ -83,6 +106,7 @@ export interface Interviewer {
 export interface SessionMeta {
   id: number;
   candidate: string;
+  pool: string;
   candidate_id?: number | null;
   interviewer_id?: number | null;
   created_at: string;
@@ -96,24 +120,11 @@ export interface Session extends SessionMeta {
 export interface SessionSummary {
   id: number;
   candidate: string;
+  pool: string;
   candidate_id?: number | null;
   interviewer_id?: number | null;
   created_at: string;
 }
-
-export const BLOCK_LABEL: Record<Block, string> = {
-  frameworks: "Фреймворки",
-  databases: "Базы данных",
-  python: "Python",
-  platform: "Платформа",
-};
-
-export const BLOCK_COLOR: Record<Block, string> = {
-  frameworks: "#2563eb",
-  databases: "#16a34a",
-  python: "#d97706",
-  platform: "#9333ea",
-};
 
 export const DIFF_LABEL: Record<Difficulty, string> = {
   base: "base",
@@ -135,6 +146,16 @@ export const DIFF_COLOR: Record<Difficulty, string> = {
 export function lighten(hex: string, amount: number): string {
   const h = hex.replace("#", "");
   const mix = (c: number) => Math.round(c + (255 - c) * amount);
+  const r = mix(parseInt(h.slice(0, 2), 16));
+  const g = mix(parseInt(h.slice(2, 4), 16));
+  const b = mix(parseInt(h.slice(4, 6), 16));
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+// Затемнить цвет блока — для плашек заголовков (700-ряд из 600-го, см. design-themes.css).
+export function darken(hex: string, amount: number): string {
+  const h = hex.replace("#", "");
+  const mix = (c: number) => Math.round(c * (1 - amount));
   const r = mix(parseInt(h.slice(0, 2), 16));
   const g = mix(parseInt(h.slice(2, 4), 16));
   const b = mix(parseInt(h.slice(4, 6), 16));
