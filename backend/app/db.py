@@ -174,6 +174,12 @@ class Database:
             # План интервью (JSON: mode, blocks, subblocks, difficulties, count, order). NULL — сессия
             # по всей матрице, как до v1-closure.
             conn.execute("ALTER TABLE sessions ADD COLUMN plan TEXT")
+        if "status" not in cols:
+            # Итог сессии: active → finished с решением (hire | no_hire | hold) и комментарием.
+            conn.execute("ALTER TABLE sessions ADD COLUMN status TEXT NOT NULL DEFAULT 'active'")
+            conn.execute("ALTER TABLE sessions ADD COLUMN decision TEXT")
+            conn.execute("ALTER TABLE sessions ADD COLUMN summary TEXT")
+            conn.execute("ALTER TABLE sessions ADD COLUMN finished_at TEXT")
 
     @staticmethod
     def _migrate_nodes(conn: sqlite3.Connection) -> None:
@@ -680,6 +686,23 @@ class Database:
             )
             sid = cur.lastrowid
         return self.get_session(sid, tenant_id)
+
+    def finish_session(
+        self, session_id: int, tenant_id: str, decision: str, summary: str
+    ) -> Optional[Dict]:
+        """Завершить сессию с итогом; повторный вызов правит решение/комментарий. None — нет сессии."""
+        with self._conn() as conn:
+            cur = conn.execute(
+                """
+                UPDATE sessions SET status = 'finished', decision = ?, summary = ?,
+                    finished_at = COALESCE(finished_at, ?)
+                WHERE id = ? AND tenant_id = ?
+                """,
+                (decision, summary, _now(), session_id, tenant_id),
+            )
+            if cur.rowcount == 0:
+                return None
+        return self.get_session(session_id, tenant_id)
 
     @staticmethod
     def _session_summary(row: sqlite3.Row) -> Dict:
