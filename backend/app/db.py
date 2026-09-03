@@ -76,6 +76,14 @@ CREATE TABLE IF NOT EXISTS auth_sessions (
     user_id    TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS session_invites (
+    token      TEXT PRIMARY KEY,                -- часть ссылки #/join/<token>; многоразовая, не протухает
+    tenant_id  TEXT NOT NULL,
+    session_id INTEGER NOT NULL,
+    role       TEXT NOT NULL DEFAULT 'viewer',  -- viewer | member (гость получает эту роль в рамках одной сессии)
+    created_by TEXT,
+    created_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS interviewers (
     tenant_id   TEXT NOT NULL DEFAULT 'default' REFERENCES tenants(id),
     id          INTEGER NOT NULL,            -- автоинкремент в пределах тенанта, уник. (tenant_id,id)
@@ -148,6 +156,14 @@ class Database:
             conn.executescript(_SCHEMA)
             self._migrate_sessions(conn)
             self._migrate_nodes(conn)
+            self._migrate_auth_sessions(conn)
+
+    @staticmethod
+    def _migrate_auth_sessions(conn: sqlite3.Connection) -> None:
+        """Гостевой вход по ссылке: auth-сессия может быть ограничена одной сессией интервью."""
+        cols = {r["name"] for r in conn.execute("PRAGMA table_info(auth_sessions)").fetchall()}
+        if "scope_session_id" not in cols:
+            conn.execute("ALTER TABLE auth_sessions ADD COLUMN scope_session_id INTEGER")
 
     @staticmethod
     def _migrate_sessions(conn: sqlite3.Connection) -> None:
@@ -288,6 +304,39 @@ class Database:
     def delete_auth_session(self, token: str) -> None:
         with self._conn() as conn:
             conn.execute("DELETE FROM auth_sessions WHERE token = ?", (token,))
+
+    # --- приглашения в сессию (гостевой вход по ссылке) ---
+    def create_invite(self, tenant_id: str, session_id: int, role: str, created_by: Optional[str]) -> str:
+        token = secrets.token_urlsafe(24)
+        with self._conn() as conn:
+            conn.execute(
+                "INSERT INTO session_invites (token, tenant_id, session_id, role, created_by, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (token, tenant_id, session_id, role, created_by, _now()),
+            )
+        return token
+
+    def get_invite(self, token: str) -> Optional[Dict]:
+        with self._conn() as conn:
+            row = conn.execute("SELECT * FROM session_invites WHERE token = ?", (token,)).fetchone()
+        return dict(row) if row else None
+
+    def create_guest_auth_session(self, invite: Dict) -> str:
+        """Гость по приглашению: одноразовый пользователь без пароля с ролью приглашения и auth-сессия,
+        ограниченная одной сессией интервью (scope_session_id). Возвращает токен cookie."""
+        uid = f"guest-{secrets.token_hex(6)}"
+        token = secrets.token_urlsafe(32)
+        with self._conn() as conn:
+            conn.execute(
+                "INSERT INTO users (tenant_id, id, email, password_hash, role, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (invite["tenant_id"], uid, f"{uid}@invite.local", "!", invite["role"], _now()),
+            )
+            conn.execute(
+                "INSERT INTO auth_sessions (token, tenant_id, user_id, created_at, scope_session_id) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (token, invite["tenant_id"], uid, _now(), invite["session_id"]),
+            )
+        return token
 
     # --- nodes (банк вопросов, per-tenant) ---
     def count_nodes(self, tenant_id: str, pool: Optional[str] = None) -> int:

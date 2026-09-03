@@ -453,6 +453,29 @@ const dimUnscoredAfter = await page.locator(".qnode--dimmed").count();
 if (dimUnscoredAfter >= dimUnscored) fail(`toggling off did not clear dim (${dimUnscored} → ${dimUnscoredAfter})`);
 console.log(`OK: «только неоценённые» dims ${dimUnscored}, clears to ${dimUnscoredAfter}`);
 
+// 10d. Ссылка для коллеги (v1-closure): интервьюер выдаёт ссылку; новая вкладка без cookie входит по
+//      #/join/<token> и видит эту же сессию; гость ограничен ею (без «Выйти» и без выдачи ссылок),
+//      главная для гостя тоже ведёт на доску сессии.
+await page.locator(".session .invitebtn").click();
+await page.waitForSelector(".invitemenu", { timeout: 3000 });
+await page.locator(".invite__member").click();
+await page.waitForSelector(".invite__url", { timeout: 5000 });
+const inviteUrl = await page.locator(".invite__url").inputValue();
+if (!/#\/join\/[A-Za-z0-9_-]+$/.test(inviteUrl)) fail(`invite url malformed: ${inviteUrl}`);
+await page.keyboard.press("Escape");
+const guestCtx = await browser.newContext();
+const guest = await guestCtx.newPage();
+await guest.goto(inviteUrl, { waitUntil: "load" });
+await guest.waitForSelector(".session__active", { timeout: 10000 });
+const guestHdr = await guest.locator(".session__active").innerText();
+if (!guestHdr.includes("Cmp Bot")) fail(`guest does not see the invited session: "${guestHdr}"`);
+if ((await guest.locator(".session .invitebtn").count()) !== 0) fail("guest must not see the invite button");
+if ((await guest.locator(".session__leave").count()) !== 0) fail("guest must not see «Выйти»");
+await guest.goto(inviteUrl.replace(/#.*$/, "#/"), { waitUntil: "load" });
+await guest.waitForSelector(".session__active", { timeout: 10000 });
+await guestCtx.close();
+console.log("OK: guest joins by invite link, scoped to the session");
+
 // 10c. Итог интервью (v1-closure): «Завершить» → решение + комментарий → статус «Завершена» в ряду
 //      сессии; кнопка превращается в «Итог» (правка итога).
 await page.locator(".session .cta-done").click();
