@@ -1,9 +1,11 @@
+import { ArrowRight, CalendarDays, CircleHelp, ClipboardList, Ellipsis, Play, Radio, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import { LangSwitch } from "../components/LangSwitch";
 import { PoolFormModal } from "../components/PoolFormModal";
 import { StartSessionForm } from "../components/StartSessionForm";
 import { nWord, useT } from "../i18n";
+import { poolIcon } from "../poolIcons";
 import { href } from "../router";
 import type { PoolConfig } from "../types";
 
@@ -59,12 +61,11 @@ export function HomePage({
     }
   };
 
-  // Статистика направления: «61 вопрос · 25 сессий» с правильными формами числа.
-  const stats = (p: PoolConfig) => {
-    const n = p.counts?.nodes ?? 0;
-    const s = p.counts?.sessions ?? 0;
-    return `${n} ${nWord(n, ["вопрос", "вопроса", "вопросов"], ["question", "questions"])} · ${s} ${nWord(s, ["сессия", "сессии", "сессий"], ["session", "sessions"])}`;
-  };
+  // Статистика направления с правильными формами числа: «61 вопрос», «25 сессий».
+  const questions = (n: number) => `${n} ${nWord(n, ["вопрос", "вопроса", "вопросов"], ["question", "questions"])}`;
+  const sessions = (n: number) => `${n} ${nWord(n, ["сессия", "сессии", "сессий"], ["session", "sessions"])}`;
+  // Иконки — только outline Lucide, единый stroke-width: они усиливают иерархию, а не спорят с CTA.
+  const ICON = { strokeWidth: 1.75 } as const;
 
   return (
     <div className="page home">
@@ -89,7 +90,9 @@ export function HomePage({
           <p className="muted">{t("Нет ни одного направления: создайте первое кнопкой «+ Новое направление» или положите каталог с `pool.yaml` в `content/`.")}</p>
         )}
         <div className="home__pools">
-          {pools.map((p) => (
+          {pools.map((p) => {
+            const { Icon, tint } = poolIcon(p.id);
+            return (
             <div key={p.id} className="poolcard" data-pool={p.id}>
               {/* Меню направления лежит над «растяжкой» .poolcard__label::after (z-index), иначе клик уводит на доску. */}
               <button
@@ -102,7 +105,7 @@ export function HomePage({
                   setMenuFor((cur) => (cur === p.id ? null : p.id));
                 }}
               >
-                •••
+                <Ellipsis size={18} {...ICON} />
               </button>
               {menuFor === p.id && (
                 <div className="poolcard__dropdown" role="menu" onClick={(e) => e.stopPropagation()}>
@@ -114,10 +117,20 @@ export function HomePage({
                   </button>
                 </div>
               )}
-              {/* Ссылка-«растяжка»: её ::after накрывает всю карточку — клик в любом месте открывает доску. */}
-              <a className="poolcard__label" href={href.board(p.id)}>{p.label}</a>
-              {p.description && <div className="poolcard__desc">{p.description}</div>}
-              <div className="poolcard__meta">{stats(p)}</div>
+              <div className="poolcard__head">
+                <span className={`poolcard__icon poolcard__icon--${tint}`} aria-hidden="true">
+                  <Icon size={24} {...ICON} />
+                </span>
+                <div className="poolcard__titles">
+                  {/* Ссылка-«растяжка»: её ::after накрывает всю карточку — клик в любом месте открывает доску. */}
+                  <a className="poolcard__label" href={href.board(p.id)}>{p.label}</a>
+                  {p.description && <div className="poolcard__desc">{p.description}</div>}
+                </div>
+              </div>
+              <div className="poolcard__meta">
+                <span className="poolcard__stat"><CircleHelp size={16} strokeWidth={2} aria-hidden="true" />{questions(p.counts?.nodes ?? 0)}</span>
+                <span className="poolcard__stat"><CalendarDays size={16} strokeWidth={2} aria-hidden="true" />{sessions(p.counts?.sessions ?? 0)}</span>
+              </div>
               <div className="poolcard__blocks">
                 {p.blocks.map((b) => (
                   <span key={b.id} className="poolcard__block">{b.label}</span>
@@ -126,13 +139,18 @@ export function HomePage({
               {/* Действия лежат над «растяжкой»; margin-top:auto прижимает их к низу — карточки в ряду одной высоты. */}
               <div className="poolcard__actions">
                 <button className="poolcard__start btn--primary" onClick={() => setStartPool(p.id)}>
-                  {t("Начать интервью →")}
+                  <Play size={15} strokeWidth={2} aria-hidden="true" />
+                  {t("Начать интервью")}
                 </button>
-                <a className="poolcard__open" href={href.bank(p.id)}>{t("Открыть вопросы →")}</a>
+                <a className="poolcard__open" href={href.bank(p.id)}>
+                  {t("Открыть вопросы")}
+                  <ArrowRight size={16} {...ICON} aria-hidden="true" />
+                </a>
               </div>
               {startPool === p.id && <StartSessionForm pool={p} onClose={() => setStartPool(null)} />}
             </div>
-          ))}
+            );
+          })}
         </div>
         {modal && (
           <PoolFormModal
@@ -149,18 +167,20 @@ export function HomePage({
 
         <h2 className="home__h2 home__sections-head">{t("Проведение интервью")}</h2>
         <div className="home__sections">
-          <a className="menucard" href={href.candidates}>
-            <strong>{t("Кандидаты")}</strong>
-            <span>{t("Справочник кандидатов и интервьюеров")}</span>
-          </a>
-          <a className="menucard" href={href.sessions}>
-            <strong>{t("Сессии")}</strong>
-            <span>{t("Все проведённые интервью, отчёты")}</span>
-          </a>
-          <a className="menucard" href={href.connect}>
-            <strong>{t("Подключение")}</strong>
-            <span>{t("Присоединиться к идущей live-сессии")}</span>
-          </a>
+          {[
+            { href: href.candidates, Icon: Users, title: t("Кандидаты"), text: t("Справочник кандидатов и интервьюеров") },
+            { href: href.sessions, Icon: ClipboardList, title: t("Сессии"), text: t("Все проведённые интервью, отчёты") },
+            { href: href.connect, Icon: Radio, title: t("Подключение"), text: t("Присоединиться к идущей live-сессии") },
+          ].map(({ href: to, Icon: I, title, text }) => (
+            <a key={to} className="menucard" href={to}>
+              <span className="menucard__icon" aria-hidden="true"><I size={22} {...ICON} /></span>
+              <span className="menucard__text">
+                <strong>{title}</strong>
+                <span>{text}</span>
+              </span>
+              <ArrowRight className="menucard__arrow" size={18} {...ICON} aria-hidden="true" />
+            </a>
+          ))}
         </div>
       </main>
     </div>

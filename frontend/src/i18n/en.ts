@@ -44,7 +44,7 @@ export const EN: Record<string, string> = {
   "Интервью · доска вопросов": "Interview · question board",
   "Направления": "Tracks",
   "+ Новое направление": "+ New track",
-  "Открыть вопросы →": "Open questions →",
+  "Открыть вопросы": "Open questions",
   "Меню направления": "Track menu",
   "Проведение интервью": "Interviewing",
   "Нет ни одного направления: создайте первое кнопкой «+ Новое направление» или положите каталог с `pool.yaml` в `content/`.":

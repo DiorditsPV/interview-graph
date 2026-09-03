@@ -727,3 +727,31 @@ a.iconbtn { text-decoration: none; display: inline-block; }
 .home__sections-head { margin-top: 36px; padding-top: 22px; border-top: 1px solid var(--border); }
 .home__sections { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 @media (max-width: 640px) { .home__sections { grid-template-columns: 1fr; } }
+
+/* ---- главная: иконки Lucide (ТЗ 2026-09-03) — role-icon в мягком тинте, статистика в светлом блоке,
+   Play в CTA, ArrowRight во вторичных переходах, иконки нижних карточек ---- */
+.poolcard__head { display: flex; gap: 12px; align-items: flex-start; padding-right: 36px; }
+.poolcard__label { padding-right: 0; }
+.poolcard__titles { min-width: 0; display: grid; gap: 4px; }
+.poolcard__icon { flex: 0 0 52px; width: 52px; height: 52px; display: grid; place-items: center; border-radius: 12px; border: 1px solid; }
+.poolcard__icon--blue   { color: #2563eb; background: rgba(37, 99, 235, .08);  border-color: rgba(37, 99, 235, .22); }
+.poolcard__icon--teal   { color: #059669; background: rgba(5, 150, 105, .08);  border-color: rgba(5, 150, 105, .22); }
+.poolcard__icon--violet { color: #7c3aed; background: rgba(124, 58, 237, .08); border-color: rgba(124, 58, 237, .22); }
+.poolcard__icon--amber  { color: #d97706; background: rgba(217, 119, 6, .08);  border-color: rgba(217, 119, 6, .22); }
+.poolcard__icon--slate  { color: #64748b; background: rgba(100, 116, 139, .08); border-color: rgba(100, 116, 139, .22); }
+.poolcard__meta { display: flex; flex-wrap: wrap; gap: 6px 20px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); font-size: 13px; color: var(--text); }
+.poolcard__stat { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.poolcard__stat svg { color: var(--accent); flex: 0 0 auto; }
+.poolcard__actions { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px; }
+.poolcard .poolcard__start { display: inline-flex; align-items: center; gap: 8px; }
+.poolcard__open {
+  display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border: 1px solid var(--border-strong); border-radius: 6px;
+  font-size: 13px; font-weight: 600; color: var(--text); text-decoration: none; background: var(--surface); white-space: nowrap;
+}
+.poolcard__open:hover { background: var(--hover); text-decoration: none; }
+.poolcard__menu { padding: 3px 6px; display: inline-flex; }
+.menucard { flex-direction: row; align-items: center; gap: 14px; }
+.menucard__icon { flex: 0 0 46px; width: 46px; height: 46px; display: grid; place-items: center; border-radius: 10px; color: var(--accent); background: rgba(37, 99, 235, .08); border: 1px solid rgba(37, 99, 235, .22); }
+.menucard__text { flex: 1; min-width: 0; display: grid; gap: 3px; }
+.menucard__arrow { flex: 0 0 auto; color: var(--text); }
+.menucard__text strong { font-size: 15px; }

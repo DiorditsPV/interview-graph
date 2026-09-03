@@ -42,14 +42,14 @@ const deCard = page.locator('.poolcard[data-pool="data-engineer"]');
 if ((await deCard.count()) !== 1) fail("data-engineer pool card missing on main menu");
 // 0c. CRUD направлений (pool-crud): создать из пресета DE → карточка с тем же числом вопросов →
 //     переименовать → удалить (confirm принимается). Всё на главной, до ухода на доску.
-const deMeta = await deCard.locator(".poolcard__meta").innerText();
+const deMeta = await deCard.locator(".poolcard__stat").first().innerText();
 await page.locator(".home__add").click();
 await page.waitForSelector(".poolform", { timeout: 3000 });
 await page.fill(".poolform__label", "Smoke Pool");
 await page.locator(".pool-preset").selectOption("data-engineer");
 await page.locator(".poolform__submit").click();
 await page.waitForSelector('.poolcard[data-pool="smoke-pool"]', { timeout: 10000 });
-const smokeMeta = await page.locator('.poolcard[data-pool="smoke-pool"] .poolcard__meta').innerText();
+const smokeMeta = await page.locator('.poolcard[data-pool="smoke-pool"] .poolcard__stat').first().innerText();
 if (smokeMeta.split("·")[0].trim() !== deMeta.split("·")[0].trim()) fail(`preset copy mismatch: "${smokeMeta}" vs "${deMeta}"`);
 await page.locator('.poolcard[data-pool="smoke-pool"] .poolcard__menu').click();
 await page.locator('.poolcard[data-pool="smoke-pool"] .poolcard__edit').click();
@@ -66,7 +66,7 @@ await page.waitForFunction(
 //      колонку пресета (у неё есть вопросы → confirm с числом) → чипов на один меньше, вопросов меньше.
 const smokeCard = page.locator('.poolcard[data-pool="smoke-pool"]');
 const chipsBefore = await smokeCard.locator(".poolcard__block").count();
-const nodesBefore = parseInt(await smokeCard.locator(".poolcard__meta").innerText(), 10);
+const nodesBefore = parseInt(await smokeCard.locator(".poolcard__stat").first().innerText(), 10);
 await smokeCard.locator(".poolcard__menu").click();
 await smokeCard.locator(".poolcard__edit").click();
 await page.waitForSelector(".blocks-editor", { timeout: 3000 });
@@ -107,7 +107,7 @@ await page.waitForFunction(
   chipsBefore,
   { timeout: 5000 },
 );
-const nodesAfter = parseInt(await smokeCard.locator(".poolcard__meta").innerText(), 10);
+const nodesAfter = parseInt(await smokeCard.locator(".poolcard__stat").first().innerText(), 10);
 if (!(nodesAfter < nodesBefore)) fail(`deleting a column did not drop questions: ${nodesBefore} → ${nodesAfter}`);
 console.log(`OK: pool blocks editor — column deleted with confirm, questions ${nodesBefore} → ${nodesAfter}`);
 
@@ -121,7 +121,7 @@ console.log("OK: pool create from preset / rename / delete");
 //     (язык хранится в localStorage — обязательно вернуть RU, остальные шаги идут по русским строкам).
 await page.locator(".langswitch").first().click();
 await page.waitForFunction(() => document.querySelector(".home__h2")?.textContent === "Tracks", null, { timeout: 3000 });
-if ((await page.locator(".poolcard__start").first().innerText()) !== "Start interview →") fail("EN: start button not translated");
+if ((await page.locator(".poolcard__start").first().innerText()) !== "Start interview") fail("EN: start button not translated");
 await page.locator(".langswitch").first().click();
 await page.waitForFunction(() => document.querySelector(".home__h2")?.textContent === "Направления", null, { timeout: 3000 });
 console.log("OK: RU/EN switch");
