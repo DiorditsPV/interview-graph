@@ -665,6 +665,8 @@ kbd {
 .table__edit input { width: 100%; padding: 4px 6px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--surface); color: var(--text); }
 a.iconbtn { text-decoration: none; display: inline-block; }
 
+/* ---- i18n: переключатель языка (в шапках главной, страниц и доски) ---- */
+.langswitch { font-size: 11px; letter-spacing: .08em; font-weight: 700; }
 /* ---- pool-crud: карточка «+ Новое направление», кнопки изменить/удалить, модалка ---- */
 .poolcard--new {
   align-items: center; justify-content: center; min-height: 120px; cursor: pointer;

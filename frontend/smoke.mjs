@@ -65,6 +65,15 @@ await page.locator('.poolcard[data-pool="smoke-pool"] .poolcard__delete').click(
 await page.waitForSelector('.poolcard[data-pool="smoke-pool"]', { state: "detached", timeout: 5000 });
 console.log("OK: pool create from preset / rename / delete");
 
+// 0d. RU/EN (i18n): переключатель на главной меняет опорные подписи и возвращает обратно
+//     (язык хранится в localStorage — обязательно вернуть RU, остальные шаги идут по русским строкам).
+await page.locator(".langswitch").first().click();
+await page.waitForFunction(() => document.querySelector(".home__h2")?.textContent === "Tracks", null, { timeout: 3000 });
+if ((await page.locator(".poolcard__start").first().innerText()) !== "Start interview") fail("EN: start button not translated");
+await page.locator(".langswitch").first().click();
+await page.waitForFunction(() => document.querySelector(".home__h2")?.textContent === "Направления", null, { timeout: 3000 });
+console.log("OK: RU/EN switch");
+
 // Кликаем по самой ссылке-«растяжке» (.poolcard__label), а не по всей карточке: внутри есть ещё
 // сиблинг .poolcard__bank (ссылка на банк) — клик по центру div'а рискует попасть мимо доски.
 await deCard.locator(".poolcard__label").click();

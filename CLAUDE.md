@@ -82,7 +82,7 @@ Dev hot-reload вручную: `uvicorn app.main:app --reload --port 8000` (из
 
 ## Проверка изменений
 Скилл **interview-verify** (или вручную): import 0 ошибок (`/api/graph`) → `pytest` →
-при правке фронта `npm run build` + `npm run smoke` (нужен сервер) → рестарт uvicorn.
+при правке фронта `npm run build` + `npm run i18n:check` (ключи `t("…")` есть в `src/i18n/en.ts`) + `npm run smoke` (нужен сервер) → рестарт uvicorn.
 При переименовании нод/тегов/классов, на которые опирается smoke, обнови `frontend/smoke.mjs`.
 
 ## Скиллы проекта (`.claude/skills/`)

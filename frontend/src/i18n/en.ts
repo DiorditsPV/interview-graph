@@ -1,0 +1,245 @@
+// Словарь RU → EN интерфейса. Ключ — русская строка ровно как в коде (см. i18n.tsx):
+// изменил фразу в коде — измени ключ здесь, иначе перевод молча потеряется.
+// Группы — по файлам; подстановки вида {name} сохраняются как есть.
+// Ключ, встречающийся в нескольких файлах, лежит в группе «Общие» (в литерале объекта
+// один ключ может быть только один раз).
+export const EN: Record<string, string> = {
+  // --- Общие (несколько файлов) ---
+  "Отмена": "Cancel",
+  "Сохранить": "Save",
+  "Создать": "Create",
+  "Открыть": "Open",
+  "Закрыть (Esc)": "Close (Esc)",
+  "Загрузка…": "Loading…",
+  "вопрос": "question",
+  "задача": "task",
+  "Вопрос": "Question",
+  "Задача": "Task",
+  "Ответ": "Answer",
+  "Эталон / решение": "Reference solution",
+  "Заголовок": "Title",
+  "Сложность": "Difficulty",
+  "Тип": "Type",
+  "Оценка": "Score",
+  "Оценено": "Scored",
+  "Стартовый код": "Starter code",
+  "Критерии оценки": "Scoring criteria",
+  "{n} вопросов": "{n} questions",
+  "Кандидат": "Candidate",
+  "Кандидаты": "Candidates",
+  "Сессии": "Sessions",
+  "Имя": "Name",
+  "Позиция": "Position",
+  "Грейд": "Grade",
+  "Банк вопросов": "Question bank",
+  "Горячие клавиши": "Keyboard shortcuts",
+  "Настройки": "Settings",
+  "Начать интервью": "Start interview",
+  "Агенда": "Agenda",
+
+  // --- index.html / LangProvider (заголовок вкладки) ---
+  "Интервью · граф вопросов": "Interview · question graph",
+
+  // --- HomePage ---
+  "Интервью · доска вопросов": "Interview · question board",
+  "Направления": "Tracks",
+  "Разделы": "Sections",
+  "банк вопросов →": "question bank →",
+  "+ Новое направление": "+ New track",
+  "Нет ни одного пула: положите каталог с `pool.yaml` в `content/`.": "No pools yet: put a directory with `pool.yaml` into `content/`.",
+  "{nodes} вопросов · {sessions} сессий": "{nodes} questions · {sessions} sessions",
+  "изменить": "edit",
+  "удалить": "delete",
+  "Удалить направление «{label}»? Вопросы ({nodes}) будут удалены, сессии ({sessions}) останутся в истории.":
+    "Delete track “{label}”? Its questions ({nodes}) will be deleted; sessions ({sessions}) stay in history.",
+  "Не удалось удалить направление": "Could not delete track",
+  "Справочник кандидатов и интервьюеров": "Directory of candidates and interviewers",
+  "Все проведённые интервью, отчёты": "All past interviews, reports",
+  "Подключение": "Connect",
+  "Присоединиться к идущей live-сессии": "Join a live session in progress",
+
+  // --- PageShell / LangSwitch ---
+  "← Меню": "← Menu",
+  "Главное меню": "Main menu",
+  "Русский": "Russian",
+  "English": "English",
+
+  // --- Router ---
+  "Не удалось загрузить направления: {error}": "Could not load tracks: {error}",
+  "Направления «{pool}» нет": "No track “{pool}”",
+
+  // --- Login ---
+  "Вход": "Sign in",
+  "пароль": "password",
+  "Войти": "Sign in",
+  "Неверный email или пароль": "Invalid email or password",
+
+  // --- BoardPage ---
+  "Оценено по текущему набору фильтров": "Scored within the current filter set",
+  "оценено {done} / {total} ({pct}%)": "scored {done} / {total} ({pct}%)",
+  "оценено {scored} · средн. {avg}": "scored {scored} · avg {avg}",
+  "Live: изменения синхронизируются с HR": "Live: changes sync with HR",
+  "Подключение к live…": "Connecting to live…",
+  "Выйти из сессии": "Leave session",
+  "Выйти": "Leave",
+  "Просмотр без сессии": "Viewing without a session",
+  "Начать интервью →": "Start interview →",
+  "Сначала выставьте оценки": "Score something first",
+  "Скачать результаты (HTML)": "Download results (HTML)",
+  "Скачать": "Download",
+  "Все вопросы оценены — скачать итоговый отчёт": "All questions scored — download the final report",
+  "Завершить · Скачать отчёт": "Finish · Download report",
+  "⚠ Ошибки импорта ({n}):": "⚠ Import errors ({n}):",
+  "Загрузка графа…": "Loading board…",
+  "Фильтры вопросов": "Question filters",
+  "Свернуть фильтры": "Collapse filters",
+  "Развернуть фильтры": "Expand filters",
+  "Фильтры": "Filters",
+  "Фильтры активны": "Filters active",
+  "Поиск по вопросам…": "Search questions…",
+  "Поиск по вопросам": "Search questions",
+  "Блоки": "Blocks",
+  "Прогресс": "Progress",
+  "Только неоценённые": "Unscored only",
+  "Развернуть теги": "Expand tags",
+  "Свернуть теги": "Collapse tags",
+  "Теги": "Tags",
+  "сбросить": "reset",
+  "Время на вопрос · вся сессия": "Time per question · whole session",
+  "Дальше →": "Next →",
+  "Снять выбор (Esc)": "Clear selection (Esc)",
+  "Не удалось удалить вопрос": "Could not delete question",
+  "Не удалось сохранить изменения": "Could not save changes",
+
+  // --- BankPage ---
+  "Добавить вопрос": "Add question",
+  "Загрузить файл": "Upload file",
+  "Скачать HTML": "Download HTML",
+
+  // --- CandidatesPage ---
+  "Кандидаты и интервьюеры": "Candidates and interviewers",
+  "Контакт": "Contact",
+  "Добавить": "Add",
+  "Изменить": "Edit",
+  "Интервьюеры": "Interviewers",
+  "Роль": "Role",
+
+  // --- SessionsPage ---
+  "Направление": "Track",
+  "Интервьюер": "Interviewer",
+  "Дата": "Date",
+  "Отчёт": "Report",
+  "Сессий пока нет — начните интервью с главной.": "No sessions yet — start an interview from the main menu.",
+
+  // --- ConnectPage ---
+  "Подключиться к сессии": "Join a session",
+  "Откроется доска направления с оценками этой сессии; дальнейшие оценки синхронизируются live.":
+    "Opens the track's board with this session's scores; further scores sync live.",
+  "Нет сессий, к которым можно подключиться.": "No sessions to join.",
+
+  // --- AddQuestionModal ---
+  "Не удалось создать вопрос": "Could not create question",
+  "Новый вопрос": "New question",
+  "Блок": "Block",
+  "Тема": "Topic",
+  "например, sql": "e.g. sql",
+  "Теги (через запятую)": "Tags (comma-separated)",
+
+  // --- PoolFormModal ---
+  "Не удалось создать направление": "Could not create track",
+  "Не удалось сохранить направление": "Could not save track",
+  "Новое направление": "New track",
+  "Направление · {label}": "Track · {label}",
+  "Название": "Name",
+  "Описание": "Description",
+  "Набор вопросов": "Question set",
+
+  // --- StartSessionForm ---
+  "Не удалось начать сессию": "Could not start session",
+  "Выбрать существующего кандидата": "Pick an existing candidate",
+  "Новый кандидат…": "New candidate…",
+  "Кандидат…": "Candidate…",
+  "Позиция (опц.)": "Position (optional)",
+  "Грейд (опц.)": "Grade (optional)",
+  "Начать": "Start",
+
+  // --- UploadModal ---
+  "Загрузить вопросы": "Upload questions",
+  "Перетащите .md / .json сюда или нажмите для выбора": "Drop .md / .json here or click to choose",
+  "Добавлено: {n}": "Added: {n}",
+  "Ошибки: {n}": "Errors: {n}",
+
+  // --- SettingsMenu ---
+  "Оформление": "Look",
+  "Оформление доски": "Board look",
+  "Цветовая тема": "Color theme",
+  "Выбор запоминается": "Choice is remembered",
+  "Тёмная тема": "Dark theme",
+  "Холст": "Canvas",
+  "Отображение холста": "Canvas display",
+  "Точки на фоне": "Background dots",
+  "Границы блоков": "Block boundaries",
+  "Вертикальные направляющие": "Vertical guides",
+  "Уровни Base / Junior / Middle / Senior": "Base / Junior / Middle / Senior levels",
+  "Горизонтальные направляющие": "Horizontal guides",
+  "Панели": "Panels",
+  "Сайдбар со списком вопросов": "Sidebar with the question list",
+  "Показывать вопросы, убранные с доски": "Show questions removed from the board",
+  "Скрытые вопросы": "Hidden questions",
+  "Время на вопрос и на сессию в нижней панели": "Time per question and per session in the bottom bar",
+  "Таймер": "Timer",
+  "Открыть банк направления →": "Open the track's question bank →",
+  "Справка": "Help",
+
+  // --- ShortcutsHelp ---
+  "оценить текущий вопрос": "score the current question",
+  "открыть карточку текущего вопроса": "open the current question's card",
+  "перейти к следующему неоценённому": "go to the next unscored question",
+  "навигация по сетке вопросов": "navigate the question grid",
+  "снять выделение / закрыть эту шпаргалку": "clear selection / close this cheat sheet",
+  "показать / скрыть эту шпаргалку": "show / hide this cheat sheet",
+
+  // --- DetailDrawer ---
+  "Детали вопроса": "Question details",
+  "🛠 задача": "🛠 task",
+  "❓ вопрос": "❓ question",
+  "Вернуть на доску": "Return to board",
+  "Скрыть с доски (локально, обратимо)": "Hide from board (local, reversible)",
+  "Вернуть": "Return",
+  "Скрыть": "Hide",
+  "Удалить вопрос «{name}» из банка безвозвратно?": "Delete question “{name}” from the bank permanently?",
+  "Удалить вопрос из банка (необратимо)": "Delete question from the bank (irreversible)",
+  "Удалить": "Delete",
+  "Редактировать вопрос (в банке)": "Edit question (in the bank)",
+  "Редактировать": "Edit",
+  "Развернуть/свернуть": "Expand/collapse",
+  "Свернуть": "Collapse",
+  "На весь экран": "Full screen",
+  "💾 Сохранить": "💾 Save",
+  "Оценка {n}": "Score {n}",
+  "Заметка интервьюера…": "Interviewer's note…",
+
+  // --- BankBrowser ---
+  "Все вопросы": "All questions",
+  "показано {shown} из {total}": "showing {shown} of {total}",
+  "Поиск по тексту, теме, тегам…": "Search text, topic, tags…",
+  "Развернуть всё": "Expand all",
+  "Свернуть всё": "Collapse all",
+  "Ничего не найдено": "Nothing found",
+
+  // --- QuestionNode ---
+  "скрыт · ": "hidden · ",
+
+  // --- report.ts ---
+  "Нет оценённых вопросов — выставьте оценки и скачайте отчёт снова.": "No scored questions — set some scores and download the report again.",
+  "Результаты интервью": "Interview results",
+  "направление": "track",
+  "интервьюер": "interviewer",
+  "Средний балл": "Average score",
+  "Сгенерировано локальным сервисом «Интервью · граф вопросов»": "Generated by the local service “Interview · question graph”",
+  "Заготовка кода": "Starter code",
+  "Критерии": "Criteria",
+  "Банк пуст.": "The bank is empty.",
+  "Банк вопросов · интервью": "Question bank · interview",
+  "кандидат": "candidate",
+};

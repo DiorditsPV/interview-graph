@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { AuthGate } from "./AuthGate";
+import { LangProvider } from "./i18n";
 
 import "@xyflow/react/dist/style.css";
 import "highlight.js/styles/github-dark.css";
@@ -9,6 +10,9 @@ import "./design-themes.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <AuthGate />
+    {/* Язык интерфейса — над гейтом входа: экран логина тоже переводится. */}
+    <LangProvider>
+      <AuthGate />
+    </LangProvider>
   </StrictMode>,
 );

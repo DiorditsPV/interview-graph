@@ -8,6 +8,7 @@
     "build": "tsc --noEmit -p tsconfig.json && vite build",
     "preview": "vite preview",
     "smoke": "node smoke.mjs",
+    "i18n:check": "node i18n-check.mjs",
     "shots": "node shots.mjs"
   },
   "dependencies": {

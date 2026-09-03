@@ -13,7 +13,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type NodeUpdate } from "../api";
 import { BandsNode } from "../components/BandsNode";
 import { BlockGroupNode } from "../components/BlockGroupNode";
+import { LangSwitch } from "../components/LangSwitch";
 import { SettingsMenu } from "../components/SettingsMenu";
+import { useT } from "../i18n";
 import { DetailDrawer } from "../components/DetailDrawer";
 import { GuidesNode } from "../components/GuidesNode";
 import { QuestionNode } from "../components/QuestionNode";
@@ -244,6 +246,7 @@ const KIND_COLOR: Record<string, string> = { question: "#2563eb", task: "#9333ea
 const ALL_KINDS: Record<string, boolean> = { question: true, task: true };
 
 export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; sessionFromUrl: number | null }) {
+  const t = useT();
   const [graph, setGraph] = useState<QNode[]>([]);
   const [errors, setErrors] = useState<ImportErr[]>([]);
   const [placement, setPlacement] = useState<Placement | null>(null);
@@ -415,7 +418,7 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
       try {
         await api.deleteNode(id);
       } catch {
-        alert("Не удалось удалить вопрос");
+        alert(t("Не удалось удалить вопрос"));
         return;
       }
       await loadGraph();
@@ -437,7 +440,7 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
       try {
         await api.updateNode(id, fields);
       } catch {
-        alert("Не удалось сохранить изменения");
+        alert(t("Не удалось сохранить изменения"));
         return;
       }
       await loadGraph();
@@ -704,24 +707,25 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
       <header className="topbar">
         {/* ряд 1 — где мы: назад в меню, направление, прогресс, настройки */}
         <div className="topbar__row topbar__row--flow">
-          <a className="topbar__back" href={href.home} title="Главное меню">← Меню</a>
+          <a className="topbar__back" href={href.home} title={t("Главное меню")}>{t("← Меню")}</a>
           <h1 className="appname">{pool.label}</h1>
-          <span className="muted">{graph.length} вопросов</span>
-          <div className="progress" title="Оценено по текущему набору фильтров">
+          <span className="muted">{t("{n} вопросов", { n: graph.length })}</span>
+          <div className="progress" title={t("Оценено по текущему набору фильтров")}>
             <div className="progress__track">
               <div className="progress__fill" style={{ width: `${coverage.pct}%` }} />
             </div>
             <span className="progress__label">
-              оценено {coverage.done} / {coverage.total} ({coverage.pct}%)
+              {t("оценено {done} / {total} ({pct}%)", { done: coverage.done, total: coverage.total, pct: coverage.pct })}
             </span>
           </div>
+          <LangSwitch />
           <div className="settings topbar__settings">
             <button
               className={`iconbtn setbtn btn--quiet ${settingsOpen ? "setbtn--on" : ""}`}
               onClick={() => setSettingsOpen((v) => !v)}
               aria-expanded={settingsOpen}
               aria-haspopup="dialog"
-              title="Настройки"
+              title={t("Настройки")}
             >
               ⚙
             </button>
@@ -761,22 +765,22 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
             <>
               <span className="session__active">
                 👤 {session.candidate}
-                {" · "}оценено {scored} · средн. {avg}
+                {" · "}{t("оценено {scored} · средн. {avg}", { scored, avg })}
               </span>
               <span
                 className={`livedot ${live ? "livedot--on" : ""}`}
-                title={live ? "Live: изменения синхронизируются с HR" : "Подключение к live…"}
+                title={live ? t("Live: изменения синхронизируются с HR") : t("Подключение к live…")}
               >
                 ● {live ? "LIVE" : "…"}
               </span>
-              <button className="iconbtn" onClick={leaveSession} title="Выйти из сессии">
-                Выйти
+              <button className="iconbtn" onClick={leaveSession} title={t("Выйти из сессии")}>
+                {t("Выйти")}
               </button>
             </>
           ) : (
             <>
-              <span className="session__none muted">Просмотр без сессии</span>
-              <a className="session__start" href={href.start(pool.id)}>Начать интервью →</a>
+              <span className="session__none muted">{t("Просмотр без сессии")}</span>
+              <a className="session__start" href={href.start(pool.id)}>{t("Начать интервью →")}</a>
             </>
           )}
           <span className="session__sep" aria-hidden="true" />
@@ -784,17 +788,17 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
             className="iconbtn dlbtn"
             onClick={() => downloadReport(session?.candidate ?? "", graph, scores, pool, notes, reportPeople)}
             disabled={scored === 0}
-            title={scored === 0 ? "Сначала выставьте оценки" : "Скачать результаты (HTML)"}
+            title={scored === 0 ? t("Сначала выставьте оценки") : t("Скачать результаты (HTML)")}
           >
-            Скачать
+            {t("Скачать")}
           </button>
           {graph.length > 0 && scored === graph.length && (
             <button
               className="cta-done"
               onClick={() => downloadReport(session?.candidate ?? "", graph, scores, pool, notes, reportPeople)}
-              title="Все вопросы оценены — скачать итоговый отчёт"
+              title={t("Все вопросы оценены — скачать итоговый отчёт")}
             >
-              Завершить · Скачать отчёт
+              {t("Завершить · Скачать отчёт")}
             </button>
           )}
         </div>
@@ -803,7 +807,7 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
 
       {errors.length > 0 && (
         <div className="errbar">
-          ⚠ Ошибки импорта ({errors.length}):{" "}
+          {t("⚠ Ошибки импорта ({n}):", { n: errors.length })}{" "}
           {errors.map((e, i) => (
             <span key={i} className="erritem">
               {e.file}: {e.error}
@@ -815,7 +819,7 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
       <div className="main">
         {agendaOpen && placement && (
           <aside className="interview">
-            <h4>Агенда · {agendaRows.filter((r) => r.kind === "item").length}</h4>
+            <h4>{t("Агенда")} · {agendaRows.filter((r) => r.kind === "item").length}</h4>
             {agendaRows.map((r, i) =>
               r.kind === "head" ? (
                 <div key={`h-${r.block}-${i}`} className="iv-block" style={{ color: blockColor(pool, r.block) }}>
@@ -842,7 +846,7 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
         )}
         <div className="canvas">
           {rfNodes.length === 0 ? (
-            <div className="loading">Загрузка графа…</div>
+            <div className="loading">{t("Загрузка графа…")}</div>
           ) : (
             <ReactFlow
               nodes={rfNodes}
@@ -878,31 +882,31 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
                 <div
                   className={`filterpanel ${filtersOpen ? "" : "filterpanel--closed"}`}
                   role="region"
-                  aria-label="Фильтры вопросов"
+                  aria-label={t("Фильтры вопросов")}
                 >
                   <div className="fp__bar">
                     <button
                       className="fp__toggle"
                       onClick={() => setFiltersOpen((v) => !v)}
                       aria-expanded={filtersOpen}
-                      title={filtersOpen ? "Свернуть фильтры" : "Развернуть фильтры"}
+                      title={filtersOpen ? t("Свернуть фильтры") : t("Развернуть фильтры")}
                     >
-                      Фильтры
+                      {t("Фильтры")}
                       <span className="fp__chevron">{filtersOpen ? "▸" : "◂"}</span>
                     </button>
-                    {!filtersOpen && anyFilterOn && <span className="fp__badge" title="Фильтры активны" />}
+                    {!filtersOpen && anyFilterOn && <span className="fp__badge" title={t("Фильтры активны")} />}
                   </div>
                   {filtersOpen && (
                   <>
                   <input
                     className="fp__search"
-                    placeholder="Поиск по вопросам…"
-                    aria-label="Поиск по вопросам"
+                    placeholder={t("Поиск по вопросам…")}
+                    aria-label={t("Поиск по вопросам")}
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                   />
                   <div className="fp__group">
-                    <h2 className="fp__title">Блоки</h2>
+                    <h2 className="fp__title">{t("Блоки")}</h2>
                     {blockOrder(pool).map((b) => (
                       <button
                         key={b}
@@ -919,7 +923,7 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
                     ))}
                   </div>
                   <div className="fp__group">
-                    <h2 className="fp__title">Сложность</h2>
+                    <h2 className="fp__title">{t("Сложность")}</h2>
                     {DIFFS.map((d) => (
                       <button
                         key={d}
@@ -936,7 +940,7 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
                     ))}
                   </div>
                   <div className="fp__group">
-                    <h2 className="fp__title">Тип</h2>
+                    <h2 className="fp__title">{t("Тип")}</h2>
                     {KINDS.map((k) => (
                       <button
                         key={k}
@@ -948,12 +952,12 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
                         }}
                         onClick={() => toggleKind(k)}
                       >
-                        {KIND_LABEL[k]}
+                        {t(KIND_LABEL[k])}
                       </button>
                     ))}
                   </div>
                   <div className="fp__group">
-                    <h2 className="fp__title">Прогресс</h2>
+                    <h2 className="fp__title">{t("Прогресс")}</h2>
                     <button
                       className={`fp__chip ${unscoredOnly ? "" : "fp__chip--off"}`}
                       style={{
@@ -963,7 +967,7 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
                       }}
                       onClick={() => setUnscoredOnly((v) => !v)}
                     >
-                      Только неоценённые
+                      {t("Только неоценённые")}
                     </button>
                   </div>
                   <div className="fp__group fp__group--tags">
@@ -971,13 +975,13 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
                       <button
                         className="fp__collapse"
                         onClick={() => setTagsCollapsed((v) => !v)}
-                        title={tagsCollapsed ? "Развернуть теги" : "Свернуть теги"}
+                        title={tagsCollapsed ? t("Развернуть теги") : t("Свернуть теги")}
                       >
-                        {tagsCollapsed ? "▸" : "▾"} Теги
+                        {tagsCollapsed ? "▸" : "▾"} {t("Теги")}
                       </button>
                       {anyTagActive && (
                         <button className="fp__clear" onClick={clearTags}>
-                          сбросить
+                          {t("сбросить")}
                         </button>
                       )}
                     </div>
@@ -1007,7 +1011,7 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
                       {currentNode.title || currentNode.question}
                     </span>
                     {showTimer && (
-                      <span className="hud__timer" title="Время на вопрос · вся сессия">
+                      <span className="hud__timer" title={t("Время на вопрос · вся сессия")}>
                         ⏱ {mmss(now - questionStart)}
                         {sessionStart != null && ` · ${mmss(now - sessionStart)}`}
                       </span>
@@ -1030,11 +1034,11 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
                         </button>
                       ))}
                     </span>
-                    <button onClick={() => setSelectedId(currentId)}>Открыть</button>
+                    <button onClick={() => setSelectedId(currentId)}>{t("Открыть")}</button>
                     <button className="btn--primary" onClick={nextQuestion}>
-                      Дальше →
+                      {t("Дальше →")}
                     </button>
-                    <button className="hud__cancel" onClick={() => setCurrentId(null)} title="Снять выбор (Esc)">
+                    <button className="hud__cancel" onClick={() => setCurrentId(null)} title={t("Снять выбор (Esc)")}>
                       ✕
                     </button>
                   </div>

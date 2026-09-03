@@ -1,10 +1,12 @@
 import { useState, type FormEvent } from "react";
 
 import { api } from "../api";
+import { useT } from "../i18n";
 
 // auth-identity (#36): экран входа. Показывается AuthGate, когда /api/auth/me даёт 401.
 // Успешный логин ставит HttpOnly-cookie сессии → onLogin() переключает на доску.
 export function Login({ onLogin }: { onLogin: () => void }) {
+  const t = useT();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -18,7 +20,7 @@ export function Login({ onLogin }: { onLogin: () => void }) {
       await api.login(email, password);
       onLogin();
     } catch {
-      setError("Неверный email или пароль");
+      setError(t("Неверный email или пароль"));
       setBusy(false);
     }
   };
@@ -53,7 +55,7 @@ export function Login({ onLogin }: { onLogin: () => void }) {
           boxShadow: "0 10px 40px rgba(0,0,0,.3)",
         }}
       >
-        <h2 style={{ margin: 0, color: "#1e293b" }}>Вход</h2>
+        <h2 style={{ margin: 0, color: "#1e293b" }}>{t("Вход")}</h2>
         <input
           className="login__input"
           type="email"
@@ -67,7 +69,7 @@ export function Login({ onLogin }: { onLogin: () => void }) {
         <input
           className="login__input"
           type="password"
-          placeholder="пароль"
+          placeholder={t("пароль")}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
@@ -84,7 +86,7 @@ export function Login({ onLogin }: { onLogin: () => void }) {
           disabled={busy}
           style={{ padding: "10px 12px" }}
         >
-          {busy ? "…" : "Войти"}
+          {busy ? "…" : t("Войти")}
         </button>
       </form>
     </div>
