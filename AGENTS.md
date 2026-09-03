@@ -41,10 +41,13 @@ Dev (hot reload): `uvicorn app.main:app --reload --port 8000` (из `backend/`, 
 
 ## API (FastAPI)
 Граф/контент: `GET /api/graph` (ноды + ошибки импорта), `GET /api/pools`, `GET /api/graph?pool=`,
-`POST /api/import`, `POST/PUT/DELETE /api/nodes`. Направления: `POST /api/pools` (из пресета —
-существующего направления: копируются колонки и вопросы, id — транслитерация названия),
-`PUT /api/pools/{id}` (название/описание), `DELETE /api/pools/{id}` (вопросы удаляются, сессии
-остаются, id остаётся занятым tombstone'ом). Интервью/сессии: `POST /api/interview`,
+`POST /api/import`, `POST/PUT/DELETE /api/nodes`. Направления: `POST /api/pools` (ровно одно из
+`preset` — существующее направление, копируются колонки и вопросы, — или `blocks` — свои колонки
+без вопросов; id — транслитерация названия), `PUT /api/pools/{id}` (название/описание/`blocks`:
+`[{id?, label, color, subblocks?: [{id?, label}]}]` — у существующих колонок id передаётся как есть,
+новые получают id из названия; колонка, которой нет в списке, удаляется вместе с вопросами,
+исчезнувшая под-колонка оставляет вопросы в колонке без под-колонки), `DELETE /api/pools/{id}`
+(вопросы удаляются, сессии остаются, id остаётся занятым tombstone'ом). Интервью/сессии: `POST /api/interview`,
 `POST /api/sessions`, `GET /api/sessions`, `GET /api/sessions/{id}`, `POST /api/sessions/{id}/score`,
 `GET /api/sessions/{id}/events` (SSE). Люди: `GET/POST/PUT /api/candidates`,
 `GET/POST /api/interviewers`. Служебное: `GET /api/health`. Полные схемы — Swagger UI на `/docs`.

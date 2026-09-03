@@ -69,15 +69,13 @@ export function swimlaneLayout(nodes: QNode[], pool: PoolConfig): Placement {
   for (const n of [...nodes].sort((a, c) => a.block.localeCompare(c.block)))
     if (!blocks.includes(n.block)) blocks.push(n.block);
 
-  // Под-блоки каждого блока: сначала объявленные в pool.yaml (в их порядке), потом прочие.
+  // Под-блоки каждого блока: сначала объявленные в направлении (в их порядке, даже пустые —
+  // добавленная в форме под-колонка должна быть видна на доске), потом прочие из нод.
   const subsByBlock: Record<string, string[]> = {};
   for (const b of blocks) {
     const present = Array.from(new Set(nodes.filter((n) => n.block === b).map(subOf)));
     const pref = pool.blocks.find((x) => x.id === b)?.subblocks.map((s) => s.id) ?? [];
-    const ordered = [
-      ...pref.filter((s) => present.includes(s)),
-      ...present.filter((s) => !pref.includes(s)).sort(),
-    ];
+    const ordered = [...pref, ...present.filter((s) => !pref.includes(s)).sort()];
     subsByBlock[b] = ordered.length ? ordered : [b];
   }
 

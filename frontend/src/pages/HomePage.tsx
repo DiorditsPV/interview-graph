@@ -56,48 +56,48 @@ export function HomePage({
         {notice && <div className="errbar">{notice}</div>}
 
         <h2 className="home__h2">{t("Направления")}</h2>
-        {pools.length === 0 ? (
-          <p className="muted">{t("Нет ни одного пула: положите каталог с `pool.yaml` в `content/`.")}</p>
-        ) : (
-          <div className="home__pools">
-            {pools.map((p) => (
-              <div key={p.id} className="poolcard" data-pool={p.id}>
-                {/* Ссылка-«растяжка»: её ::after накрывает всю карточку — клик в любом месте открывает
-                    доску. Ссылка на банк — сиблинг с z-index выше. Обе — настоящие <a>, в tab-порядке. */}
-                <a className="poolcard__label" href={href.board(p.id)}>{p.label}</a>
-                {p.description && <div className="poolcard__desc">{p.description}</div>}
-                <div className="poolcard__meta">
-                  {t("{nodes} вопросов · {sessions} сессий", { nodes: p.counts?.nodes ?? 0, sessions: p.counts?.sessions ?? 0 })}
-                </div>
-                <div className="poolcard__blocks">
-                  {p.blocks.map((b) => (
-                    <span key={b.id} className="poolcard__block" style={{ background: b.color }}>{b.label}</span>
-                  ))}
-                </div>
-                {/* Кнопка и форма лежат над «растяжкой» (.poolcard__label::after) — иначе клик уводит на доску. */}
-                <div className="poolcard__actions">
-                  <button className="poolcard__start btn--primary" onClick={() => setStartPool(p.id)}>
-                    {t("Начать интервью")}
-                  </button>
-                  <a className="poolcard__bank" href={href.bank(p.id)}>{t("банк вопросов →")}</a>
-                  <span className="poolcard__manage">
-                    <button className="poolcard__edit iconbtn btn--quiet" onClick={() => setModal({ mode: "edit", pool: p })}>
-                      {t("изменить")}
-                    </button>
-                    <button className="poolcard__delete iconbtn btn--quiet" onClick={() => remove(p)}>
-                      {t("удалить")}
-                    </button>
-                  </span>
-                </div>
-                {startPool === p.id && <StartSessionForm pool={p} onClose={() => setStartPool(null)} />}
-              </div>
-            ))}
-            {/* Новое направление всегда из пресета — без единого пула создавать не из чего. */}
-            <button className="poolcard poolcard--new" onClick={() => setModal({ mode: "create" })}>
-              {t("+ Новое направление")}
-            </button>
-          </div>
+        {pools.length === 0 && (
+          <p className="muted">{t("Нет ни одного направления: создайте первое кнопкой «+ Новое направление» или положите каталог с `pool.yaml` в `content/`.")}</p>
         )}
+        <div className="home__pools">
+          {pools.map((p) => (
+            <div key={p.id} className="poolcard" data-pool={p.id}>
+              {/* Ссылка-«растяжка»: её ::after накрывает всю карточку — клик в любом месте открывает
+                  доску. Ссылка на банк — сиблинг с z-index выше. Обе — настоящие <a>, в tab-порядке. */}
+              <a className="poolcard__label" href={href.board(p.id)}>{p.label}</a>
+              {p.description && <div className="poolcard__desc">{p.description}</div>}
+              <div className="poolcard__meta">
+                {t("{nodes} вопросов · {sessions} сессий", { nodes: p.counts?.nodes ?? 0, sessions: p.counts?.sessions ?? 0 })}
+              </div>
+              <div className="poolcard__blocks">
+                {p.blocks.map((b) => (
+                  <span key={b.id} className="poolcard__block" style={{ background: b.color }}>{b.label}</span>
+                ))}
+              </div>
+              {/* Кнопка и форма лежат над «растяжкой» (.poolcard__label::after) — иначе клик уводит на доску. */}
+              <div className="poolcard__actions">
+                <button className="poolcard__start btn--primary" onClick={() => setStartPool(p.id)}>
+                  {t("Начать интервью")}
+                </button>
+                <a className="poolcard__bank" href={href.bank(p.id)}>{t("банк вопросов →")}</a>
+                <span className="poolcard__manage">
+                  <button className="poolcard__edit iconbtn btn--quiet" onClick={() => setModal({ mode: "edit", pool: p })}>
+                    {t("изменить")}
+                  </button>
+                  <button className="poolcard__delete iconbtn btn--quiet" onClick={() => remove(p)}>
+                    {t("удалить")}
+                  </button>
+                </span>
+              </div>
+              {startPool === p.id && <StartSessionForm pool={p} onClose={() => setStartPool(null)} />}
+            </div>
+          ))}
+          {/* Новое направление — из пресета (копия колонок и вопросов) или со своими колонками,
+              поэтому кнопка есть и без единого пула. */}
+          <button className="poolcard poolcard--new" onClick={() => setModal({ mode: "create" })}>
+            {t("+ Новое направление")}
+          </button>
+        </div>
         {modal && (
           <PoolFormModal
             mode={modal.mode}

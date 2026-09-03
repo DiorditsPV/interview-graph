@@ -150,3 +150,64 @@ def test_pool_from_row_validates():
 ])
 def test_slug_from_label(label, slug):
     assert slug_from_label(label) == slug
+
+
+# --- pool-blocks-editor: колонки из UI → id/weight по правилам, затем обычная валидация ---
+from app.pools import BlockCfg, SubblockCfg, normalize_blocks
+
+
+def test_normalize_blocks_generates_ids_and_keeps_weights():
+    existing = (
+        BlockCfg(id="python", label="Python", color="#d97706", weight=30, subblocks=()),
+        BlockCfg(id="sql", label="SQL", color="#16a34a", weight=25, subblocks=(SubblockCfg("queries", "Запросы"),)),
+    )
+    raw = [
+        {"id": "sql", "label": "SQL и индексы", "color": "#16a34a", "subblocks": [
+            {"id": "queries", "label": "Запросы"}, {"label": "Индексы и планы"}]},
+        {"label": "Переговоры", "color": "#2563eb"},
+        {"label": "Переговоры", "color": "#9333ea", "subblocks": [{"label": "Холодные"}, {"label": "Холодные"}]},
+    ]
+    out = normalize_blocks(raw, existing)
+    assert [b["id"] for b in out] == ["sql", "peregovory", "peregovory-2"]
+    assert out[0]["weight"] == 25 and out[1]["weight"] == 1          # прежний вес сохраняется, новый — 1
+    assert [s["id"] for s in out[0]["subblocks"]] == ["queries", "indeksy-i-plany"]
+    assert [s["id"] for s in out[2]["subblocks"]] == ["holodnye", "holodnye-2"]
+    assert parse_blocks(out)[2].subblocks[1].id == "holodnye-2"
+
+
+def test_normalize_blocks_bad_input():
+    with pytest.raises(PoolConfigError):
+        normalize_blocks({"label": "x"}, ())
+    with pytest.raises(PoolConfigError):
+        normalize_blocks(["x"], ())
+    with pytest.raises(PoolConfigError):
+        parse_blocks(normalize_blocks([{"label": "", "color": "#000000"}], ()))   # пустое название
+    with pytest.raises(PoolConfigError):
+        parse_blocks(normalize_blocks([{"label": "A", "color": "red"}], ()))       # цвет не #rrggbb
+    with pytest.raises(PoolConfigError):
+        parse_blocks(normalize_blocks([], ()))                                       # ни одной колонки
+
+
+def test_normalize_blocks_does_not_recycle_ids_of_removed_entries():
+    """Удалили колонку/под-колонку и в том же сохранении добавили новую с тем же названием:
+    id не переиспользуется, иначе вопросы удалённой «выживут» под новой."""
+    existing = (
+        BlockCfg(id="peregovory", label="Переговоры", color="#111111", weight=3,
+                 subblocks=(SubblockCfg("holodnye", "Холодные"), SubblockCfg("goryachie", "Горячие"))),
+    )
+    out = normalize_blocks([{"label": "Переговоры", "color": "#222222"}], existing)
+    assert out[0]["id"] == "peregovory-2" and out[0]["weight"] == 1
+    out = normalize_blocks(
+        [{"id": "peregovory", "label": "Переговоры", "color": "#111111",
+          "subblocks": [{"id": "goryachie", "label": "Горячие"}, {"label": "Холодные"}]}],
+        existing,
+    )
+    assert [s["id"] for s in out[0]["subblocks"]] == ["goryachie", "holodnye-2"]
+
+
+def test_normalize_blocks_ignores_bool_weight_and_rejects_non_list_subblocks():
+    existing = (BlockCfg(id="a", label="A", color="#111111", weight=7, subblocks=()),)
+    assert normalize_blocks([{"id": "a", "label": "A", "color": "#111111", "weight": True}], existing)[0]["weight"] == 7
+    assert normalize_blocks([{"id": "a", "label": "A", "color": "#111111", "weight": 4}], existing)[0]["weight"] == 4
+    with pytest.raises(PoolConfigError):
+        normalize_blocks([{"label": "A", "color": "#111111", "subblocks": 0}], ())

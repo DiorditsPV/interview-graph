@@ -455,18 +455,49 @@ class Database:
         return self.get_pool(tenant_id, pool_id)
 
     def update_pool(self, tenant_id: str, pool_id: str, fields: Dict) -> Optional[Dict]:
-        """Правка названия/описания (остальные ключи игнорируются). None — нет или удалено."""
+        """Правка названия/описания/колонок (остальные ключи игнорируются). None — нет или удалено.
+
+        `blocks` — уже валидированный список dict (см. pools.normalize_blocks + parse_blocks).
+        Смена колонок и её последствия для вопросов — одна транзакция: вопросы исчезнувших колонок
+        удаляются, вопросы исчезнувших под-колонок остаются в колонке без под-колонки.
+        """
         current = self.get_pool(tenant_id, pool_id)
         if current is None or current["deleted_at"] is not None:
             return None
         allowed = {k: v for k, v in fields.items() if k in ("label", "description")}
-        if allowed:
-            sets = ", ".join(f"{k} = ?" for k in allowed)
-            with self._conn() as conn:
+        blocks = fields.get("blocks")
+        if not allowed and blocks is None:
+            return current
+        now = _now()
+        with self._conn() as conn:
+            if allowed:
+                sets = ", ".join(f"{k} = ?" for k in allowed)
                 conn.execute(
                     f"UPDATE pools SET {sets}, updated_at = ? WHERE tenant_id = ? AND id = ?",
-                    (*allowed.values(), _now(), tenant_id, pool_id),
+                    (*allowed.values(), now, tenant_id, pool_id),
                 )
+            if blocks is not None:
+                conn.execute(
+                    "UPDATE pools SET blocks = ?, updated_at = ? WHERE tenant_id = ? AND id = ?",
+                    (json.dumps(blocks, ensure_ascii=False), now, tenant_id, pool_id),
+                )
+                kept = [b["id"] for b in blocks]
+                if not kept:  # `NOT IN ()` удалил бы все вопросы; непустоту гарантирует parse_blocks у вызывающего
+                    raise ValueError("blocks must not be empty")
+                marks = ",".join("?" * len(kept))
+                conn.execute(
+                    f"DELETE FROM nodes WHERE tenant_id = ? AND pool = ? AND block NOT IN ({marks})",
+                    (tenant_id, pool_id, *kept),
+                )
+                for b in blocks:
+                    subs = [s["id"] for s in b.get("subblocks") or []]
+                    sub_marks = ",".join("?" * len(subs))
+                    cond = f"AND subblock NOT IN ({sub_marks})" if subs else ""
+                    conn.execute(
+                        f"UPDATE nodes SET subblock = NULL, updated_at = ? WHERE tenant_id = ? AND pool = ? "
+                        f"AND block = ? AND subblock IS NOT NULL {cond}",
+                        (now, tenant_id, pool_id, b["id"], *subs),
+                    )
         return self.get_pool(tenant_id, pool_id)
 
     def delete_pool(self, tenant_id: str, pool_id: str) -> Optional[int]:
