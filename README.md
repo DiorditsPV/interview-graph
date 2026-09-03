@@ -1,206 +1,228 @@
-# Интервью · граф вопросов
+# Interview Graph
 
-Локальный веб-сервис для технических интервью по дата-инженерному стеку команды.
-Ядро — интерактивная **доска вопросов** на канве: вертикальная колонка на каждое направление
-(Фреймворки / Базы данных / Python / Платформа), внутри колонки карточки ранжированы по
-сложности (base → junior → middle → senior). Карточка = вопрос или задача + эталонный ответ +
-оценка 1–5 и заметка интервьюера. Контент живёт в Markdown/JSON и импортируется в банк вопросов.
+A self-hosted web app for running technical interviews. The heart of it is an interactive
+**question matrix** on a canvas: one column per section (Frameworks / Databases / Python /
+Platform), cards inside a column ranked by difficulty (base → junior → middle → senior).
+A card is a question or a hands-on task plus a reference answer, a 1–5 score and the
+interviewer's note. Content lives in Markdown/JSON and is imported into the question bank.
 
-Интервьюер ведёт всё интервью на одном экране: видит покрытие по направлениям в реальном
-времени, ставит оценки с клавиатуры, а на выходе получает самодостаточный HTML-отчёт по
-кандидату.
+One screen carries the whole interview: pick the area, generate the question set, score with the
+keyboard, watch coverage in real time, and finish with a verdict and a self-contained HTML report.
 
-Стек: **FastAPI + SQLite** (бэкенд) · **React + Vite + React Flow** (фронт). Только локально,
-за логином (локальные аккаунты, роли owner / member / viewer).
+Stack: **FastAPI + SQLite** on the back end, **React + Vite + React Flow** on the front. Runs
+locally behind a login (local accounts, `owner` / `member` / `viewer` roles), Russian and English UI.
 
-## Как это выглядит
+## What it looks like
 
-Доска в разгаре интервью: 61 вопрос по четырём направлениям, прогресс `46/61`, оценённые
-карточки помечены баллом, справа — фильтры по направлениям, сложности, типу и тегам.
+Tracks are the entry point: question and session counts, sections, and the two things you actually
+do — start an interview or open the question bank.
 
-![Доска вопросов, тёмная тема](docs/screenshots/01-board-dark.png)
+![Tracks](docs/screenshots/01-home.png)
 
-| | |
-| --- | --- |
-| **Оценка с клавиатуры.** Клавиши `1–5` ставят балл текущему вопросу, `n` перебрасывает на следующий неоценённый; снизу — HUD текущего вопроса (таймер вопроса и сессии включается в ⚙).<br><br>[![Оценка вопроса](docs/screenshots/02-scoring.png)](docs/screenshots/02-scoring.png) | **Полный текст рядом с доской.** Немодальный drawer: вопрос, эталонный ответ с подсветкой кода, оценка и заметка интервьюера — доска остаётся интерактивной.<br><br>[![Drawer с ответом](docs/screenshots/03-drawer.png)](docs/screenshots/03-drawer.png) |
-| **Практические задачи.** Кроме вопросов в банке есть задачи: условие, стартовый код, эталонное решение и критерии оценки.<br><br>[![Задача с решением](docs/screenshots/04-task.png)](docs/screenshots/04-task.png) | **Банк вопросов.** Полнотекстовый поиск и фильтры по всему банку; вопросы правятся и добавляются прямо из интерфейса.<br><br>[![Банк вопросов](docs/screenshots/05-bank.png)](docs/screenshots/05-bank.png) |
-| **Светлая тема.** Переключается в шапке, выбор запоминается; по умолчанию берётся системная.<br><br>[![Доска, светлая тема](docs/screenshots/07-board-light.png)](docs/screenshots/07-board-light.png) | |
+|                                                                                                                                                                                                                                                                                          |                                                                                                                                                                                                                                                                          |
+|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Interview setup.** Candidate, sections and sub-columns, levels, and how the set is built: auto-pick N questions by section weights, or take everything that matches in matrix order.<br><br>[![Interview setup](docs/screenshots/02-setup.png)](docs/screenshots/02-setup.png)         | **The matrix during a session.** The plan drives the board: questions outside the set are dimmed, the header shows the candidate, live sync and progress against the plan.<br><br>[![Question matrix](docs/screenshots/03-board.png)](docs/screenshots/03-board.png)     |
+| **Scoring from the keyboard.** `1–5` score the current question, `n` jumps to the next unscored one; the HUD at the bottom keeps the current card, its position in the plan and an optional timer.<br><br>[![Scoring](docs/screenshots/04-scoring.png)](docs/screenshots/04-scoring.png) | **Full text next to the board.** A non-modal drawer: question, reference answer with syntax highlighting, score and the interviewer's note, while the board stays interactive.<br><br>[![Answer drawer](docs/screenshots/05-drawer.png)](docs/screenshots/05-drawer.png) |
+| **Hands-on tasks.** Besides questions the bank holds tasks: a statement, starter code, a reference solution and scoring criteria.<br><br>[![Task](docs/screenshots/06-task.png)](docs/screenshots/06-task.png)                                                                           | **Question bank.** Full-text search and filters over the whole bank; questions are edited and added straight from the UI.<br><br>[![Question bank](docs/screenshots/07-bank.png)](docs/screenshots/07-bank.png)                                                          |
+| **Verdict.** Finishing an interview records a decision (hire / no hire / hold) and an overall comment; the session moves to *finished* and the verdict travels into the report.<br><br>[![Verdict](docs/screenshots/08-verdict.png)](docs/screenshots/08-verdict.png)                    | **Track editor.** Sections and sub-columns are data: rename, reorder by drag and drop, pick a colour from a fixed palette, preview the structure before saving.<br><br>[![Track editor](docs/screenshots/10-structure.png)](docs/screenshots/10-structure.png)           |
 
-**Итоговый отчёт** генерируется на клиенте одним самодостаточным HTML-файлом: шапка с кандидатом
-и интервьюером, средний балл и охват по направлениям, таблицы оценённых вопросов с заметками.
-Открывается в браузере и печатается в PDF.
+**The report** is generated client-side as one self-contained HTML file: candidate and interviewer,
+the verdict with strong and weak sections, average score and coverage per section, and a table of
+scored questions with notes. Open it in a browser, print it to PDF, send it as is.
 
-![HTML-отчёт по сессии](docs/screenshots/08-report.png)
+![Interview report](docs/screenshots/09-report.png)
 
-> Скриншоты пересобираются командой `npm run shots` из `frontend/` — см. [Тесты](#тесты).
+Dark theme is a toggle in the settings panel and is remembered per browser; the system preference
+is the default.
 
-## Быстрый старт
+![Dark theme](docs/screenshots/11-board-dark.png)
+
+> Screenshots are rebuilt with `npm run shots` from `frontend/` against the English demo content in
+> `demo/content-en` — see [Tests](#tests).
+
+## Quick start
 
 ```bash
-INTERVIEW_OWNER_PASSWORD=<пароль> ./run.sh   # venv + сборка фронта (если нужно) + сервер
-# открыть http://localhost:8000 и войти как owner@interview.local
+INTERVIEW_OWNER_PASSWORD=<password> ./run.sh   # venv + front-end build (if needed) + server
+# open http://localhost:8000 and sign in as owner@interview.local
 ```
 
-Открывается главное меню: направления (доски), Кандидаты, Сессии, Подключение; банк вопросов —
-по направлению.
-
-Первый запуск заводит owner-аккаунт `owner@interview.local`. Если `INTERVIEW_OWNER_PASSWORD`
-не задан, пароль генерируется случайно и печатается в лог сервера — известный дефолт не
-используется намеренно. Пересобрать фронт принудительно: `./run.sh --build`.
+The first launch seeds the owner account `owner@interview.local`. Without
+`INTERVIEW_OWNER_PASSWORD` a random password is generated and printed to the server log once — a
+known default is deliberately not used. Force a front-end rebuild with `./run.sh --build`.
 
 ## Docker
 
-Самодостаточный образ: фронт собирается внутри, наружу торчит только том с БД —
-ни node, ни python на хосте не нужны.
+A self-contained image: the front end is built inside, only the database volume is exposed. No
+node or python on the host.
 
 ```bash
 docker compose up -d --build     # http://localhost:8000
-docker compose logs -f           # логи
-docker compose down              # остановить (данные остаются в томе)
-docker compose down -v           # снести вместе с данными
+docker compose logs -f           # logs
+docker compose down              # stop (data stays in the volume)
+docker compose down -v           # stop and drop the data
 ```
 
-Логин — `admin` / `admin`. Известные креды заданы в `compose.yaml` намеренно: owner
-сидится в БД один раз, а том постоянный, так что случайные означали бы «после первого
-старта войти уже нельзя». Свои — `INTERVIEW_OWNER_EMAIL=<логин>
-INTERVIEW_OWNER_PASSWORD=<пароль> docker compose up -d`; сменить на уже поднятом сервисе —
-только с пересозданием тома (`docker compose down -v`).
+Credentials are `admin` / `admin`. Known credentials in `compose.yaml` are intentional: the owner
+is seeded once and the volume is persistent, so random ones would mean "no way in after the first
+start". Use your own with `INTERVIEW_OWNER_EMAIL=<login> INTERVIEW_OWNER_PASSWORD=<password>
+docker compose up -d`; changing them on a running instance requires recreating the volume
+(`docker compose down -v`).
 
-Если `:8000` занят (например, там уже крутится `./run.sh`) —
+If `:8000` is taken (say `./run.sh` already runs there), use
 `INTERVIEW_PORT=8080 docker compose up -d`.
 
-Раскладка внутри контейнера повторяет серверную из `deploy/bootstrap.sh`: код в `/app`,
-контент в `/app/content`, БД — в именованном томе на `/data`. Поэтому пересборка образа
-не трогает данные, а `content/` можно держать read-only: бэкенд туда не пишет
-(загруженные файлы парсятся во временном каталоге и едут в БД).
+The layout inside the container mirrors the server one from `deploy/bootstrap.sh`: code in `/app`,
+content in `/app/content`, database in a named volume on `/data`. Rebuilding the image does not
+touch the data, and `content/` can stay read-only — the back end never writes there (uploads are
+parsed in a temp directory and stored in the database).
 
-## Режим разработки (hot reload)
+## Development mode (hot reload)
 
-Два процесса:
+Two processes:
 
 ```bash
-# терминал 1 — бэкенд
+# terminal 1 — back end
 cd backend && . .venv/bin/activate && uvicorn app.main:app --reload --port 8000
 
-# терминал 2 — фронт (Vite проксирует /api на :8000)
+# terminal 2 — front end (Vite proxies /api to :8000)
 cd frontend && npm run dev      # http://localhost:5173
 ```
 
-## Управление во время интервью
+## Running an interview
 
-Раскладка — **swimlanes**: вертикальная колонка на каждое направление (Фреймворки /
-Базы данных / Python / Платформа) с заголовком и цветным полупрозрачным фоном; внутри
-колонки вопросы ранжированы сверху вниз по сложности (base → junior → middle → senior, левая ось).
+**Set up.** "Start interview" on a track card opens the setup screen: pick or create a candidate,
+choose sections and sub-columns, levels, and the mode. *Auto-pick* samples N questions
+proportionally to section weights; *all matching* takes every question that fits, in matrix order.
+The resulting set is stored with the session as its plan. Starting from the board carries the
+current board filters into the setup screen.
 
-Блок можно делить на **под-колонки по технологиям** через поле `subblock` во frontmatter
-(напр. Фреймворки → Airflow / PySpark / dbt / Streaming): под общим заголовком блока
-появляются под-колонки с собственными хедерами. Если у нод блока один `subblock` — блок
-остаётся одной колонкой. Порядок и подписи под-блоков задаются в `subblocks` блока в `pool.yaml`.
+**Score.** The board layout is **swimlanes**: a column per section with a coloured translucent
+background, questions ranked top to bottom by difficulty (base → junior → middle → senior, the
+left axis). A section splits into **sub-columns** through the `subblock` field. A card shows a
+short `title` and tags; the full text opens in the drawer. There are no edges between questions —
+it is a board of cards grouped by section and difficulty, not a dependency graph.
 
-Карточка показывает короткий **заголовок** (`title`) и **теги** — полный текст вопроса/ответа
-открывается в drawer. Зависимостей между вопросами (рёбер) нет — это просто доска карточек,
-сгруппированная по направлениям и сложности.
+- **Click a card** — opens the drawer and makes the card current.
+- **HUD at the bottom** — current question, position in the plan, 1–5 score, "Next →", timer.
+- **Filters** — sections, difficulty, kind and tags, plus full-text search; "unscored only" appears
+  inside a session.
+- **Keyboard:** `1–5` score the current card, `↑↓` move by difficulty, `←→` between columns,
+  `Enter` opens the drawer, `n` goes to the next unscored question, `Esc` clears the current one,
+  `?` shows the shortcut cheat sheet.
 
-- **Клик по ноде** — открывает drawer (полный текст) и делает её «текущей».
-- **HUD снизу** — текущий вопрос + оценка 1–5 + «Дальше →» (следующий неоцененный вопрос) + «✕».
-- **Панель фильтров (справа)** — переключатели направлений, сложностей и **тегов** + прогресс
-  `done/total`. Активные теги гасят нерелевантные карточки (подсветка/фильтр).
-- **Клавиатура:** `1–5` — оценить текущий, `↑↓` — по сложности в колонке, `←→` — между
-  колонками, `Enter` — открыть drawer, `n` — следующий неоцененный, `Esc` — снять текущий.
-- **Тема** — в ⚙ → Тема (переключатель светлая/тёмная, запоминается в localStorage;
-  по умолчанию берётся системная). Канва React Flow, контролы и миникарта тоже темнеют.
-- **📥 Скачать** — выгружает результаты текущей сессии **самодостаточным HTML-отчётом**
-  (кандидат, дата, средний балл и охват по блокам, таблицы оценённых вопросов с темой/тегами/
-  баллами). Открывается в браузере и печатается в PDF. Генерируется на клиенте (`src/report.ts`).
+**Invite a colleague.** A session can be shared by link: pick a role (interviewer who can score, or
+observer who only watches) and a lifetime (1 hour, 24 hours, 7 days). The guest joins through
+`#/join/<token>` with no account and sees only that session; scores sync live over SSE. Links are
+listed with their expiry and can be revoked — a revoked or expired link drops the guest on the next
+request.
 
-## Контент
+**Finish.** "Finish" records the decision and an overall comment. The session gets the *finished*
+status, and "Export" produces the HTML report described above.
 
-Вопросы живут в пулах направлений: `content/<pool>/pool.yaml` задаёт блоки (порядок колонок,
-подписи, цвета, под-колонки, веса), `content/<pool>/<block>/*.md|*.json` — сами вопросы.
-Сейчас есть `data-engineer` (Фреймворки · Базы данных · Python · Платформа); новый пул —
-новый каталог с `pool.yaml`.
+## Content
 
-### Формат Markdown
+Questions live in track pools: `content/<pool>/pool.yaml` describes the sections (column order,
+labels, colours, sub-columns, weights) and `content/<pool>/<block>/*.md|*.json` holds the questions
+themselves. `pool.yaml` is the seed: at runtime tracks are read from the database, so they can be
+created, edited and deleted from the UI (`POST/PUT/DELETE /api/pools`). A new track is either a copy
+of an existing one (structure and questions included) or a structure you build yourself in the
+editor.
+
+The repository ships two Russian-language pools used in real interviews plus a
+`demo/content-en` set in English used for the screenshots above.
+
+### Markdown format
 
 ```markdown
 ---
 id: spark-shuffle-01
 kind: question            # question | task
-block: frameworks         # один из blocks[].id в pool.yaml
-subblock: pyspark         # (опц.) под-колонка внутри блока
-title: Shuffle в Spark    # короткий заголовок для карточки
+block: frameworks         # one of blocks[].id in pool.yaml
+subblock: pyspark         # (optional) sub-column inside the section
+title: Shuffle in Spark   # short heading shown on the card
 topic: distributed-batch
 difficulty: middle        # base | junior | middle | senior
 weight: 13
-tags: [spark, optimization]
+tags: [optimization, distributed]
 ---
-## Вопрос
-Текст вопроса…
+## Question
+The question text…
 
-## Ответ
-Текст ответа (Markdown, поддерживаются блоки кода)…
+## Answer
+The answer (Markdown, code blocks supported)…
 ```
 
-- **`title`** — короткий заголовок, отображается на карточке (полный текст — в drawer).
-- **`tags`** — отображаются чипами на карточке и доступны для фильтра справа.
-- Для `kind: task` доступны поля `starterCode` (стартовый код) и `rubric` (критерии),
-  а тело можно писать через `## Задача` / `## Решение`.
+- **`title`** — the short heading on the card; the full text lives in the drawer.
+- **`tags`** — rendered as chips on the card and available as filters. Keep to the ~17 cross-cutting
+  concepts listed in `AGENTS.md`, one to three per card.
+- `kind: task` adds `starterCode` and `rubric`, and the body may use `## Task` / `## Solution`.
 
-> **Парсинг тела:** строки, начинающиеся с `#`, трактуются как заголовки-маркеры
-> разбиения на вопрос/ответ. Если в ответе нужен текст, начинающийся с `#` вне
-> блока кода, — задайте `question`/`answer` прямо во frontmatter (тогда тело не парсится).
+> **Body parsing:** lines starting with `#` are treated as split markers between question and
+> answer. If the answer needs a line starting with `#` outside a code block, set `question` /
+> `answer` in the frontmatter directly — then the body is not parsed.
 
 ## API
 
-| метод | путь                       | назначение                                                              |
-| ----- | -------------------------- | ----------------------------------------------------------------------- |
-| GET   | `/api/graph?pool=<id>`     | ноды + ошибки импорта                                                   |
-| GET   | `/api/pools`               | пулы с блоками и счётчиками                                             |
-| POST  | `/api/interview`           | собрать набор вопросов пропорц. весам (`{count, difficulties?, seed?}`) |
-| POST  | `/api/sessions`            | создать сессию кандидата                                                |
-| POST  | `/api/sessions/{id}/score` | выставить оценку (`{nodeId, score}`)                                    |
-| GET   | `/api/sessions/{id}`       | сессия с оценками                                                       |
+| method | path                        | purpose                                                |
+|--------|-----------------------------|--------------------------------------------------------|
+| GET    | `/api/pools`                | tracks with sections and counts                        |
+| POST   | `/api/pools`                | create a track from a preset or from your own sections |
+| GET    | `/api/graph?pool=<id>`      | nodes plus import errors                               |
+| POST   | `/api/sessions`             | create a session, optionally with an interview `plan`  |
+| POST   | `/api/sessions/{id}/score`  | score a question (`{nodeId, score, note?}`)            |
+| POST   | `/api/sessions/{id}/finish` | record the verdict (`{decision, summary}`)             |
+| POST   | `/api/sessions/{id}/invite` | link for a colleague (`{role, expires_hours}`)         |
+| GET    | `/api/sessions/{id}/events` | live updates over SSE                                  |
 
-Это ядро. Полный список ручек (кандидаты/интервьюеры, CRUD нод `/api/nodes`, импорт `/api/import`,
-live-обновления по SSE `/api/sessions/{id}/events`) и схемы —
-в Swagger UI на `/docs`.
+That is the core. The full list (candidates and interviewers, node CRUD on `/api/nodes`, import on
+`/api/import`, invite management, question sampling on `/api/interview`) and the schemas are in the
+Swagger UI at `/docs`.
 
-## Тесты
+## Tests
 
-Бэкенд (67 тестов — `test_app.py` импорт MD/JSON, sampler, API, сессии; `test_nodes.py` CRUD нод;
-`test_people.py` кандидаты/интервьюеры, изоляция тенантов; `test_auth.py` логин, сессии, RBAC):
+Back end — 122 tests: content import, sampler and interview plans, node CRUD, candidates and
+interviewers with tenant isolation, auth and RBAC, track CRUD, session verdicts, guest invites.
 
 ```bash
 cd backend && . .venv/bin/activate && pytest -q
 ```
 
-Фронтенд — headless smoke-тест реального рантайма (граф рендерится, нода → drawer,
-оценка проставляется и отражается в HUD/прогрессе). Требует запущенного сервера на :8000:
+Front end — a headless smoke test of the real runtime: the matrix renders, a card opens the drawer,
+a session starts from the setup screen and follows its plan, the verdict lands in the header, a
+guest joins by invite link. It needs a running server on `:8000`:
 
 ```bash
-cd frontend && npm run smoke
+cd frontend && npm run build     # tsc --noEmit + vite build
+npm run i18n:check               # every t("…") key exists in src/i18n/en.ts
+npm run smoke
 ```
 
-Скриншоты для README (`npm run shots`) — тот же playwright-сценарий поверх живого сервера:
-логинится owner'ом, сеет две демо-сессии через API и снимает 8 экранов в `docs/screenshots`.
-Кандидаты синтетические, но пишутся в ту же БД — поднимай сервер на отдельной:
+Screenshots for this README are the same Playwright setup over a live server: it signs in as the
+owner, seeds two demo sessions through the API and captures the screens into `docs/screenshots`.
+The demo candidates are synthetic but written to the same database, so run the server on a separate
+one — and on the English content:
 
 ```bash
-INTERVIEW_DB_PATH=$PWD/backend/demo.db INTERVIEW_OWNER_PASSWORD=interview-dev ./run.sh
-cd frontend && npm run shots     # во втором терминале
+INTERVIEW_CONTENT_DIR=$PWD/demo/content-en \
+INTERVIEW_DB_PATH=$PWD/backend/demo.db \
+INTERVIEW_OWNER_PASSWORD=interview-dev ./run.sh --build
+
+cd frontend && npm run shots     # in a second terminal
 ```
 
-## Конфигурация (env)
+## Configuration (env)
 
-- `INTERVIEW_CONTENT_DIR` — каталог контента (по умолч. `./content`)
-- `INTERVIEW_DB_PATH` — путь к SQLite (по умолч. `backend/interview.db`); указывай **абсолютный**
-  путь: сервер стартует из `backend/`, и относительный резолвится от неё
-- `INTERVIEW_FRONTEND_DIR` — каталог собранного фронта (по умолч. `frontend/dist`)
-- `INTERVIEW_OWNER_PASSWORD` — пароль owner-аккаунта при первом старте (иначе случайный, в логе)
+- `INTERVIEW_CONTENT_DIR` — content directory (default `./content`)
+- `INTERVIEW_DB_PATH` — SQLite path (default `backend/interview.db`); use an **absolute** path, the
+  server starts from `backend/` and a relative one resolves against it
+- `INTERVIEW_FRONTEND_DIR` — built front end (default `frontend/dist`)
+- `INTERVIEW_OWNER_PASSWORD` — owner password on first start (random and logged otherwise)
 
-## Деплой
+## Deploy
 
-Автодеплой на сервер при merge в `main` (GitHub Actions → SSH). Порт **8800**.
-Подробности и разовая настройка секретов/ключа — в `DEPLOY.md`.
+Merging into `main` deploys to the server over SSH via GitHub Actions, port **8800**; `dev` deploys
+to port **8801**. Details and the one-time secret setup are in `DEPLOY.md`.
 
-См. `REPORT.md` — отчёт-исследование и архитектурные решения.
+See `REPORT.md` for the design notes behind the architecture, and `AGENTS.md` for the repository
+map and content conventions.

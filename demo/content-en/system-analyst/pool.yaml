@@ -1,0 +1,31 @@
+# English demo pool for showcase screenshots: system analyst track.
+id: system-analyst
+label: System Analyst
+description: Requirements, process and data modelling, SQL, integrations
+blocks:
+  - id: requirements
+    label: Requirements
+    color: "#2563eb"
+    weight: 35
+    subblocks:
+      - { id: elicitation,   label: Elicitation }
+      - { id: analysis,      label: Analysis }
+      - { id: documentation, label: Documentation }
+  - id: modeling
+    label: Modelling
+    color: "#9333ea"
+    weight: 25
+    subblocks:
+      - { id: process, label: Process }
+      - { id: uml,     label: UML }
+  - id: data
+    label: Data
+    color: "#16a34a"
+    weight: 25
+    subblocks:
+      - { id: sql,        label: SQL }
+      - { id: data-model, label: Data model }
+  - id: integration
+    label: Integrations
+    color: "#d97706"
+    weight: 15

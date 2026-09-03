@@ -1,2 +1,2 @@
-Скриншоты собираются скриптом `frontend/shots.mjs` (`npm run shots`) на демо-сессиях.
-Кандидаты в кадре — синтетические («Кандидат А/Б · демо»).
+Screenshots are produced by `frontend/shots.mjs` (`npm run shots`) against the English demo
+content in `demo/content-en`, on seeded demo sessions. Candidates in frame are synthetic.
