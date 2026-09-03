@@ -13,7 +13,7 @@ type PoolModal = { mode: "create" } | { mode: "edit"; pool: PoolConfig } | null;
 
 // Главное меню: направления как входы на доски + разделы проведения интервью (кандидаты, сессии,
 // подключение). Карточка направления: название, описание, статистика, нейтральные чипы колонок,
-// primary «Начать интервью →», secondary «Открыть вопросы →», меню ••• (редактировать/удалить).
+// primary «Начать интервью →», secondary «Открыть вопросы →», меню ••• (редактировать/дублировать/удалить).
 // Пулов может не быть вовсе (content/ без pool.yaml) — говорим об этом, а не рисуем пустоту.
 // startPool — пул из deep-link #/?start=<pool>: форма старта интервью открывается сразу.
 // onChanged — направления создаются/правятся/удаляются здесь же (pool-crud); список живёт в Router.
@@ -61,6 +61,16 @@ export function HomePage({
     }
   };
 
+  // «Дублировать» = создать из пресета p: сервер копирует разделы и вопросы, id — из названия «… (копия)».
+  const duplicate = async (p: PoolConfig) => {
+    try {
+      await api.createPool({ label: t("{label} (копия)", { label: p.label }), description: p.description, preset: p.id });
+      onChanged();
+    } catch {
+      alert(t("Не удалось дублировать направление"));
+    }
+  };
+
   // Статистика направления с правильными формами числа: «61 вопрос», «25 сессий».
   const questions = (n: number) => `${n} ${nWord(n, ["вопрос", "вопроса", "вопросов"], ["question", "questions"])}`;
   const sessions = (n: number) => `${n} ${nWord(n, ["сессия", "сессии", "сессий"], ["session", "sessions"])}`;
@@ -93,7 +103,7 @@ export function HomePage({
           {pools.map((p) => {
             const { Icon, tint } = poolIcon(p.id);
             return (
-            <div key={p.id} className="poolcard" data-pool={p.id}>
+            <div key={p.id} className={`poolcard poolcard--${tint}`} data-pool={p.id}>
               {/* Меню направления лежит над «растяжкой» .poolcard__label::after (z-index), иначе клик уводит на доску. */}
               <button
                 className="poolcard__menu iconbtn"
@@ -112,6 +122,10 @@ export function HomePage({
                   <button className="poolcard__edit" role="menuitem" onClick={() => { setMenuFor(null); setModal({ mode: "edit", pool: p }); }}>
                     {t("Редактировать")}
                   </button>
+                  <button className="poolcard__dup" role="menuitem" onClick={() => { setMenuFor(null); duplicate(p); }}>
+                    {t("Дублировать")}
+                  </button>
+                  <div className="poolcard__dropdown-sep" role="separator" />
                   <button className="poolcard__delete" role="menuitem" onClick={() => { setMenuFor(null); remove(p); }}>
                     {t("Удалить")}
                   </button>

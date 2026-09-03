@@ -40,67 +40,98 @@ const poolCards = await page.locator(".poolcard").count();
 if (poolCards < 1) fail("main menu shows no pools");
 const deCard = page.locator('.poolcard[data-pool="data-engineer"]');
 if ((await deCard.count()) !== 1) fail("data-engineer pool card missing on main menu");
-// 0c. CRUD направлений (pool-crud): создать из пресета DE → карточка с тем же числом вопросов →
-//     переименовать → удалить (confirm принимается). Всё на главной, до ухода на доску.
+// 0c. Мастер направления (pool-wizard): шаг 1 (название + пресет DE) → шаг 2 (в редакторе 4 раздела
+//     пресета) → шаг 3 (предпросмотр) → «Создать» → карточка с тем же числом вопросов, что у DE.
 const deMeta = await deCard.locator(".poolcard__stat").first().innerText();
 await page.locator(".home__add").click();
 await page.waitForSelector(".poolform", { timeout: 3000 });
 await page.fill(".poolform__label", "Smoke Pool");
 await page.locator(".pool-preset").selectOption("data-engineer");
+await page.locator(".wizard__next").click();
+await page.waitForFunction(() => document.querySelectorAll(".struct__section").length === 4, null, { timeout: 3000 });
+await page.locator(".wizard__next").click();
+await page.waitForSelector(".wizard__preview", { timeout: 3000 });
+if (!(await page.locator(".wizard__preview").innerText()).includes("ФРЕЙМВОРКИ")) fail("wizard preview lacks FRAMEWORKS section");
 await page.locator(".poolform__submit").click();
 await page.waitForSelector('.poolcard[data-pool="smoke-pool"]', { timeout: 10000 });
 const smokeMeta = await page.locator('.poolcard[data-pool="smoke-pool"] .poolcard__stat').first().innerText();
 if (smokeMeta.split("·")[0].trim() !== deMeta.split("·")[0].trim()) fail(`preset copy mismatch: "${smokeMeta}" vs "${deMeta}"`);
-await page.locator('.poolcard[data-pool="smoke-pool"] .poolcard__menu').click();
-await page.locator('.poolcard[data-pool="smoke-pool"] .poolcard__edit').click();
+console.log("OK: pool wizard — created from preset via 3 steps");
+// Переименование: тот же мастер в режиме edit, «Далее» ×2 → «Сохранить».
+const smokeCard = page.locator('.poolcard[data-pool="smoke-pool"]');
+await smokeCard.locator(".poolcard__menu").click();
+await smokeCard.locator(".poolcard__edit").click();
 await page.waitForSelector(".poolform", { timeout: 3000 });
 await page.fill(".poolform__label", "Smoke Pool 2");
+await page.locator(".wizard__next").click();
+await page.locator(".wizard__next").click();
 await page.locator(".poolform__submit").click();
 await page.waitForFunction(
   () => document.querySelector('.poolcard[data-pool="smoke-pool"] .poolcard__label')?.textContent === "Smoke Pool 2",
   null,
   { timeout: 5000 },
 );
-// 0c'. Редактор колонок (pool-blocks-editor): «изменить» → добавить колонку «Продажи» с под-колонкой
-//      «Холодные» → чип на карточке, колонка и под-колонка на доске направления; затем удалить первую
-//      колонку пресета (у неё есть вопросы → confirm с числом) → чипов на один меньше, вопросов меньше.
-const smokeCard = page.locator('.poolcard[data-pool="smoke-pool"]');
+// 0c'. Структурный редактор: добавить раздел «Продажи» с подкатегорией «Холодные», перетащить его
+//      на первое место (HTML5 DnD за ⠿) → предпросмотр → «Сохранить» → чип первый на карточке,
+//      раздел первый на доске направления и под-колонка на месте.
 const chipsBefore = await smokeCard.locator(".poolcard__block").count();
 const nodesBefore = parseInt(await smokeCard.locator(".poolcard__stat").first().innerText(), 10);
 await smokeCard.locator(".poolcard__menu").click();
 await smokeCard.locator(".poolcard__edit").click();
-await page.waitForSelector(".blocks-editor", { timeout: 3000 });
-await page.locator(".blocks-editor__add").click();
-await page.locator(".blocks-editor__label").last().fill("Продажи");
-await page.locator(".blocks-editor__subadd").last().fill("Холодные");
-await page.locator(".blocks-editor__subadd").last().press("Enter");
-if ((await page.locator(".blocks-editor__sub").last().innerText()).replace("×", "").trim() !== "Холодные") fail("sub-column chip not added");
+await page.waitForSelector(".poolform", { timeout: 3000 });
+await page.locator(".wizard__next").click();
+await page.waitForSelector(".struct", { timeout: 3000 });
+await page.locator(".struct__addsection").click();
+await page.locator(".struct__name").last().fill("Продажи");
+await page.locator(".struct__section").last().locator(".struct__addsub").click();
+await page.locator(".struct__subname").last().fill("Холодные");
+// Не locator.dragTo(): hover цели прокручивает тело мастера ДО первого движения мыши, а Chromium
+// ищет draggable по позиции mousedown — после прокрутки там уже другой элемент и drag не начинается.
+// Поэтому: зажать ⠿ → сдвиг на 8px (drag стартовал) → hover цели (теперь прокрутка безопасна) → отпустить.
+const grip = page.locator(".struct__section").last().locator(".struct__grip");
+await grip.hover();
+await page.mouse.down();
+const gripBox = await grip.boundingBox();
+await page.mouse.move(gripBox.x + gripBox.width / 2, gripBox.y + gripBox.height / 2 + 8);
+await page.locator(".struct__section").first().hover();
+await page.mouse.up();
+await page.waitForFunction(() => document.querySelector(".struct__name")?.value === "Продажи", null, { timeout: 3000 });
+await page.locator(".wizard__next").click();
+await page.waitForSelector(".wizard__preview", { timeout: 3000 });
+const previewText = await page.locator(".wizard__preview").innerText();
+if (!previewText.includes("ПРОДАЖИ") || !previewText.includes("Холодные")) fail(`wizard preview lacks new section/sub: ${JSON.stringify(previewText)}`);
 await page.locator(".poolform__submit").click();
 await page.waitForFunction(
-  () => [...document.querySelectorAll('.poolcard[data-pool="smoke-pool"] .poolcard__block')].some((e) => e.textContent === "Продажи"),
+  () => document.querySelector('.poolcard[data-pool="smoke-pool"] .poolcard__block')?.textContent === "Продажи",
   null,
   { timeout: 5000 },
 );
-if ((await smokeCard.locator(".poolcard__block").count()) !== chipsBefore + 1) fail("column chip count did not grow by one");
+if ((await smokeCard.locator(".poolcard__block").count()) !== chipsBefore + 1) fail("section chip count did not grow by one");
 await page.goto(URL + "#/board/smoke-pool");
 await page.waitForSelector(".bgroup__header", { timeout: 10000 });
 const smokeHeaders = await page.locator(".bgroup__header").allInnerTexts();
-if (!smokeHeaders.some((h) => h.toLowerCase().includes("продажи"))) fail(`board lacks new column: ${JSON.stringify(smokeHeaders)}`);
+if (!smokeHeaders[0]?.toLowerCase().includes("продажи")) fail(`board: dragged section is not first: ${JSON.stringify(smokeHeaders)}`);
 const smokeSubs = await page.locator(".subhead").allInnerTexts();
 if (!smokeSubs.some((s) => s.includes("Холодные"))) fail(`board lacks new sub-column: ${JSON.stringify(smokeSubs)}`);
-console.log("OK: pool blocks editor — added column + sub-column, board shows them");
+console.log("OK: structure editor — section + subcategory added, drag & drop reordered, board shows them");
 await page.goto(URL + "#/");
 await page.waitForSelector('.poolcard[data-pool="smoke-pool"]', { timeout: 10000 });
+// Удаление раздела с вопросами (второй в списке — бывший первый DE): confirm с числом вопросов.
 await smokeCard.locator(".poolcard__menu").click();
 await smokeCard.locator(".poolcard__edit").click();
-await page.waitForSelector(".blocks-editor", { timeout: 3000 });
+await page.waitForSelector(".poolform", { timeout: 3000 });
+await page.locator(".wizard__next").click();
+await page.waitForSelector(".struct", { timeout: 3000 });
+await page.locator(".struct__section").nth(1).locator(".struct__menu").click();
 let colConfirm = "";
 page.once("dialog", (d) => {
   colConfirm = d.message();
   d.accept();
 });
-await page.locator(".blocks-editor__del").first().click(); // ждёт enabled: счётчики вопросов подгружаются
+await page.locator(".struct__del").click(); // ждёт enabled: счётчики вопросов подгружаются
 if (!/\(\d+\)/.test(colConfirm)) fail(`expected confirm with question count, got: "${colConfirm}"`);
+await page.waitForFunction((n) => document.querySelectorAll(".struct__section").length === n, chipsBefore, { timeout: 3000 });
+await page.locator(".wizard__next").click();
 await page.locator(".poolform__submit").click();
 await page.waitForFunction(
   (n) => document.querySelectorAll('.poolcard[data-pool="smoke-pool"] .poolcard__block').length === n,
@@ -108,8 +139,24 @@ await page.waitForFunction(
   { timeout: 5000 },
 );
 const nodesAfter = parseInt(await smokeCard.locator(".poolcard__stat").first().innerText(), 10);
-if (!(nodesAfter < nodesBefore)) fail(`deleting a column did not drop questions: ${nodesBefore} → ${nodesAfter}`);
-console.log(`OK: pool blocks editor — column deleted with confirm, questions ${nodesBefore} → ${nodesAfter}`);
+if (!(nodesAfter < nodesBefore)) fail(`deleting a section did not drop questions: ${nodesBefore} → ${nodesAfter}`);
+console.log(`OK: structure editor — section deleted with confirm, questions ${nodesBefore} → ${nodesAfter}`);
+
+// 0c''. «Дублировать» в меню карточки DE: копия «Дата-инженер (копия)» (id — транслитерация) с той же
+//       статистикой вопросов; затем удаляем копию через меню.
+await deCard.locator(".poolcard__menu").click();
+await deCard.locator(".poolcard__dup").click();
+await page.waitForSelector('.poolcard[data-pool^="data-inzhener"]', { timeout: 10000 });
+const dupCard = page.locator('.poolcard[data-pool^="data-inzhener"]').first();
+const dupId = await dupCard.getAttribute("data-pool");
+const dupMeta = await dupCard.locator(".poolcard__stat").first().innerText();
+if (dupMeta.split("·")[0].trim() !== deMeta.split("·")[0].trim()) fail(`duplicate mismatch: "${dupMeta}" vs "${deMeta}"`);
+if (!(await dupCard.locator(".poolcard__label").innerText()).includes("(копия)")) fail("duplicate label lacks «(копия)»");
+page.once("dialog", (d) => d.accept());
+await dupCard.locator(".poolcard__menu").click();
+await dupCard.locator(".poolcard__delete").click();
+await page.waitForSelector(`.poolcard[data-pool="${dupId}"]`, { state: "detached", timeout: 5000 });
+console.log(`OK: duplicate — ${dupId} created with DE stats and deleted`);
 
 page.once("dialog", (d) => d.accept());
 await smokeCard.locator(".poolcard__menu").click();
