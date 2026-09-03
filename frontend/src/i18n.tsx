@@ -27,6 +27,16 @@ export function t(s: string, vars?: Vars): string {
   return vars ? out.replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? String(vars[k]) : m)) : out;
 }
 
+/** Слово при числе: русские формы (1 вопрос / 2 вопроса / 5 вопросов), английские (one / many). */
+export function nWord(n: number, ru: [string, string, string], en: [string, string]): string {
+  if (current === "en") return n === 1 ? en[0] : en[1];
+  const m10 = n % 10;
+  const m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return ru[0];
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return ru[1];
+  return ru[2];
+}
+
 const LangCtx = createContext<{ lang: Lang; setLang: (l: Lang) => void }>({
   lang: current,
   setLang: () => void 0,
