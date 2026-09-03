@@ -45,6 +45,6 @@ export default function Router() {
     case "connect":
       return <ConnectPage pools={pools} />;
     default:
-      return <HomePage pools={pools} />;
+      return <HomePage pools={pools} startPool={route.name === "home" ? route.start : null} />;
   }
 }

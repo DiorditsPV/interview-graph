@@ -34,15 +34,11 @@ import {
   blockLabel,
   blockOrder,
   DIFF_COLOR,
-  type Candidate,
   type Difficulty,
   type ImportErr,
-  type Interviewer,
   type PoolConfig,
   type QNode,
   type Session,
-  type SessionMeta,
-  type SessionSummary,
 } from "../types";
 import { href } from "../router";
 import { notesOf, scoresOf } from "../sessionUtils";
@@ -258,17 +254,9 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
   // hide-local: скрытые с доски вопросы (клиентски) + тумблер показа.
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(() => readHiddenIds(pool.id));
   const [showHidden, setShowHidden] = useState(false);
+  // Сессия стартует с главной (StartSessionForm) и приходит сюда по ?session=<id>;
+  // своей строки кандидата у доски больше нет.
   const [session, setSession] = useState<Session | null>(null);
-  const [candidate, setCandidate] = useState("");
-  // people-schema: кандидаты/интервьюеры как сущности БД + выбор при старте сессии.
-  const [candidates, setCandidates] = useState<Candidate[]>([]);
-  const [interviewers, setInterviewers] = useState<Interviewer[]>([]);
-  const [pickedCandidateId, setPickedCandidateId] = useState<number | null>(null);
-  const [pickedInterviewerId, setPickedInterviewerId] = useState<number | null>(null);
-  const [candPosition, setCandPosition] = useState("");
-  const [candSeniority, setCandSeniority] = useState("");
-  const [pastSessions, setPastSessions] = useState<SessionSummary[]>([]);
-  const [sessions, setSessions] = useState<SessionMeta[]>([]);
   const [live, setLive] = useState(false);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [now, setNow] = useState(() => Date.now());
@@ -457,10 +445,6 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
     [loadGraph],
   );
 
-  useEffect(() => {
-    api.listSessions(pool.id).then(setPastSessions).catch(() => setPastSessions([]));
-  }, [pool.id]);
-
   const rfNodes = useMemo(
     () =>
       placement
@@ -599,58 +583,6 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
     [pool.id],
   );
 
-  const startSession = useCallback(async () => {
-    // people-schema: либо выбран существующий кандидат (pickedCandidateId), либо вводим имя.
-    let candidateId = pickedCandidateId;
-    let name = candidate.trim();
-    if (candidateId != null) {
-      name = candidates.find((c) => c.id === candidateId)?.name ?? name;
-    }
-    if (candidateId == null && !name) return;
-    // draft-autosave: именованная сессия персистит в БД — локальный черновик больше не нужен.
-    localStorage.removeItem(`draftScores:${pool.id}`);
-    // Новое имя без выбранной карточки → завести кандидата (с опц. позицией/грейдом).
-    if (candidateId == null && name) {
-      try {
-        const created = await api.createCandidate({
-          name,
-          position: candPosition.trim() || undefined,
-          seniority: candSeniority.trim() || undefined,
-        });
-        candidateId = created.id;
-        setCandidates((cs) => [...cs, created]);
-      } catch {
-        /* при сбое создания кандидата всё равно стартуем сессию по свободному имени */
-      }
-    }
-    const s = await api.createSession(
-      pool.id,
-      name || "—",
-      candidateId ?? undefined,
-      pickedInterviewerId ?? undefined,
-    );
-    setSession(s);
-    setScores(scoresOf(s));
-    setSessionParam(s.id);
-    // Обновляем оба списка сессий (loadsess-резюме и live-пикер).
-    api.listSessions(pool.id).then((ls) => {
-      setPastSessions(ls);
-      setSessions(ls);
-    }).catch(() => void 0);
-    const t = Date.now();
-    setSessionStart(t);
-    localStorage.setItem(`timerStart:${pool.id}`, String(t));
-  }, [
-    candidate,
-    candidates,
-    pickedCandidateId,
-    pickedInterviewerId,
-    candPosition,
-    candSeniority,
-    setSessionParam,
-    pool.id,
-  ]);
-
   // Подключиться к уже существующей сессии (другой интервьюер / HR): подтянуть оценки.
   const joinSession = useCallback(
     async (id: number) => {
@@ -673,23 +605,10 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
     setSessionParam(null);
   }, [setSessionParam]);
 
-  // Список сессий для пикера + авто-подключение по ?session=<id> при загрузке.
+  // Авто-подключение по ?session=<id> при загрузке (старт с главной и «Открыть» со страницы сессий).
   useEffect(() => {
-    api.listSessions(pool.id).then(setSessions).catch(() => void 0);
     if (sessionFromUrl) joinSession(sessionFromUrl);
-  }, [joinSession, pool.id, sessionFromUrl]);
-
-  // people-schema: подтянуть кандидатов и интервьюеров; преселект дефолтного интервьюера.
-  useEffect(() => {
-    api.listCandidates().then(setCandidates).catch(() => void 0);
-    api
-      .listInterviewers()
-      .then((iv) => {
-        setInterviewers(iv);
-        setPickedInterviewerId((cur) => cur ?? (iv.length ? iv[0].id : null));
-      })
-      .catch(() => void 0);
-  }, []);
+  }, [joinSession, sessionFromUrl]);
 
   // Live-синхронизация: подписка на SSE-поток активной сессии. Входящие снимки
   // сливаются объединением, чтобы не затирать только что выставленную локальную оценку.
@@ -715,16 +634,6 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
     };
   }, [session]);
 
-  // Загрузить прошлую сессию: восстановить оценки на доске.
-  const loadSession = useCallback(async (id: number) => {
-    if (!id) return;
-    const s = await api.getSession(id);
-    setSession(s);
-    setScores(scoresOf(s));
-    setNotes(notesOf(s));
-    setSessionParam(id);
-  }, [setSessionParam]);
-
   const toggleBlock = (b: string) => setActiveBlocks((s) => ({ ...s, [b]: !s[b] }));
   const toggleDiff = (d: Difficulty) => setActiveDiffs((s) => ({ ...s, [d]: !s[d] }));
   const toggleTag = (t: string) => setActiveTags((s) => ({ ...s, [t]: !s[t] }));
@@ -733,16 +642,26 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
 
   const scored = Object.keys(scores).length;
   const avg = scored > 0 ? (Object.values(scores).reduce((a, b) => a + b, 0) / scored).toFixed(1) : "—";
-  // people-schema: интервьюер + позиция/грейд кандидата для шапки отчёта.
-  const reportPeople = useMemo(() => {
-    const iv = interviewers.find((i) => i.id === session?.interviewer_id) ?? interviewers.find((i) => i.id === pickedInterviewerId);
-    const cand = candidates.find((c) => c.id === (session?.candidate_id ?? pickedCandidateId));
-    return {
-      interviewer: iv?.name ?? null,
-      position: cand?.position ?? null,
-      seniority: cand?.seniority ?? null,
+  // Позиция/грейд кандидата и имя интервьюера — для шапки отчёта; грузим по факту сессии.
+  const [reportPeople, setReportPeople] = useState<{ interviewer: string | null; position: string | null; seniority: string | null }>(
+    { interviewer: null, position: null, seniority: null },
+  );
+  useEffect(() => {
+    if (!session) {
+      setReportPeople({ interviewer: null, position: null, seniority: null });
+      return;
+    }
+    let alive = true; // ответ по уже сменившейся сессии не должен перетереть актуальный
+    Promise.all([api.listCandidates().catch(() => []), api.listInterviewers().catch(() => [])]).then(([cs, ivs]) => {
+      if (!alive) return;
+      const cand = cs.find((c) => c.id === session.candidate_id);
+      const iv = ivs.find((i) => i.id === session.interviewer_id);
+      setReportPeople({ interviewer: iv?.name ?? null, position: cand?.position ?? null, seniority: cand?.seniority ?? null });
+    });
+    return () => {
+      alive = false;
     };
-  }, [interviewers, candidates, session, pickedInterviewerId, pickedCandidateId]);
+  }, [session]);
   const progress = useMemo(() => {
     const out: Record<string, { done: number; total: number }> = {};
     for (const b of blockOrder(pool)) out[b] = { done: 0, total: 0 };
@@ -842,10 +761,6 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
             <>
               <span className="session__active">
                 👤 {session.candidate}
-                {(() => {
-                  const iv = interviewers.find((i) => i.id === session.interviewer_id);
-                  return iv ? ` · 🎤 ${iv.name}` : "";
-                })()}
                 {" · "}оценено {scored} · средн. {avg}
               </span>
               <span
@@ -860,101 +775,14 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
             </>
           ) : (
             <>
-              {candidates.length > 0 && (
-                <select
-                  className="cand-pick"
-                  value={pickedCandidateId ?? ""}
-                  onChange={(e) => {
-                    const v = e.target.value ? Number(e.target.value) : null;
-                    setPickedCandidateId(v);
-                    if (v != null) setCandidate("");
-                  }}
-                  title="Выбрать существующего кандидата"
-                >
-                  <option value="">Новый кандидат…</option>
-                  {candidates.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                      {c.seniority ? ` · ${c.seniority}` : ""}
-                    </option>
-                  ))}
-                </select>
-              )}
-              {pickedCandidateId == null && (
-                <>
-                  <input
-                    placeholder="Кандидат…"
-                    value={candidate}
-                    onChange={(e) => setCandidate(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && startSession()}
-                  />
-                  <input
-                    className="cand-pos"
-                    placeholder="Позиция (опц.)"
-                    value={candPosition}
-                    onChange={(e) => setCandPosition(e.target.value)}
-                  />
-                  <input
-                    className="cand-sen"
-                    placeholder="Грейд (опц.)"
-                    value={candSeniority}
-                    onChange={(e) => setCandSeniority(e.target.value)}
-                  />
-                </>
-              )}
-              {interviewers.length > 0 && (
-                <select
-                  className="iv-pick"
-                  value={pickedInterviewerId ?? ""}
-                  onChange={(e) =>
-                    setPickedInterviewerId(e.target.value ? Number(e.target.value) : null)
-                  }
-                  title="Кто проводит интервью"
-                >
-                  {interviewers.map((iv) => (
-                    <option key={iv.id} value={iv.id}>
-                      {iv.name}
-                    </option>
-                  ))}
-                </select>
-              )}
-              <button className="btn--primary" onClick={startSession}>Начать сессию</button>
-              {pastSessions.length > 0 && (
-                <select
-                  className="loadsess"
-                  value=""
-                  onChange={(e) => e.target.value && loadSession(Number(e.target.value))}
-                  title="Загрузить прошлую сессию (восстановить оценки)"
-                >
-                  <option value="">Загрузить сессию…</option>
-                  {pastSessions.map((ps) => (
-                    <option key={ps.id} value={ps.id}>
-                      {ps.candidate} · {ps.created_at.slice(0, 16).replace("T", " ")}
-                    </option>
-                  ))}
-                </select>
-              )}
-              {sessions.length > 0 && (
-                <select
-                  className="session__pick"
-                  value=""
-                  onChange={(e) => e.target.value && joinSession(Number(e.target.value))}
-                  title="Подключиться к существующей сессии (live)"
-                >
-                  <option value="">Подключиться…</option>
-                  {sessions.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.candidate} · {s.created_at.slice(0, 10)}
-                    </option>
-                  ))}
-                </select>
-              )}
+              <span className="session__none muted">Просмотр без сессии</span>
+              <a className="session__start" href={href.start(pool.id)}>Начать интервью →</a>
             </>
           )}
           <span className="session__sep" aria-hidden="true" />
           <button
             className="iconbtn dlbtn"
-            onClick={() => downloadReport(session?.candidate ?? candidate, graph, scores, pool, notes, reportPeople)}
+            onClick={() => downloadReport(session?.candidate ?? "", graph, scores, pool, notes, reportPeople)}
             disabled={scored === 0}
             title={scored === 0 ? "Сначала выставьте оценки" : "Скачать результаты (HTML)"}
           >
@@ -963,7 +791,7 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
           {graph.length > 0 && scored === graph.length && (
             <button
               className="cta-done"
-              onClick={() => downloadReport(session?.candidate ?? candidate, graph, scores, pool, notes, reportPeople)}
+              onClick={() => downloadReport(session?.candidate ?? "", graph, scores, pool, notes, reportPeople)}
               title="Все вопросы оценены — скачать итоговый отчёт"
             >
               Завершить · Скачать отчёт

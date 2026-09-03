@@ -1,9 +1,21 @@
+import { useEffect, useState } from "react";
+import { StartSessionForm } from "../components/StartSessionForm";
 import { href } from "../router";
 import type { PoolConfig } from "../types";
 
 // Главное меню: направления как входы на доски + разделы (кандидаты, сессии, подключение).
 // Пулов может не быть вовсе (content/ без pool.yaml) — говорим об этом, а не рисуем пустоту.
-export function HomePage({ pools, notice }: { pools: PoolConfig[]; notice?: string }) {
+// startPool — пул из deep-link #/?start=<pool>: форма старта интервью открывается сразу.
+export function HomePage({
+  pools,
+  notice,
+  startPool: startPool0,
+}: { pools: PoolConfig[]; notice?: string; startPool?: string | null }) {
+  const [startPool, setStartPool] = useState<string | null>(startPool0 ?? null);
+  // Переход #/ → #/?start=<pool> не перемонтирует страницу — синхронизируем с пропом.
+  useEffect(() => {
+    if (startPool0) setStartPool(startPool0);
+  }, [startPool0]);
   return (
     <div className="page home">
       <header className="pageshell">
@@ -31,7 +43,14 @@ export function HomePage({ pools, notice }: { pools: PoolConfig[]; notice?: stri
                     <span key={b.id} className="poolcard__block" style={{ background: b.color }}>{b.label}</span>
                   ))}
                 </div>
-                <a className="poolcard__bank" href={href.bank(p.id)}>банк вопросов →</a>
+                {/* Кнопка и форма лежат над «растяжкой» (.poolcard__label::after) — иначе клик уводит на доску. */}
+                <div className="poolcard__actions">
+                  <button className="poolcard__start btn--primary" onClick={() => setStartPool(p.id)}>
+                    Начать интервью
+                  </button>
+                  <a className="poolcard__bank" href={href.bank(p.id)}>банк вопросов →</a>
+                </div>
+                {startPool === p.id && <StartSessionForm pool={p} onClose={() => setStartPool(null)} />}
               </div>
             ))}
           </div>
