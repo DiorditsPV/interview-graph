@@ -57,22 +57,62 @@ body {
 
 .app { display: flex; flex-direction: column; height: 100vh; }
 
-/* ---- topbar (два ряда: где мы → ход интервью) ---- */
+/* ---- topbar (ТЗ 10–14): один ряд toolbar — слева «где мы», справа действия;
+   ряд сессии появляется только при активной сессии ---- */
 .topbar {
   display: flex; flex-direction: column; gap: 6px;
   padding: 8px 16px; background: var(--surface); border-bottom: 1px solid var(--border);
 }
 .topbar__row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-/* ряд 2 — визуально тише: отделён сверху, мельче */
-.topbar__row--utility { padding-top: 6px; border-top: 1px solid var(--border); }
-.topbar__row--utility .iconbtn,
-.topbar__row--utility .tb__toggle { font-size: 13px; }
+.topbar__row--main { justify-content: space-between; }
+.topbar__left, .topbar__right { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.topbar__right { gap: 8px; flex-wrap: wrap; }
 .topbar strong { color: var(--heading); }
-.appname { margin: 0; font-size: 16px; font-weight: 700; line-height: 1.2; color: var(--heading); }
-.topbar__back { color: var(--text-muted); text-decoration: none; font-size: 13px; white-space: nowrap; }
+.appname { margin: 0; font-size: 16px; font-weight: 700; line-height: 1.2; color: var(--heading); white-space: nowrap; }
+.topbar__back {
+  display: inline-flex; align-items: center; gap: 4px;
+  color: var(--text-muted); text-decoration: none; font-size: 13px; white-space: nowrap;
+}
 .topbar__back:hover { color: var(--text); }
-.topbar__settings { margin-left: auto; }
-.topbar .muted { color: var(--text-faint); font-size: 13px; }
+.topbar__count { color: var(--text-faint); font-size: 13px; white-space: nowrap; }
+
+/* Кнопки toolbar'а одного роста (button и a); primary — только «Начать интервью». */
+.tbbtn {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; font-size: 13px; line-height: 1.2;
+  font-weight: 500; border: 1px solid var(--border-strong); border-radius: 6px;
+  background: var(--surface); color: var(--text); text-decoration: none; white-space: nowrap; cursor: pointer;
+}
+.tbbtn:hover { background: var(--hover); }
+.tbbtn[aria-pressed="true"], .tbbtn[aria-expanded="true"] { background: var(--hover); }
+.tbbtn--icon { padding: 6px 7px; }
+.tbbtn.btn--primary { border-color: #2563eb; }
+.tbbtn.btn--primary:hover { background: #1d4ed8; }
+.tbbtn.btn--quiet { border-color: transparent; background: transparent; color: var(--text-muted); }
+.tbbtn.btn--quiet:hover { background: var(--hover); color: var(--text); border-color: var(--border); }
+/* Точка на «Фильтры»: панель закрыта, а доска отфильтрована — факт не должен прятаться. */
+.filtersbtn__dot { width: 6px; height: 6px; border-radius: 999px; background: var(--accent); }
+
+/* Dropdown'ы toolbar'а («Экспорт», «•••»): выпадают под кнопкой, к правому краю;
+   z-index выше канвы (5) и панели ⚙ (45) — меню коротко живёт поверх всего, кроме модалок (50). */
+.tbdrop { position: relative; display: inline-flex; }
+.tbmenu {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 46; display: grid; min-width: 220px; padding: 4px;
+  background: var(--surface); border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: 0 6px 16px var(--shadow-strong);
+}
+.tbmenu__item {
+  display: flex; align-items: center; gap: 8px; text-align: left; padding: 8px 10px; border: 0; border-radius: 6px;
+  background: transparent; color: var(--text); font: inherit; font-size: 13px; text-decoration: none; white-space: nowrap; cursor: pointer;
+}
+.tbmenu__item:hover:not(:disabled) { background: var(--hover); }
+.tbmenu__item:disabled { opacity: .5; cursor: not-allowed; }
+.tbmenu__item:disabled:hover { background: transparent; }
+.tbmenu__item svg { color: var(--text-muted); flex: 0 0 auto; }
+
+/* ряд сессии — тише: отделён линией; выход и «Завершить» прижаты вправо */
+.topbar__row--session { padding-top: 6px; border-top: 1px solid var(--border); }
+.session { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; width: 100%; }
+.session__active { font-size: 13px; color: var(--text); white-space: nowrap; }
+.session__actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 
 /* ---- страницы кроме доски: тонкая полоса «← Меню · заголовок» + содержимое ---- */
 .page { display: flex; flex-direction: column; min-height: 100vh; background: var(--bg); }
@@ -98,9 +138,6 @@ body {
 .progress__label {
   color: var(--text-muted); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap;
 }
-.session { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.session__active { font-size: 14px; color: var(--text-muted); }
-.session__start { color: var(--accent); text-decoration: none; font-weight: 600; }
 .livedot {
   display: inline-flex; align-items: center; gap: 4px;
   font-size: 11px; font-weight: 700; letter-spacing: .04em;
@@ -118,21 +155,16 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 button:disabled:hover { background: var(--surface); }
 .iconbtn { padding: 6px 10px; line-height: 1; }
 
-/* Иерархия действий в шапке: банк/загрузка/справка — тихие (рамка проявляется на hover),
-   «Скачать» — результат интервью, единственная акцентная. Иначе 13 кнопок одного веса. */
+/* Тихие кнопки (рамка проявляется на hover): иначе все действия одного веса. */
 .btn--quiet {
   border-color: transparent; background: transparent; color: var(--text-muted);
 }
 .btn--quiet:hover { background: var(--hover); color: var(--text); border-color: var(--border); }
 .btn--quiet:disabled:hover { background: transparent; border-color: transparent; }
-.dlbtn:not(:disabled) { border-color: var(--accent); color: var(--accent); font-weight: 600; }
-.dlbtn:not(:disabled):hover { background: var(--accent); color: #fff; }
-.session__sep { width: 1px; align-self: stretch; margin: 2px 4px; background: var(--border); }
 
-/* ---- настройки отображения: боковая панель ⚙ (.setdrawer) ----
+/* ---- настройки отображения: боковая панель ⚙ (.setdrawer), открывается из «•••» ----
    z-index между канвой (5) и модалками (50): всплывает над доской, но не над оверлеями. */
-.settings { position: relative; display: inline-flex; }
-.setbtn--on { background: var(--hover); color: var(--text); border-color: var(--border); }
+.settings { display: contents; }
 .setdrawer {
   position: fixed; left: 0; top: 0; bottom: 0; z-index: 45; width: 304px; max-width: 88vw;
   display: flex; flex-direction: column; gap: 18px; padding: 16px; overflow-y: auto;
@@ -343,29 +375,26 @@ button:disabled:hover { background: var(--surface); }
 .btn--primary { background: #2563eb; color: #fff; border-color: #2563eb; font-weight: 600; }
 .btn--primary:hover { background: #1d4ed8; }
 
-/* ---- панель фильтров ---- */
+/* ---- панель фильтров: popover у правого края канвы, открывается кнопкой toolbar'а ----
+   Обёртка React Flow растянута на всю высоту канвы (top+bottom), чтобы max-height панели
+   считался от неё; клики сквозь пустую часть обёртки идут на канву (pointer-events).
+   Снизу оставлен запас под мини-карту. */
+.react-flow__panel.top.right { bottom: 0; display: flex; align-items: flex-start; pointer-events: none; }
 .filterpanel {
+  width: 340px; max-width: calc(100vw - 40px); max-height: calc(100% - 150px); overflow-y: auto; pointer-events: auto;
   background: var(--panel-bg); border: 1px solid var(--border); border-radius: 10px;
-  padding: 8px 10px; box-shadow: 0 2px 8px var(--shadow); display: flex; flex-direction: column; gap: 8px;
+  padding: 10px 12px; box-shadow: 0 4px 16px var(--shadow); display: flex; flex-direction: column; gap: 8px;
   backdrop-filter: blur(4px);
 }
+.fp__head { display: flex; align-items: center; justify-content: space-between; }
+.fp__heading { margin: 0; font-size: 13px; font-weight: 700; color: var(--heading); }
+.fp__close { display: inline-flex; padding: 3px 5px; border-color: transparent; background: transparent; color: var(--text-muted); }
+.fp__close:hover { background: var(--hover); color: var(--text); }
 /* Мини-карта: рамка и тень, чтобы не читалась пустым белым прямоугольником */
 .react-flow__minimap {
   border: 1px solid var(--border); border-radius: 8px;
   box-shadow: 0 2px 8px var(--shadow); overflow: hidden;
 }
-/* Шапка панели: сворачивание целиком — панель лежит поверх канвы и в развёрнутом виде
-   закрывает правую колонку доски. */
-.fp__bar { display: flex; align-items: center; gap: 6px; }
-.fp__toggle {
-  display: flex; align-items: center; gap: 6px; padding: 4px 8px; font-size: 12px;
-  font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
-  color: var(--text-muted); border-color: transparent; background: transparent;
-}
-.fp__toggle:hover { color: var(--text); background: var(--hover); }
-.fp__chevron { font-size: 10px; opacity: .7; }
-.fp__badge { width: 6px; height: 6px; border-radius: 999px; background: var(--accent); }
-.filterpanel--closed { padding: 4px 6px; }
 
 .fp__search {
   width: 100%; box-sizing: border-box; padding: 5px 8px; font-size: 13px;
@@ -516,11 +545,6 @@ kbd {
   background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600;
 }
 .cta-done:hover { filter: brightness(1.08); background: var(--accent); }
-.fp__collapse {
-  display: inline-flex; align-items: center; min-height: 22px;
-  background: none; border: none; padding: 2px 0; font: inherit; color: inherit; cursor: pointer;
-}
-.fp__collapse:hover { background: none; color: var(--accent); }
 
 /* Экран «Все вопросы» (bank-browser): полноэкранный оверлей просмотра банка. */
 .bankbrowser {

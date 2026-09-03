@@ -226,9 +226,7 @@ async function main() {
   await shot(page, "02-scoring.png");
 
   // 3. Drawer рядом с доской: полный текст вопроса, теги, оценка и заметка интервьюера.
-  await open("dark");
-  await page.locator(".fp__collapse").click(); // свернуть список тегов: панель не перекрывает доску
-  await settle(page, 300);
+  await open("dark"); // панель фильтров по умолчанию закрыта — доску не перекрывает
   const zoomBox = await page.locator(".qnode__title", { hasText: "Shuffle в Spark" }).first().boundingBox();
   await page.mouse.move(zoomBox.x, zoomBox.y);
   for (let i = 0; i < 3; i++) {
@@ -267,7 +265,8 @@ async function main() {
 
   // 8. Итоговый HTML-отчёт по сессии (генерируется на клиенте, самодостаточный файл).
   const dl = page.waitForEvent("download", { timeout: 15000 });
-  await page.locator(".dlbtn").click();
+  await page.locator(".topbar .exportbtn").click(); // отчёт — пункт dropdown'а «Экспорт»
+  await page.locator(".exportmenu .dlbtn").click();
   const report = await dl;
   const reportPath = path.join(os.tmpdir(), "interview-report-demo.html");
   await report.saveAs(reportPath);
