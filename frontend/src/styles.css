@@ -506,7 +506,8 @@ kbd {
 .upload-result .muted { color: var(--text-faint); }
 
 /* ---- UX-полировка ---- */
-.tagchip--more { background: var(--border); color: var(--text-muted); font-weight: 600; }
+/* Счётчик скрытых тегов — тихий текст, не плашка: в оформлении 37 --border чёрный, и плашка била в глаза. */
+.tagchip--more { background: transparent; color: var(--text-muted); font-weight: 600; padding-left: 0; }
 .hud__progress {
   font-size: 12px; color: var(--text-faint); font-variant-numeric: tabular-nums; white-space: nowrap;
   padding-left: 8px; border-left: 1px solid var(--border); margin-left: 2px;
@@ -630,8 +631,11 @@ kbd {
 .poolcard__block { font-size: 11px; color: #fff; padding: 1px 7px; border-radius: 4px; }
 .poolcard__bank { font-size: 12px; color: var(--accent); text-decoration: none; }
 /* Кнопка старта и форма — над «растяжкой» .poolcard__label::after, иначе клики уходят на доску. */
-.poolcard__actions { display: flex; align-items: center; gap: 12px; margin-top: 4px; position: relative; z-index: 1; }
-.poolcard__start { padding: 6px 12px; font-size: 13px; }
+/* Ряд действий: элементы не рвутся по словам, а переносятся целиком — на узкой карточке
+   «изменить · удалить» уходят на вторую строку, а не вылезают за край. */
+.poolcard__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 4px; position: relative; z-index: 1; }
+.poolcard__actions > *, .poolcard__manage > * { white-space: nowrap; }
+.poolcard .poolcard__start { padding: 6px 12px; font-size: 13px; line-height: 1.2; }
 .poolcard__form {
   position: relative; z-index: 1; display: grid; gap: 6px; padding: 10px; margin-top: 4px;
   border: 1px solid var(--border); border-radius: 8px; background: var(--bg);
