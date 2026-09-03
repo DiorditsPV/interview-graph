@@ -166,7 +166,9 @@ export function buildReportHtml(
   .c-diff { width: 84px; } .c-score { width: 130px; white-space: nowrap; }
   .diff { font-size: 11px; text-transform: uppercase; font-weight: 700; }
   .sub { font-size: 11px; color: #6b7280; background: #f1f5f9; padding: 1px 6px; border-radius: 4px; }
-  .qt { font-weight: 600; }
+  /* Заголовок вопроса — как в экспорте банка (14/700): на 13/600 строки из одних строчных
+     («Topics, partitions, consumer groups») читались мельче соседних с заглавными. */
+  .qt { font-weight: 700; font-size: 14px; line-height: 1.35; }
   .kind { font-size: 10px; color: #92400e; background: #fef3c7; padding: 1px 6px; border-radius: 4px; }
   .topic { font-size: 11px; color: #9ca3af; margin-top: 2px; }
   .qnote { font-size: 12px; color: #374151; background: #fffbeb; border-left: 2px solid #f59e0b; padding: 3px 7px; margin-top: 5px; border-radius: 3px; white-space: pre-wrap; }
