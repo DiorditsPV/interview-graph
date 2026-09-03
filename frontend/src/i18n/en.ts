@@ -43,14 +43,12 @@ export const EN: Record<string, string> = {
   // --- HomePage ---
   "Интервью · доска вопросов": "Interview · question board",
   "Направления": "Tracks",
-  "Разделы": "Sections",
-  "банк вопросов →": "question bank →",
   "+ Новое направление": "+ New track",
+  "Открыть вопросы →": "Open questions →",
+  "Меню направления": "Track menu",
+  "Проведение интервью": "Interviewing",
   "Нет ни одного направления: создайте первое кнопкой «+ Новое направление» или положите каталог с `pool.yaml` в `content/`.":
     "No tracks yet: create the first one with “+ New track” or put a directory with `pool.yaml` into `content/`.",
-  "{nodes} вопросов · {sessions} сессий": "{nodes} questions · {sessions} sessions",
-  "изменить": "edit",
-  "удалить": "delete",
   "Удалить направление «{label}»? Вопросы ({nodes}) будут удалены, сессии ({sessions}) останутся в истории.":
     "Delete track “{label}”? Its questions ({nodes}) will be deleted; sessions ({sessions}) stay in history.",
   "Не удалось удалить направление": "Could not delete track",
