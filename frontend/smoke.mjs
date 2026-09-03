@@ -11,12 +11,19 @@ const errors = [];
 page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
 page.on("pageerror", (e) => errors.push(String(e)));
 
-// topbar-settings: тумблеры отображения — в боковой панели (.setdrawer) под ⚙, поэтому каждое
-// переключение = открыть панель → кликнуть чип → закрыть. Esc закрывает панель (перехватывается
-// в capture-фазе внутри SettingsMenu), поэтому дожидаемся её исчезновения перед следующим шагом.
-async function toggleSetting(label) {
-  await page.locator(".setbtn").click();
+// topbar-settings: тумблеры отображения — в боковой панели (.setdrawer) под ⚙, а ⚙ (.setbtn) —
+// пункт меню «•••» toolbar'а (board-toolbar). Каждое переключение = ••• → Настройки → чип → Esc.
+// Пункт меню закрывает «•••» сам; Esc закрывает панель (перехватывается в capture-фазе внутри
+// SettingsMenu), поэтому дожидаемся её исчезновения перед следующим шагом.
+async function openSettings() {
+  await page.locator(".morebtn").click();
+  await page.waitForSelector(".moremenu", { timeout: 3000 });
+  await page.locator(".moremenu .setbtn").click();
   await page.waitForSelector(".setdrawer", { timeout: 3000 });
+  await page.waitForSelector(".moremenu", { state: "detached", timeout: 3000 });
+}
+async function toggleSetting(label) {
+  await openSettings();
   await page.locator(".setdrawer .tb__toggle", { hasText: label }).click();
   await page.keyboard.press("Escape");
   await page.waitForSelector(".setdrawer", { state: "detached", timeout: 3000 });
@@ -140,6 +147,15 @@ const nodeCount = await page.locator(".qnode").count();
 if (nodeCount < 5) fail(`too few nodes rendered: ${nodeCount}`);
 console.log(`OK: rendered ${nodeCount} nodes`);
 
+// 1a. board-toolbar: панель фильтров по умолчанию закрыта и открывается кнопкой toolbar'а.
+//     Открываем один раз и держим открытой (состояние персистится в localStorage) — на неё
+//     завязаны шаги с .fp__* ниже.
+if ((await page.locator(".filterpanel").count()) !== 0) fail("filter panel must be closed by default");
+await page.locator(".topbar .filtersbtn").click();
+await page.waitForSelector(".filterpanel", { timeout: 3000 });
+if ((await page.locator(".topbar .filtersbtn").getAttribute("aria-pressed")) !== "true") fail("filters button not pressed after opening");
+console.log("OK: filter panel opens from the toolbar");
+
 // 1b. Swimlane: 4 заголовка блоков + под-колонки фреймворков + 4 метки оси сложности (base/junior/middle/senior).
 const groups = await page.locator(".bgroup__header").count();
 if (groups !== 4) fail(`expected 4 block headers, got ${groups}`);
@@ -206,10 +222,9 @@ const afterNext = await page.locator(".hud__title").innerText();
 if (afterNext === beforeNext) fail("«Дальше» stuck on leaf node");
 console.log("OK: «Дальше» advances from a leaf node");
 
-// 6b. Настройки отображения (topbar-settings): панель под ⚙ открывается и содержит тумблеры
-// направляющих, точек-фона, агенды, скрытых и таймера.
-await page.locator(".setbtn").click();
-await page.waitForSelector(".setdrawer", { timeout: 3000 });
+// 6b. Настройки отображения (topbar-settings): панель под ⚙ (пункт «•••») открывается и содержит
+// тумблеры направляющих, точек-фона, агенды, скрытых и таймера.
+await openSettings();
 const tbBtns = await page.locator(".setdrawer .tb__toggle").count();
 if (tbBtns < 6) fail(`display toggles missing in settings drawer (got ${tbBtns})`);
 await page.keyboard.press("Escape");
@@ -228,19 +243,23 @@ const bgDots = await page.locator(".react-flow__background").count();
 if (bgDots < 1) fail("dots background not shown after toggling icon");
 console.log(`OK: settings drawer (${tbBtns} toggles) switches guides + dots grid (default off)`);
 
-// 7. Скачивание результатов: кнопка отдаёт .html-файл.
+// 7. Скачивание результатов: «Экспорт» → «Отчёт по сессии (HTML)» отдаёт .html-файл
+//    (черновик оценок без сессии — оценка выставлена на шаге 4, пункт активен).
+await page.locator(".topbar .exportbtn").click();
+await page.waitForSelector(".exportmenu", { timeout: 3000 });
+if (await page.locator(".exportmenu .dlbtn").isDisabled()) fail("report export must be enabled once a score exists");
 const [dl] = await Promise.all([
   page.waitForEvent("download"),
-  page.locator(".dlbtn").click(),
+  page.locator(".exportmenu .dlbtn").click(),
 ]);
+await page.waitForSelector(".exportmenu", { state: "detached", timeout: 3000 });
 const fn = dl.suggestedFilename();
 if (!fn.endsWith(".html")) fail(`download is not .html: ${fn}`);
 console.log(`OK: results download (${fn})`);
 
 // 8. Тёмная тема: переключатель в настройках меняет data-theme и тёмный фон.
 const before = await page.evaluate(() => document.documentElement.dataset.theme || "light");
-await page.locator(".setbtn").click();
-await page.waitForSelector(".setdrawer", { timeout: 3000 });
+await openSettings();
 await page.locator(".setdrawer .themebtn").click();
 await page.keyboard.press("Escape");
 await page.waitForTimeout(200);
@@ -294,26 +313,11 @@ const dimCleared = await page.locator(".qnode--dimmed").count();
 if (dimCleared >= dimSearch) fail(`clearing search did not remove dim (${dimSearch} → ${dimCleared})`);
 console.log(`OK: question search dims ${dimSearch}, clears to ${dimCleared}`);
 
-// 9d. «Только неоценённые»: оценённая на шаге 4 нода (ROW_NUMBER) гаснет при включении тумблера.
-const unscoredBtn = page.locator(".fp__chip", { hasText: "Только неоценённые" });
-await unscoredBtn.click();
-await page.waitForTimeout(250);
-const dimUnscored = await page.locator(".qnode--dimmed").count();
-if (dimUnscored < 1) fail("unscored-only did not dim scored nodes");
-await unscoredBtn.click();
-await page.waitForTimeout(250);
-const dimUnscoredAfter = await page.locator(".qnode--dimmed").count();
-if (dimUnscoredAfter >= dimUnscored) fail(`toggling off did not clear dim (${dimUnscored} → ${dimUnscoredAfter})`);
-console.log(`OK: «только неоценённые» dims ${dimUnscored}, clears to ${dimUnscoredAfter}`);
-
-// 9e. Прогресс-бар в шапке: присутствует, подпись с дробью, заполнение > 0 (оценка со шага 4).
-await page.waitForSelector(".progress", { timeout: 3000 });
-const progLabel = await page.locator(".progress__label").innerText();
-if (!progLabel.includes("/")) fail(`progress label has no fraction: "${progLabel}"`);
-const fillW = await page.locator(".progress__fill").evaluate((el) => el.style.width);
-const fillPct = parseFloat(fillW);
-if (!(fillPct > 0)) fail(`progress fill not advanced after scoring: "${fillW}"`);
-console.log(`OK: progress bar (${progLabel}, fill ${fillW})`);
+// 9d/9e. board-toolbar (ТЗ 13): без сессии оценки — черновик: ни чипа «Только неоценённые» в фильтрах,
+//        ни прогресса интервью в шапке. Оба проверяются в активной сессии (шаг 10).
+if ((await page.locator(".fp__chip", { hasText: "Только неоценённые" }).count()) !== 0) fail("«Только неоценённые» must be hidden without a session");
+if ((await page.locator(".topbar .progress").count()) !== 0) fail("progress bar must be hidden without a session");
+console.log("OK: no unscored-only chip and no progress bar without a session");
 
 // 9f. UX-полировка: HUD-прогресс+топик, чип переполнения тегов, свёртка панели тегов.
 // (ДО старта сессии/resume: нужен активный HUD текущего вопроса — после resume-reload его нет.)
@@ -331,17 +335,17 @@ const moreChips = await page.locator(".tagchip--more").count();
 if (moreChips > 0) fail(`tag-overflow chip (+N) rendered although no card has >3 tags (${moreChips})`);
 console.log(`OK: cards show all tags (${threeTagCards} with three), no +N chip`);
 
+// board-toolbar: ✕ в панели закрывает её целиком, кнопка toolbar'а открывает обратно — теги на месте.
 const tagsBefore = await page.locator(".fp__tag").count();
 if (tagsBefore < 1) fail("expected tag chips in filter panel");
-await page.locator(".fp__collapse").click();
-await page.waitForTimeout(150);
-const tagsCollapsedCount = await page.locator(".fp__tag").count();
-if (tagsCollapsedCount !== 0) fail(`tag panel did not collapse (still ${tagsCollapsedCount})`);
-await page.locator(".fp__collapse").click(); // развернуть обратно
-await page.waitForTimeout(150);
+await page.locator(".fp__close").click();
+await page.waitForSelector(".filterpanel", { state: "detached", timeout: 3000 });
+if ((await page.locator(".topbar .filtersbtn").getAttribute("aria-pressed")) !== "false") fail("filters button still pressed after closing");
+await page.locator(".topbar .filtersbtn").click();
+await page.waitForSelector(".filterpanel", { timeout: 3000 });
 const tagsAgain = await page.locator(".fp__tag").count();
-if (tagsAgain !== tagsBefore) fail(`tag panel did not restore (${tagsAgain} vs ${tagsBefore})`);
-console.log(`OK: tag panel collapse toggle (${tagsBefore} ⇄ 0)`);
+if (tagsAgain !== tagsBefore) fail(`filter panel did not restore tags (${tagsAgain} vs ${tagsBefore})`);
+console.log(`OK: filter panel close/reopen keeps ${tagsBefore} tags`);
 
 // 10. Старт сессии с главной (home-session-start): «Начать интервью» на карточке DE → форма
 //     кандидата (имя + грейд) → доска с ?session=<id> и активной сессией. Затем оценка в HUD.
@@ -356,6 +360,10 @@ await page.waitForFunction(() => /^#\/board\/data-engineer\?session=\d+/.test(lo
 await page.waitForSelector(".session__active", { timeout: 5000 });
 const activeHdr = await page.locator(".session__active").innerText();
 if (!activeHdr.includes("Cmp Bot")) fail(`active session missing candidate: "${activeHdr}"`);
+if (!activeHdr.includes("Сессия #")) fail(`active session missing session id: "${activeHdr}"`);
+// board-toolbar: в сессии второй ряд шапки, кнопки старта в toolbar'е нет.
+if ((await page.locator(".topbar > .topbar__row").count()) !== 2) fail("active session must add a second topbar row");
+if ((await page.locator(".topbar .session__start").count()) !== 0) fail("start button must be hidden during a session");
 console.log(`OK: session starts from main menu (${activeHdr.replace(/\s+/g, " ").slice(0, 50)})`);
 // Доска смонтирована заново — текущего вопроса нет, HUD появляется после клика по ноде.
 await page.waitForSelector(".qnode", { timeout: 10000 });
@@ -363,6 +371,28 @@ await page.locator(".qnode__title", { hasText: "ROW_NUMBER" }).first().click();
 await page.waitForSelector(".hud__score .scorebtn", { timeout: 3000 });
 await page.locator(".hud__score .scorebtn").nth(2).click(); // 3/5 → персист в сессию
 await page.waitForTimeout(400);
+
+// 10a. Прогресс интервью — только в сессии: подпись с дробью, заполнение > 0 после оценки.
+await page.waitForSelector(".topbar .progress", { timeout: 3000 });
+const progLabel = await page.locator(".progress__label").innerText();
+if (!progLabel.includes("/")) fail(`progress label has no fraction: "${progLabel}"`);
+const fillW = await page.locator(".progress__fill").evaluate((el) => el.style.width);
+if (!(parseFloat(fillW) > 0)) fail(`progress fill not advanced after scoring: "${fillW}"`);
+console.log(`OK: session progress bar (${progLabel}, fill ${fillW})`);
+
+// 10b. «Только неоценённые» (чип есть только в сессии): оценённая нода (ROW_NUMBER) гаснет.
+await page.waitForSelector(".filterpanel", { timeout: 3000 }); // открыта с шага 1a (персист)
+const unscoredBtn = page.locator(".fp__chip", { hasText: "Только неоценённые" });
+if ((await unscoredBtn.count()) !== 1) fail("«Только неоценённые» chip missing in session");
+await unscoredBtn.click();
+await page.waitForTimeout(250);
+const dimUnscored = await page.locator(".qnode--dimmed").count();
+if (dimUnscored < 1) fail("unscored-only did not dim scored nodes");
+await unscoredBtn.click();
+await page.waitForTimeout(250);
+const dimUnscoredAfter = await page.locator(".qnode--dimmed").count();
+if (dimUnscoredAfter >= dimUnscored) fail(`toggling off did not clear dim (${dimUnscored} → ${dimUnscoredAfter})`);
+console.log(`OK: «только неоценённые» dims ${dimUnscored}, clears to ${dimUnscoredAfter}`);
 
 // 11. Возобновление сессии: создать сессию+оценку через API → страница «Сессии» → «Открыть»
 //     → доска подключается по ?session= и восстанавливает оценки. «Загрузить сессию» с доски убран.
@@ -377,11 +407,17 @@ if (!active.includes("SmokeResume")) fail(`resume did not load session: ${active
 // Граф и сессия грузятся независимо: .session__active может появиться раньше карточек — ждём оценку, а не считаем сразу.
 await page.waitForSelector(".qnode--scored", { timeout: 10000 }).catch(() => fail("resume did not restore scores onto the board"));
 const scoredCount = await page.locator(".qnode--scored").count();
-// В активной сессии на месте «Скачать» и «Выйти»; после «Выйти» доска без сессии ведёт на форму старта.
-if ((await page.locator(".session .dlbtn").count()) !== 1) fail("download button missing in active session");
+// В активной сессии экспорт отчёта в toolbar'е активен (оценки есть) и есть «Выйти»;
+// после «Выйти» доска без сессии ведёт на форму старта.
+if ((await page.locator(".topbar .exportbtn").count()) !== 1) fail("export button missing in active session");
+await page.locator(".topbar .exportbtn").click();
+await page.waitForSelector(".exportmenu", { timeout: 3000 });
+if (await page.locator(".exportmenu .dlbtn").isDisabled()) fail("report export must be enabled in a session with scores");
+await page.keyboard.press("Escape");
+await page.waitForSelector(".exportmenu", { state: "detached", timeout: 3000 });
 await page.locator(".session button", { hasText: "Выйти" }).click();
-await page.waitForSelector(".session__start", { timeout: 3000 });
-const startHref = await page.locator(".session__start").getAttribute("href");
+await page.waitForSelector(".topbar .session__start", { timeout: 3000 });
+const startHref = await page.locator(".topbar .session__start").getAttribute("href");
 if (!startHref?.startsWith("#/?start=data-engineer")) fail(`board without session must link to start form, got ${startHref}`);
 console.log(`OK: session resume restores scores (${scoredCount} scored), no-session board links to start form`);
 
@@ -410,14 +446,26 @@ const agHud = await page.locator(".hud__title").innerText();
 if (!agHud || agHud.length < 2) fail(`agenda click did not set current question: "${agHud}"`);
 console.log(`OK: agenda sidebar (${ivCount} items, click → HUD "${agHud.slice(0, 30)}")`);
 
-// 17. pools-main-menu: шапка доски — два ряда, «← Меню», название направления, ⚙; банка в шапке нет.
+// 17. board-toolbar: шапка без сессии — один ряд: «← Направления», название, фильтры, экспорт,
+//     «Начать интервью», •••; прогресса нет; ⚙ — пункт меню •••; кнопок банка/темы в шапке нет.
 const topRows = await page.locator(".topbar > .topbar__row").count();
-if (topRows !== 2) fail(`expected 2 topbar rows, got ${topRows}`);
+if (topRows !== 1) fail(`expected 1 topbar row without a session, got ${topRows}`);
 if ((await page.locator(".topbar .topbar__back").count()) !== 1) fail("back-to-menu link missing");
 if (!(await page.locator(".topbar .appname").innerText()).includes("Дата-инженер")) fail("pool label missing in topbar");
-if ((await page.locator(".topbar .setbtn").count()) !== 1) fail("settings button missing in topbar");
+for (const sel of [".filtersbtn", ".exportbtn", ".session__start", ".morebtn"]) {
+  if ((await page.locator(`.topbar ${sel}`).count()) !== 1) fail(`toolbar element ${sel} missing`);
+}
+if ((await page.locator(".topbar .progress").count()) !== 0) fail("progress bar must not be in the toolbar without a session");
+if ((await page.locator(".topbar .setbtn").count()) !== 0) fail("settings must live inside the ••• menu, not in the toolbar");
 if ((await page.locator(".topbar .addbtn, .topbar .bankbtn, .topbar .themebtn").count()) !== 0) fail("bank/theme buttons must leave the topbar");
-console.log(`OK: board topbar (${topRows} rows, back link, pool label, settings)`);
+await page.locator(".topbar .morebtn").click();
+await page.waitForSelector(".moremenu", { timeout: 3000 });
+if ((await page.locator(".moremenu .setbtn").count()) !== 1) fail("settings item missing in ••• menu");
+if ((await page.locator(".moremenu .helpbtn").count()) !== 1) fail("shortcuts item missing in ••• menu");
+if (!(await page.locator(".moremenu .bankLink").getAttribute("href"))?.startsWith("#/bank/data-engineer")) fail("••• menu must link to the question bank");
+await page.keyboard.press("Escape");
+await page.waitForSelector(".moremenu", { state: "detached", timeout: 3000 });
+console.log(`OK: board toolbar (${topRows} row, back link, pool label, filters/export/start/•••)`);
 
 // Работа с банком — страница #/bank/<pool> (pools-main-menu).
 await page.goto(URL + "#/bank/data-engineer", { waitUntil: "load" });
@@ -426,7 +474,7 @@ await page.waitForSelector(".bankbrowser--embedded", { timeout: 10000 });
 // 12. Экспорт банка вопросов: кнопка отдаёт interview_bank_*.html (всегда активна, без reload).
 const [dlBank] = await Promise.all([
   page.waitForEvent("download"),
-  page.locator(".bankbtn").click(),
+  page.locator(".pageshell .bankbtn").click(),
 ]);
 const bankFn = dlBank.suggestedFilename();
 if (!bankFn.includes("bank") || !bankFn.endsWith(".html")) fail(`bank export wrong file: ${bankFn}`);
