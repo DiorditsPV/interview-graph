@@ -9,19 +9,30 @@ import {
   type Node,
   type ReactFlowInstance,
 } from "@xyflow/react";
+import {
+  ArrowLeft,
+  BookOpen,
+  CircleHelp,
+  Download,
+  Ellipsis,
+  Play,
+  Settings,
+  SlidersHorizontal,
+  X,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type NodeUpdate } from "../api";
 import { BandsNode } from "../components/BandsNode";
 import { BlockGroupNode } from "../components/BlockGroupNode";
 import { LangSwitch } from "../components/LangSwitch";
 import { SettingsMenu } from "../components/SettingsMenu";
-import { useT } from "../i18n";
+import { nWord, useT } from "../i18n";
 import { DetailDrawer } from "../components/DetailDrawer";
 import { GuidesNode } from "../components/GuidesNode";
 import { QuestionNode } from "../components/QuestionNode";
 import { ShortcutsHelp } from "../components/ShortcutsHelp";
 import { SubHeadNode } from "../components/SubHeadNode";
-import { downloadReport } from "../report";
+import { downloadBank, downloadReport } from "../report";
 import {
   CARD_H,
   CARD_W,
@@ -65,6 +76,35 @@ function matchesQuery(n: QNode, q: string): boolean {
   if (!q) return true;
   return `${n.title ?? ""} ${n.question} ${n.topic} ${n.tags.join(" ")}`.toLowerCase().includes(q);
 }
+
+// Dropdown'ы toolbar'а (экспорт, •••) закрываются кликом мимо и Esc. Esc глушим в capture-фазе:
+// иначе глобальный хоткей доски снимет текущий вопрос. mousedown — тоже capture: канва React Flow
+// гасит всплытие. «Мимо» — всё вне корня dropdown'а (`within`: кнопка + меню).
+function useDismiss(open: boolean, close: () => void, within: string) {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      close();
+    };
+    const onDown = (e: MouseEvent) => {
+      const el = e.target as Element | null;
+      if (el && el.closest(within)) return;
+      close();
+    };
+    window.addEventListener("keydown", onKey, { capture: true });
+    document.addEventListener("mousedown", onDown, { capture: true });
+    return () => {
+      window.removeEventListener("keydown", onKey, { capture: true });
+      document.removeEventListener("mousedown", onDown, { capture: true });
+    };
+  }, [open, close, within]);
+}
+
+// Иконки toolbar'а — только outline Lucide с единым stroke-width (как на главной).
+const ICON = { strokeWidth: 1.75 } as const;
 
 // Настройки отображения холста (фон + направляющие), сохраняются в localStorage.
 // База — без сетки; точки — единственный альтернативный вариант (переключается иконкой).
@@ -270,7 +310,9 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
   const [questionStart, setQuestionStart] = useState<number>(() => Date.now());
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
-  const [tagsCollapsed, setTagsCollapsed] = useState(false);
+  // Dropdown'ы toolbar'а: «Экспорт» и «•••».
+  const [exportOpen, setExportOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [activeBlocks, setActiveBlocks] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(blockOrder(pool).map((b) => [b, true])),
   );
@@ -298,10 +340,15 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
     const v = localStorage.getItem("design");
     return v && ["37", "56", "57", "58"].includes(v) ? v : "37";
   });
-  // Панель фильтров лежит поверх канвы: без сворачивания она съедает правую треть доски.
+  // Панель фильтров — popover у правого края канвы, открывается кнопкой toolbar'а; по умолчанию
+  // закрыта (поверх канвы она съедает правую треть доски), выбор запоминается.
   const [filtersOpen, setFiltersOpen] = useState<boolean>(
-    () => localStorage.getItem("filtersOpen") !== "0",
+    () => localStorage.getItem("filtersOpen") === "1",
   );
+  const closeExport = useCallback(() => setExportOpen(false), []);
+  const closeMore = useCallback(() => setMoreOpen(false), []);
+  useDismiss(exportOpen, closeExport, ".tbdrop--export");
+  useDismiss(moreOpen, closeMore, ".tbdrop--more");
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -632,6 +679,7 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
   const leaveSession = useCallback(() => {
     setSession(null);
     setLive(false);
+    setUnscoredOnly(false); // чип «Только неоценённые» есть только в сессии — фильтр не должен остаться висеть
     setSessionParam(null);
   }, [setSessionParam]);
 
@@ -671,7 +719,6 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
   const toggleKind = (k: string) => setActiveKinds((s) => ({ ...s, [k]: !s[k] }));
 
   const scored = Object.keys(scores).length;
-  const avg = scored > 0 ? (Object.values(scores).reduce((a, b) => a + b, 0) / scored).toFixed(1) : "—";
   // Позиция/грейд кандидата и имя интервьюера — для шапки отчёта; грузим по факту сессии.
   const [reportPeople, setReportPeople] = useState<{ interviewer: string | null; position: string | null; seniority: string | null }>(
     { interviewer: null, position: null, seniority: null },
@@ -729,107 +776,153 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
   const currentNode = currentId ? nodeMap[currentId] : null;
   const selectedNode = selectedId ? nodeMap[selectedId] : null;
 
+  const nQuestions = `${graph.length} ${nWord(graph.length, ["вопрос", "вопроса", "вопросов"], ["question", "questions"])}`;
+  const doReport = () => downloadReport(session?.candidate ?? "", graph, scores, pool, notes, reportPeople);
+
   return (
     <div className="app">
+      {/* Toolbar (ТЗ 10–14): один ряд — слева «где мы» (назад, направление, число вопросов), справа
+          действия (фильтры, экспорт, старт, язык, •••). Ход интервью — второй ряд, и только когда
+          сессия активна; общего процента прохождения вне сессии нет. */}
       <header className="topbar">
-        {/* ряд 1 — где мы: назад в меню, направление, прогресс, настройки */}
-        <div className="topbar__row topbar__row--flow">
-          <a className="topbar__back" href={href.home} title={t("Главное меню")}>{t("← Меню")}</a>
-          <h1 className="appname">{pool.label}</h1>
-          <span className="muted">{t("{n} вопросов", { n: graph.length })}</span>
-          <div className="progress" title={t("Оценено по текущему набору фильтров")}>
-            <div className="progress__track">
-              <div className="progress__fill" style={{ width: `${coverage.pct}%` }} />
-            </div>
-            <span className="progress__label">
-              {t("оценено {done} / {total} ({pct}%)", { done: coverage.done, total: coverage.total, pct: coverage.pct })}
-            </span>
+        <div className="topbar__row topbar__row--main">
+          <div className="topbar__left">
+            <a className="topbar__back" href={href.home} title={t("Главное меню")}>
+              <ArrowLeft size={16} {...ICON} aria-hidden="true" />
+              {t("Направления")}
+            </a>
+            <h1 className="appname">{pool.label}</h1>
+            <span className="topbar__count">{nQuestions}</span>
           </div>
-          <LangSwitch />
-          <div className="settings topbar__settings">
+          <div className="topbar__right">
             <button
-              className={`iconbtn setbtn btn--quiet ${settingsOpen ? "setbtn--on" : ""}`}
-              onClick={() => setSettingsOpen((v) => !v)}
-              aria-expanded={settingsOpen}
-              aria-haspopup="dialog"
-              title={t("Настройки")}
+              className="tbbtn filtersbtn"
+              onClick={() => setFiltersOpen((v) => !v)}
+              aria-pressed={filtersOpen}
+              title={t("Фильтры вопросов")}
             >
-              ⚙
+              <SlidersHorizontal size={16} {...ICON} aria-hidden="true" />
+              {t("Фильтры")}
+              {anyFilterOn && <span className="filtersbtn__dot" title={t("Фильтры активны")} />}
             </button>
-            {settingsOpen && (
-              <SettingsMenu
-                onClose={() => setSettingsOpen(false)}
-                settings={{
-                  design,
-                  onSetDesign: setDesign,
-                  theme,
-                  onToggleTheme: () => setTheme((t) => (t === "dark" ? "light" : "dark")),
-                  bgDots: bgVariant === "dots",
-                  onToggleBgDots: () => setBgVariant((v) => (v === "dots" ? "off" : "dots")),
-                  guidesV,
-                  onToggleGuidesV: () => setGuidesV((v) => !v),
-                  guidesH,
-                  onToggleGuidesH: () => setGuidesH((v) => !v),
-                  agendaOpen,
-                  onToggleAgenda: () => setAgendaOpen((v) => !v),
-                  showHidden,
-                  onToggleHidden: () => setShowHidden((v) => !v),
-                  hiddenCount: hiddenIds.size,
-                  showTimer,
-                  onToggleTimer: () => setShowTimer((v) => !v),
-                  onShowHelp: () => setHelpOpen(true),
-                  bankHref: href.bank(pool.id),
-                }}
-              />
+            <div className="tbdrop tbdrop--export">
+              <button
+                className="tbbtn exportbtn"
+                onClick={() => setExportOpen((v) => !v)}
+                aria-haspopup="menu"
+                aria-expanded={exportOpen}
+              >
+                <Download size={16} {...ICON} aria-hidden="true" />
+                {t("Экспорт")}
+              </button>
+              {exportOpen && (
+                <div className="tbmenu exportmenu" role="menu">
+                  {/* Только реально доступные форматы — их два, оба HTML. */}
+                  <button
+                    className="tbmenu__item dlbtn"
+                    role="menuitem"
+                    disabled={scored === 0}
+                    title={scored === 0 ? t("Сначала выставьте оценки") : undefined}
+                    onClick={() => { setExportOpen(false); doReport(); }}
+                  >
+                    {t("Отчёт по сессии (HTML)")}
+                  </button>
+                  <button
+                    className="tbmenu__item bankbtn"
+                    role="menuitem"
+                    onClick={() => { setExportOpen(false); downloadBank(graph, pool); }}
+                  >
+                    {t("Банк вопросов (HTML)")}
+                  </button>
+                </div>
+              )}
+            </div>
+            {/* В сессии мы уже находимся — старт нового интервью из toolbar'а не предлагаем. */}
+            {!session && (
+              <a className="tbbtn session__start btn--primary" href={href.start(pool.id)}>
+                <Play size={15} strokeWidth={2} aria-hidden="true" />
+                {t("Начать интервью →")}
+              </a>
             )}
+            <LangSwitch />
+            <div className="tbdrop tbdrop--more">
+              <button
+                className="tbbtn tbbtn--icon morebtn"
+                onClick={() => setMoreOpen((v) => !v)}
+                aria-haspopup="menu"
+                aria-expanded={moreOpen}
+                aria-label={t("Ещё")}
+                title={t("Ещё")}
+              >
+                <Ellipsis size={18} {...ICON} />
+              </button>
+              {moreOpen && (
+                <div className="tbmenu moremenu" role="menu">
+                  <button
+                    className="tbmenu__item setbtn"
+                    role="menuitem"
+                    onClick={() => { setMoreOpen(false); setSettingsOpen(true); }}
+                  >
+                    <Settings size={16} {...ICON} aria-hidden="true" />
+                    {t("Настройки")}
+                  </button>
+                  <button
+                    className="tbmenu__item helpbtn"
+                    role="menuitem"
+                    onClick={() => { setMoreOpen(false); setHelpOpen(true); }}
+                  >
+                    <CircleHelp size={16} {...ICON} aria-hidden="true" />
+                    {t("Шпаргалка клавиш")}
+                  </button>
+                  <a className="tbmenu__item bankLink" role="menuitem" href={href.bank(pool.id)}>
+                    <BookOpen size={16} {...ICON} aria-hidden="true" />
+                    {t("Открыть вопросы")}
+                  </a>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* ряд 2 — ход интервью: кандидат, сессия, результат */}
-        <div className="topbar__row topbar__row--utility">
-        <div className="session">
-          {session ? (
-            <>
+        {/* ряд 2 — ход интервью: только в активной сессии (кандидат, прогресс, live, выход) */}
+        {session && (
+          <div className="topbar__row topbar__row--session">
+            <div className="session">
               <span className="session__active">
-                👤 {session.candidate}
-                {" · "}{t("оценено {scored} · средн. {avg}", { scored, avg })}
+                {t("Кандидат: {name} · Сессия #{id}", { name: session.candidate, id: session.id })}
               </span>
+              <div className="progress" title={t("Оценено по текущему набору фильтров")}>
+                <div className="progress__track">
+                  <div className="progress__fill" style={{ width: `${coverage.pct}%` }} />
+                </div>
+                <span className="progress__label">
+                  {t("оценено {done} / {total} ({pct}%)", { done: coverage.done, total: coverage.total, pct: coverage.pct })}
+                </span>
+              </div>
               <span
                 className={`livedot ${live ? "livedot--on" : ""}`}
                 title={live ? t("Live: изменения синхронизируются с HR") : t("Подключение к live…")}
               >
                 ● {live ? "LIVE" : "…"}
               </span>
-              <button className="iconbtn" onClick={leaveSession} title={t("Выйти из сессии")}>
-                {t("Выйти")}
-              </button>
-            </>
-          ) : (
-            <>
-              <span className="session__none muted">{t("Просмотр без сессии")}</span>
-              <a className="session__start" href={href.start(pool.id)}>{t("Начать интервью →")}</a>
-            </>
-          )}
-          <span className="session__sep" aria-hidden="true" />
-          <button
-            className="iconbtn dlbtn"
-            onClick={() => downloadReport(session?.candidate ?? "", graph, scores, pool, notes, reportPeople)}
-            disabled={scored === 0}
-            title={scored === 0 ? t("Сначала выставьте оценки") : t("Скачать результаты (HTML)")}
-          >
-            {t("Скачать")}
-          </button>
-          {graph.length > 0 && scored === graph.length && (
-            <button
-              className="cta-done"
-              onClick={() => downloadReport(session?.candidate ?? "", graph, scores, pool, notes, reportPeople)}
-              title={t("Все вопросы оценены — скачать итоговый отчёт")}
-            >
-              {t("Завершить · Скачать отчёт")}
-            </button>
-          )}
-        </div>
-        </div>
+              <div className="session__actions">
+                {graph.length > 0 && scored === graph.length && (
+                  <button
+                    className="tbbtn cta-done"
+                    onClick={doReport}
+                    title={t("Все вопросы оценены — скачать итоговый отчёт")}
+                  >
+                    {t("Завершить · Скачать отчёт")}
+                  </button>
+                )}
+                <button className="tbbtn btn--quiet session__leave" onClick={leaveSession} title={t("Выйти из сессии")}>
+                  <X size={15} {...ICON} aria-hidden="true" />
+                  {t("Выйти")}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </header>
 
       {errors.length > 0 && (
@@ -905,128 +998,117 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
                 zoomable
               />
 
-              <Panel position="top-right">
-                <div
-                  className={`filterpanel ${filtersOpen ? "" : "filterpanel--closed"}`}
-                  role="region"
-                  aria-label={t("Фильтры вопросов")}
-                >
-                  <div className="fp__bar">
-                    <button
-                      className="fp__toggle"
-                      onClick={() => setFiltersOpen((v) => !v)}
-                      aria-expanded={filtersOpen}
-                      title={filtersOpen ? t("Свернуть фильтры") : t("Развернуть фильтры")}
-                    >
-                      {t("Фильтры")}
-                      <span className="fp__chevron">{filtersOpen ? "▸" : "◂"}</span>
-                    </button>
-                    {!filtersOpen && anyFilterOn && <span className="fp__badge" title={t("Фильтры активны")} />}
-                  </div>
-                  {filtersOpen && (
-                  <>
-                  <input
-                    className="fp__search"
-                    placeholder={t("Поиск по вопросам…")}
-                    aria-label={t("Поиск по вопросам")}
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                  />
-                  <div className="fp__group">
-                    <h2 className="fp__title">{t("Блоки")}</h2>
-                    {blockOrder(pool).map((b) => (
+              {filtersOpen && (
+                <Panel position="top-right">
+                  <div className="filterpanel" role="region" aria-label={t("Фильтры вопросов")}>
+                    <div className="fp__head">
+                      <h2 className="fp__heading">{t("Фильтры")}</h2>
                       <button
-                        key={b}
-                        className={`fp__chip ${activeBlocks[b] ? "" : "fp__chip--off"}`}
-                        style={{
-                          borderColor: blockColor(pool, b),
-                          color: activeBlocks[b] ? "#fff" : blockColor(pool, b),
-                          background: activeBlocks[b] ? blockColor(pool, b) : "transparent",
-                        }}
-                        onClick={() => toggleBlock(b)}
+                        className="fp__close"
+                        onClick={() => setFiltersOpen(false)}
+                        aria-label={t("Закрыть фильтры")}
+                        title={t("Закрыть фильтры")}
                       >
-                        {blockLabel(pool, b)} {progress[b].done}/{progress[b].total}
+                        <X size={16} {...ICON} aria-hidden="true" />
                       </button>
-                    ))}
-                  </div>
-                  <div className="fp__group">
-                    <h2 className="fp__title">{t("Сложность")}</h2>
-                    {DIFFS.map((d) => (
-                      <button
-                        key={d}
-                        className={`fp__chip ${activeDiffs[d] ? "" : "fp__chip--off"}`}
-                        style={{
-                          borderColor: DIFF_COLOR[d],
-                          color: activeDiffs[d] ? "#fff" : DIFF_COLOR[d],
-                          background: activeDiffs[d] ? DIFF_COLOR[d] : "transparent",
-                        }}
-                        onClick={() => toggleDiff(d)}
-                      >
-                        {d}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="fp__group">
-                    <h2 className="fp__title">{t("Тип")}</h2>
-                    {KINDS.map((k) => (
-                      <button
-                        key={k}
-                        className={`fp__chip ${activeKinds[k] ? "" : "fp__chip--off"}`}
-                        style={{
-                          borderColor: KIND_COLOR[k],
-                          color: activeKinds[k] ? "#fff" : KIND_COLOR[k],
-                          background: activeKinds[k] ? KIND_COLOR[k] : "transparent",
-                        }}
-                        onClick={() => toggleKind(k)}
-                      >
-                        {t(KIND_LABEL[k])}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="fp__group">
-                    <h2 className="fp__title">{t("Прогресс")}</h2>
-                    <button
-                      className={`fp__chip ${unscoredOnly ? "" : "fp__chip--off"}`}
-                      style={{
-                        borderColor: "#16a34a",
-                        color: unscoredOnly ? "#fff" : "#16a34a",
-                        background: unscoredOnly ? "#16a34a" : "transparent",
-                      }}
-                      onClick={() => setUnscoredOnly((v) => !v)}
-                    >
-                      {t("Только неоценённые")}
-                    </button>
-                  </div>
-                  <div className="fp__group fp__group--tags">
-                    <div className="fp__title">
-                      <button
-                        className="fp__collapse"
-                        onClick={() => setTagsCollapsed((v) => !v)}
-                        title={tagsCollapsed ? t("Развернуть теги") : t("Свернуть теги")}
-                      >
-                        {tagsCollapsed ? "▸" : "▾"} {t("Теги")}
-                      </button>
-                      {anyTagActive && (
-                        <button className="fp__clear" onClick={clearTags}>
-                          {t("сбросить")}
-                        </button>
-                      )}
                     </div>
-                    {!tagsCollapsed &&
-                      allTags.map((t) => (
+                    <input
+                      className="fp__search"
+                      placeholder={t("Поиск по вопросам…")}
+                      aria-label={t("Поиск по вопросам")}
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                    />
+                    <div className="fp__group">
+                      <h2 className="fp__title">{t("Блоки")}</h2>
+                      {blockOrder(pool).map((b) => (
                         <button
-                          key={t}
-                          className={`fp__tag ${activeTags[t] ? "fp__tag--on" : ""}`}
-                          onClick={() => toggleTag(t)}
+                          key={b}
+                          className={`fp__chip ${activeBlocks[b] ? "" : "fp__chip--off"}`}
+                          style={{
+                            borderColor: blockColor(pool, b),
+                            color: activeBlocks[b] ? "#fff" : blockColor(pool, b),
+                            background: activeBlocks[b] ? blockColor(pool, b) : "transparent",
+                          }}
+                          onClick={() => toggleBlock(b)}
                         >
-                          {t}
+                          {blockLabel(pool, b)} {progress[b].done}/{progress[b].total}
                         </button>
                       ))}
+                    </div>
+                    <div className="fp__group">
+                      <h2 className="fp__title">{t("Сложность")}</h2>
+                      {DIFFS.map((d) => (
+                        <button
+                          key={d}
+                          className={`fp__chip ${activeDiffs[d] ? "" : "fp__chip--off"}`}
+                          style={{
+                            borderColor: DIFF_COLOR[d],
+                            color: activeDiffs[d] ? "#fff" : DIFF_COLOR[d],
+                            background: activeDiffs[d] ? DIFF_COLOR[d] : "transparent",
+                          }}
+                          onClick={() => toggleDiff(d)}
+                        >
+                          {d}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="fp__group">
+                      <h2 className="fp__title">{t("Тип")}</h2>
+                      {KINDS.map((k) => (
+                        <button
+                          key={k}
+                          className={`fp__chip ${activeKinds[k] ? "" : "fp__chip--off"}`}
+                          style={{
+                            borderColor: KIND_COLOR[k],
+                            color: activeKinds[k] ? "#fff" : KIND_COLOR[k],
+                            background: activeKinds[k] ? KIND_COLOR[k] : "transparent",
+                          }}
+                          onClick={() => toggleKind(k)}
+                        >
+                          {t(KIND_LABEL[k])}
+                        </button>
+                      ))}
+                    </div>
+                    {/* Прогресс-фильтр — только в сессии (ТЗ 13): без неё оценки — черновик, не ход интервью. */}
+                    {session && (
+                      <div className="fp__group">
+                        <h2 className="fp__title">{t("Прогресс")}</h2>
+                        <button
+                          className={`fp__chip ${unscoredOnly ? "" : "fp__chip--off"}`}
+                          style={{
+                            borderColor: "#16a34a",
+                            color: unscoredOnly ? "#fff" : "#16a34a",
+                            background: unscoredOnly ? "#16a34a" : "transparent",
+                          }}
+                          onClick={() => setUnscoredOnly((v) => !v)}
+                        >
+                          {t("Только неоценённые")}
+                        </button>
+                      </div>
+                    )}
+                    <div className="fp__group fp__group--tags">
+                      <div className="fp__title">
+                        {t("Теги")}
+                        {anyTagActive && (
+                          <button className="fp__clear" onClick={clearTags}>
+                            {t("сбросить")}
+                          </button>
+                        )}
+                      </div>
+                      {allTags.map((tag) => (
+                        <button
+                          key={tag}
+                          className={`fp__tag ${activeTags[tag] ? "fp__tag--on" : ""}`}
+                          onClick={() => toggleTag(tag)}
+                        >
+                          {tag}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                  </>
-                  )}
-                </div>
-              </Panel>
+                </Panel>
+              )}
 
               {currentNode && (
                 <Panel position="bottom-center">
@@ -1094,6 +1176,35 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
           }}
         />
       </div>
+      {/* Панель ⚙ (открывается из •••): fixed-drawer слева; обёртка .settings нужна её проверке «клик мимо». */}
+      {settingsOpen && (
+        <div className="settings">
+          <SettingsMenu
+            onClose={() => setSettingsOpen(false)}
+            settings={{
+              design,
+              onSetDesign: setDesign,
+              theme,
+              onToggleTheme: () => setTheme((t) => (t === "dark" ? "light" : "dark")),
+              bgDots: bgVariant === "dots",
+              onToggleBgDots: () => setBgVariant((v) => (v === "dots" ? "off" : "dots")),
+              guidesV,
+              onToggleGuidesV: () => setGuidesV((v) => !v),
+              guidesH,
+              onToggleGuidesH: () => setGuidesH((v) => !v),
+              agendaOpen,
+              onToggleAgenda: () => setAgendaOpen((v) => !v),
+              showHidden,
+              onToggleHidden: () => setShowHidden((v) => !v),
+              hiddenCount: hiddenIds.size,
+              showTimer,
+              onToggleTimer: () => setShowTimer((v) => !v),
+              onShowHelp: () => setHelpOpen(true),
+              bankHref: href.bank(pool.id),
+            }}
+          />
+        </div>
+      )}
       {helpOpen && <ShortcutsHelp onClose={() => setHelpOpen(false)} />}
     </div>
   );
