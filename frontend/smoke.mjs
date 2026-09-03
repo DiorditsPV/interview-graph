@@ -453,6 +453,19 @@ const dimUnscoredAfter = await page.locator(".qnode--dimmed").count();
 if (dimUnscoredAfter >= dimUnscored) fail(`toggling off did not clear dim (${dimUnscored} → ${dimUnscoredAfter})`);
 console.log(`OK: «только неоценённые» dims ${dimUnscored}, clears to ${dimUnscoredAfter}`);
 
+// 10c. Итог интервью (v1-closure): «Завершить» → решение + комментарий → статус «Завершена» в ряду
+//      сессии; кнопка превращается в «Итог» (правка итога).
+await page.locator(".session .cta-done").click();
+await page.waitForSelector(".finish", { timeout: 3000 });
+await page.locator('.finish input[value="hire"]').check();
+await page.locator(".finish__summary").fill("Сильный SQL, уверенный Airflow");
+await page.locator(".finish__submit").click();
+await page.waitForSelector(".session__status", { timeout: 5000 });
+const statusText = await page.locator(".session__status").innerText();
+if (!statusText.includes("Завершена") || !statusText.includes("Нанимать")) fail(`session verdict badge wrong: "${statusText}"`);
+if ((await page.locator(".session .cta-done").innerText()) !== "Итог") fail("finish button should turn into «Итог»");
+console.log(`OK: interview finished with verdict (${statusText})`);
+
 // 11. Возобновление сессии: создать сессию+оценку через API → страница «Сессии» → «Открыть»
 //     → доска подключается по ?session= и восстанавливает оценки. «Загрузить сессию» с доски убран.
 const sid = (await (await page.request.post(URL + "api/sessions", { data: { candidate: "SmokeResume" } })).json()).id;
