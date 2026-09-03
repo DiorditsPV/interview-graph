@@ -38,10 +38,13 @@ from .importer import parse_file, validate_against_pool
 from .models import Difficulty, GraphResponse, Kind, Node
 from .pools import (
     PoolCfg,
+    PoolConfigError,
     block_weights,
     blocks_to_json,
     default_pool_id,
     load_pools,
+    normalize_blocks,
+    parse_blocks,
     pool_from_row,
     slug_from_label,
 )
@@ -209,18 +212,20 @@ class NodeUpdate(BaseModel):
 
 
 class PoolCreate(BaseModel):
-    """Новое направление из пресета: колонки и вопросы пресета копируются, id — из названия."""
+    """Новое направление: из пресета (копируются колонки и вопросы) ИЛИ со своими колонками."""
 
     label: str = Field(min_length=1)
     description: str = ""
-    preset: str = Field(min_length=1)  # id существующего направления
+    preset: Optional[str] = None  # id существующего направления
+    blocks: Optional[List[dict]] = None  # [{label, color, subblocks?: [{label}]}] — см. pools.normalize_blocks
 
 
 class PoolUpdate(BaseModel):
-    """Правка направления — только название/описание (колонки задаёт пресет при создании)."""
+    """Правка направления: название, описание, колонки (id новых генерятся, вопросы удалённых колонок уходят)."""
 
     label: Optional[str] = Field(default=None, min_length=1)
     description: Optional[str] = None
+    blocks: Optional[List[dict]] = None
 
 
 # ---------- auth (login / logout / me) ----------
@@ -344,29 +349,49 @@ def create_pool(body: PoolCreate, request: Request, _user: dict = Depends(requir
     if not label:
         # Field(min_length=1) пропускает строку из пробелов — иначе родится пул с пустым названием и id 'pool'.
         raise HTTPException(status_code=422, detail="label must not be blank")
-    preset = _pool_or_404(request, body.preset)
+    # Ровно один источник колонок: пресет (копируются колонки и вопросы) или свои колонки (без вопросов).
+    # Пустой preset считается отсутствующим — иначе _pool_or_404("") подставил бы пул по умолчанию.
+    preset_id = (body.preset or "").strip()
+    if bool(preset_id) == (body.blocks is not None):
+        raise HTTPException(status_code=422, detail="pass exactly one of 'preset' or 'blocks'")
+    if preset_id:
+        preset = _pool_or_404(request, preset_id)
+        blocks = json.loads(blocks_to_json(preset.blocks))
+        copy_from: Optional[str] = preset.id
+    else:
+        blocks = _blocks_or_422(body.blocks, ())
+        copy_from = None
     base = slug_from_label(label)
     pid, n = base, 2
     while db.get_pool(tenant, pid) is not None:
         pid, n = f"{base}-{n}", n + 1
     try:
-        row = db.create_pool(
-            tenant, pid, label, body.description.strip(), json.loads(blocks_to_json(preset.blocks)),
-            copy_from=preset.id,
-        )
+        row = db.create_pool(tenant, pid, label, body.description.strip(), blocks, copy_from=copy_from)
     except sqlite3.IntegrityError as exc:
         # id копии ноды (<pool>-<id>) занят чужой нодой — транзакция откатилась, пул не создан.
         raise HTTPException(status_code=409, detail=f"node id collision while copying preset: {exc}")
     return _pool_out(request, pool_from_row(row))
 
 
+def _blocks_or_422(raw: list, existing: tuple) -> list:
+    """Колонки из UI: достроить id/вес (normalize_blocks), проверить как pool.yaml (parse_blocks) → список dict."""
+    try:
+        return json.loads(blocks_to_json(parse_blocks(normalize_blocks(raw, existing))))
+    except PoolConfigError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
 @app.put("/api/pools/{pool_id}")
 def update_pool(
     pool_id: str, body: PoolUpdate, request: Request, _user: dict = Depends(require_member)
 ) -> dict:
-    fields = {k: v.strip() for k, v in body.model_dump(exclude_none=True).items()}
+    fields = {k: v.strip() for k, v in body.model_dump(exclude_none=True).items() if isinstance(v, str)}
     if "label" in fields and not fields["label"]:
         raise HTTPException(status_code=422, detail="label must not be blank")
+    if body.blocks is not None:
+        # Колонки — динамические данные направления: новые получают id из названия, вопросы
+        # удалённых колонок удаляются, удалённых под-колонок — остаются без под-колонки (см. db.update_pool).
+        fields["blocks"] = _blocks_or_422(body.blocks, _pool_or_404(request, pool_id).blocks)
     row = db.update_pool(resolve_tenant(request), pool_id, fields)
     if row is None:
         raise HTTPException(status_code=404, detail=f"pool '{pool_id}' not found")
