@@ -48,13 +48,14 @@ function QuestionNodeImpl({ data, selected }: NodeProps) {
 
       {node.tags.length > 0 && (
         <div className="qnode__tags">
-          {node.tags.slice(0, 2).map((t) => (
+          {/* По конвенции у ноды 1–3 тега — показываем все; «+N» только для контента сверх нормы. */}
+          {node.tags.slice(0, 3).map((t) => (
             <span key={t} className="tagchip">
               {t}
             </span>
           ))}
-          {node.tags.length > 2 && (
-            <span className="tagchip tagchip--more">+{node.tags.length - 2}</span>
+          {node.tags.length > 3 && (
+            <span className="tagchip tagchip--more" title={node.tags.slice(3).join(", ")}>+{node.tags.length - 3}</span>
           )}
         </div>
       )}

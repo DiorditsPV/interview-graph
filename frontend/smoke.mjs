@@ -319,9 +319,13 @@ if (!hudProg.includes("/")) fail(`HUD progress missing fraction: "${hudProg}"`);
 if (hudProg.replace(/[^·]/g, "").length < 1) fail(`HUD progress missing topic separator: "${hudProg}"`);
 console.log(`OK: HUD progress + topic (${hudProg})`);
 
+// Карточка показывает все 1–3 тега (конвенция контента); «+N» — только сверх нормы, поэтому
+// на банке DE его быть не должно, а карточки с тремя тегами — должны.
+const threeTagCards = await page.locator(".qnode__tags").evaluateAll((els) => els.filter((e) => e.querySelectorAll(".tagchip:not(.tagchip--more)").length === 3).length);
+if (threeTagCards < 1) fail("no card renders all three tags");
 const moreChips = await page.locator(".tagchip--more").count();
-if (moreChips < 1) fail("no tag-overflow chip (+N) rendered on any card");
-console.log(`OK: card tag overflow chip (+N) on ${moreChips} cards`);
+if (moreChips > 0) fail(`tag-overflow chip (+N) rendered although no card has >3 tags (${moreChips})`);
+console.log(`OK: cards show all tags (${threeTagCards} with three), no +N chip`);
 
 const tagsBefore = await page.locator(".fp__tag").count();
 if (tagsBefore < 1) fail("expected tag chips in filter panel");
