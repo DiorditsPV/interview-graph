@@ -22,24 +22,61 @@ DEFAULT_BLOCK_WEIGHTS: Dict[str, int] = {
 }
 
 
+LEVELS = ["base", "junior", "middle", "senior"]
+
+
+def filter_nodes(
+    nodes: List[Node],
+    blocks: Optional[List[str]] = None,
+    subblocks: Optional[Dict[str, List[str]]] = None,
+    difficulties: Optional[List[str]] = None,
+) -> List[Node]:
+    """Ноды под условия плана интервью: разделы, под-колонки (по разделу), уровни.
+
+    `subblocks` = {раздел: [под-колонки]} — ограничение действует только на перечисленные разделы;
+    у остальных разделов берутся все ноды. Пустые/None фильтры не ограничивают.
+    """
+    out = nodes
+    if blocks:
+        out = [n for n in out if n.block in blocks]
+    if subblocks:
+        out = [n for n in out if n.block not in subblocks or n.subblock in subblocks[n.block]]
+    if difficulties:
+        out = [n for n in out if n.difficulty in difficulties]
+    return out
+
+
+def matrix_order(nodes: List[Node], block_order: List[str], sub_order: Dict[str, List[str]]) -> List[str]:
+    """Порядок матрицы: раздел (как в pool.yaml) → под-колонка → уровень → id. Для ручного плана."""
+
+    def key(n: Node):
+        b = block_order.index(n.block) if n.block in block_order else len(block_order)
+        subs = sub_order.get(n.block) or []
+        s = subs.index(n.subblock) if n.subblock in subs else len(subs)
+        d = LEVELS.index(n.difficulty) if n.difficulty in LEVELS else len(LEVELS)
+        return (b, s, d, n.id)
+
+    return [n.id for n in sorted(nodes, key=key)]
+
+
 def build_interview(
     nodes: List[Node],
     count: int = 20,
     difficulties: Optional[List[str]] = None,
     block_weights: Optional[Dict[str, int]] = None,
     seed: Optional[int] = None,
+    blocks: Optional[List[str]] = None,
+    subblocks: Optional[Dict[str, List[str]]] = None,
 ) -> List[str]:
     """Собрать интервью: вернуть упорядоченный список id нод.
 
     Кол-во вопросов на блок пропорционально весам блоков; внутри блока выбор
-    взвешен по полю weight ноды. Фильтры: уровни сложности (difficulties).
+    взвешен по полю weight ноды. Фильтры: разделы, под-колонки, уровни (см. filter_nodes).
     """
     rng = random.Random(seed)
     block_weights = block_weights or DEFAULT_BLOCK_WEIGHTS
 
-    pool = nodes
-    if difficulties:
-        pool = [n for n in pool if n.difficulty in difficulties]
+    pool = filter_nodes(nodes, blocks=blocks, subblocks=subblocks, difficulties=difficulties)
     if not pool:
         return []
 
