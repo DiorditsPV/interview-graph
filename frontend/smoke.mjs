@@ -43,7 +43,7 @@ if ((await deCard.count()) !== 1) fail("data-engineer pool card missing on main 
 // 0c. CRUD направлений (pool-crud): создать из пресета DE → карточка с тем же числом вопросов →
 //     переименовать → удалить (confirm принимается). Всё на главной, до ухода на доску.
 const deMeta = await deCard.locator(".poolcard__meta").innerText();
-await page.locator(".poolcard--new").click();
+await page.locator(".home__add").click();
 await page.waitForSelector(".poolform", { timeout: 3000 });
 await page.fill(".poolform__label", "Smoke Pool");
 await page.locator(".pool-preset").selectOption("data-engineer");
@@ -51,6 +51,7 @@ await page.locator(".poolform__submit").click();
 await page.waitForSelector('.poolcard[data-pool="smoke-pool"]', { timeout: 10000 });
 const smokeMeta = await page.locator('.poolcard[data-pool="smoke-pool"] .poolcard__meta').innerText();
 if (smokeMeta.split("·")[0].trim() !== deMeta.split("·")[0].trim()) fail(`preset copy mismatch: "${smokeMeta}" vs "${deMeta}"`);
+await page.locator('.poolcard[data-pool="smoke-pool"] .poolcard__menu').click();
 await page.locator('.poolcard[data-pool="smoke-pool"] .poolcard__edit').click();
 await page.waitForSelector(".poolform", { timeout: 3000 });
 await page.fill(".poolform__label", "Smoke Pool 2");
@@ -66,6 +67,7 @@ await page.waitForFunction(
 const smokeCard = page.locator('.poolcard[data-pool="smoke-pool"]');
 const chipsBefore = await smokeCard.locator(".poolcard__block").count();
 const nodesBefore = parseInt(await smokeCard.locator(".poolcard__meta").innerText(), 10);
+await smokeCard.locator(".poolcard__menu").click();
 await smokeCard.locator(".poolcard__edit").click();
 await page.waitForSelector(".blocks-editor", { timeout: 3000 });
 await page.locator(".blocks-editor__add").click();
@@ -89,6 +91,7 @@ if (!smokeSubs.some((s) => s.includes("Холодные"))) fail(`board lacks ne
 console.log("OK: pool blocks editor — added column + sub-column, board shows them");
 await page.goto(URL + "#/");
 await page.waitForSelector('.poolcard[data-pool="smoke-pool"]', { timeout: 10000 });
+await smokeCard.locator(".poolcard__menu").click();
 await smokeCard.locator(".poolcard__edit").click();
 await page.waitForSelector(".blocks-editor", { timeout: 3000 });
 let colConfirm = "";
@@ -109,6 +112,7 @@ if (!(nodesAfter < nodesBefore)) fail(`deleting a column did not drop questions:
 console.log(`OK: pool blocks editor — column deleted with confirm, questions ${nodesBefore} → ${nodesAfter}`);
 
 page.once("dialog", (d) => d.accept());
+await smokeCard.locator(".poolcard__menu").click();
 await smokeCard.locator(".poolcard__delete").click();
 await page.waitForSelector('.poolcard[data-pool="smoke-pool"]', { state: "detached", timeout: 5000 });
 console.log("OK: pool create from preset / rename / delete");
@@ -117,13 +121,13 @@ console.log("OK: pool create from preset / rename / delete");
 //     (язык хранится в localStorage — обязательно вернуть RU, остальные шаги идут по русским строкам).
 await page.locator(".langswitch").first().click();
 await page.waitForFunction(() => document.querySelector(".home__h2")?.textContent === "Tracks", null, { timeout: 3000 });
-if ((await page.locator(".poolcard__start").first().innerText()) !== "Start interview") fail("EN: start button not translated");
+if ((await page.locator(".poolcard__start").first().innerText()) !== "Start interview →") fail("EN: start button not translated");
 await page.locator(".langswitch").first().click();
 await page.waitForFunction(() => document.querySelector(".home__h2")?.textContent === "Направления", null, { timeout: 3000 });
 console.log("OK: RU/EN switch");
 
 // Кликаем по самой ссылке-«растяжке» (.poolcard__label), а не по всей карточке: внутри есть ещё
-// сиблинг .poolcard__bank (ссылка на банк) — клик по центру div'а рискует попасть мимо доски.
+// сиблинг .poolcard__open (ссылка на вопросы) — клик по центру div'а рискует попасть мимо доски.
 // После переходов шага 0c' на доску и обратно убеждаемся, что мы снова на главной.
 await page.waitForSelector('.poolcard[data-pool="data-engineer"]', { timeout: 5000 });
 await deCard.locator(".poolcard__label").click();
