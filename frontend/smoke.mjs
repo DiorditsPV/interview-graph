@@ -473,8 +473,20 @@ if ((await guest.locator(".session .invitebtn").count()) !== 0) fail("guest must
 if ((await guest.locator(".session__leave").count()) !== 0) fail("guest must not see «Выйти»");
 await guest.goto(inviteUrl.replace(/#.*$/, "#/"), { waitUntil: "load" });
 await guest.waitForSelector(".session__active", { timeout: 10000 });
+// Отзыв: владелец отзывает ссылку → гость после перезагрузки видит экран входа, повторный вход по
+// ссылке показывает пояснение (410).
+await page.locator(".session .invitebtn").click();
+await page.waitForSelector(".invite__revoke", { timeout: 5000 });
+await page.locator(".invite__revoke").first().click();
+await page.waitForSelector(".invite__revoke", { state: "detached", timeout: 5000 });
+await page.keyboard.press("Escape");
+await guest.reload({ waitUntil: "load" });
+await guest.waitForSelector(".login__card", { timeout: 10000 });
+await guest.goto(inviteUrl, { waitUntil: "load" });
+await guest.reload({ waitUntil: "load" }); // hash-переход не перезапускает AuthGate
+await guest.waitForSelector(".login__notice", { timeout: 10000 });
 await guestCtx.close();
-console.log("OK: guest joins by invite link, scoped to the session");
+console.log("OK: guest joins by invite link, scoped to the session; revoke kicks the guest out");
 
 // 10c. Итог интервью (v1-closure): «Завершить» → решение + комментарий → статус «Завершена» в ряду
 //      сессии; кнопка превращается в «Итог» (правка итога).

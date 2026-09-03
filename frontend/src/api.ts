@@ -23,6 +23,18 @@ export interface PlanIn {
   seed?: number;
 }
 
+// Приглашение в сессию (ссылка для коллеги): state — active | expired | revoked.
+export interface Invite {
+  token: string;
+  role: "viewer" | "member";
+  session_id: number;
+  url?: string;
+  expires_at?: string | null;
+  revoked_at?: string | null;
+  created_at?: string;
+  state?: "active" | "expired" | "revoked";
+}
+
 // question-management: правка/создание вопроса банка (бэкенд пишет в БД, не в content/*.md).
 export interface NodeUpdate {
   title?: string;
@@ -194,12 +206,18 @@ export const api = {
       json<AuthUser>(res, { skipAuthReload: true }),
     ),
   // Приглашение коллеги в сессию: ссылка #/join/<token>; гость входит без аккаунта.
-  invite: (sessionId: number, role: "viewer" | "member") =>
+  // Срок жизни — часы (по умолчанию сутки); отзыв выкидывает вошедших по ссылке гостей.
+  invite: (sessionId: number, role: "viewer" | "member", expiresHours = 24) =>
     fetch(`${BASE}/sessions/${sessionId}/invite`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ role }),
-    }).then(json<{ token: string; role: string; session_id: number; url: string }>),
+      body: JSON.stringify({ role, expires_hours: expiresHours }),
+    }).then(json<Invite>),
+  listInvites: (sessionId: number) => fetch(`${BASE}/sessions/${sessionId}/invites`).then(json<Invite[]>),
+  revokeInvite: (sessionId: number, token: string) =>
+    fetch(`${BASE}/sessions/${sessionId}/invites/${encodeURIComponent(token)}`, { method: "DELETE" }).then(
+      json<{ revoked: string }>,
+    ),
   join: (token: string) =>
     fetch(`${BASE}/join/${encodeURIComponent(token)}`, { method: "POST", credentials: "include" }).then((res) =>
       json<{ session_id: number; pool: string; role: string }>(res, { skipAuthReload: true }),

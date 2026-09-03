@@ -35,7 +35,7 @@ from .auth import (
     require_session_member,
     verify_password,
 )
-from .db import SESSION_MAX_AGE, Database
+from .db import SESSION_MAX_AGE, Database, invite_state
 from .hub import SessionHub
 from .importer import parse_file, validate_against_pool
 from .models import Difficulty, GraphResponse, Kind, Node
@@ -714,6 +714,7 @@ async def set_score(
 
 class InviteIn(BaseModel):
     role: str = Field(default="viewer", pattern="^(viewer|member)$")
+    expires_hours: int = Field(default=24, ge=1, le=168)  # срок жизни ссылки: от часа до недели
 
 
 @app.post("/api/sessions/{session_id}/invite")
@@ -722,21 +723,49 @@ def invite_to_session(
 ) -> dict:
     """Ссылка для коллеги: гость входит по #/join/<token> без аккаунта и видит только эту сессию.
 
-    member — может оценивать и подводить итог, viewer — только смотреть. Ссылка многоразовая.
+    member — может оценивать и подводить итог, viewer — только смотреть. Ссылка многоразовая
+    до истечения срока (expires_hours, по умолчанию сутки) или отзыва.
     """
+    from datetime import datetime, timedelta, timezone
+
     tenant = resolve_tenant(request)
     if db.get_session(session_id, tenant) is None:
         raise HTTPException(status_code=404, detail="session not found")
-    token = db.create_invite(tenant, session_id, body.role, user.get("id"))
-    return {"token": token, "role": body.role, "session_id": session_id, "url": f"#/join/{token}"}
+    expires_at = (datetime.now(timezone.utc) + timedelta(hours=body.expires_hours)).isoformat(timespec="seconds")
+    token = db.create_invite(tenant, session_id, body.role, user.get("id"), expires_at)
+    return {"token": token, "role": body.role, "session_id": session_id, "url": f"#/join/{token}", "expires_at": expires_at}
+
+
+@app.get("/api/sessions/{session_id}/invites")
+def list_invites(session_id: int, request: Request, _user: dict = Depends(require_member)) -> list:
+    """Приглашения сессии с состоянием (active | expired | revoked) — для отзыва из UI."""
+    tenant = resolve_tenant(request)
+    if db.get_session(session_id, tenant) is None:
+        raise HTTPException(status_code=404, detail="session not found")
+    return db.list_invites(tenant, session_id)
+
+
+@app.delete("/api/sessions/{session_id}/invites/{token}")
+def revoke_invite(
+    session_id: int, token: str, request: Request, _user: dict = Depends(require_member)
+) -> dict:
+    """Отозвать приглашение: ссылка перестаёт работать, вошедшие по ней гости выкидываются."""
+    if not db.revoke_invite(resolve_tenant(request), session_id, token):
+        raise HTTPException(status_code=404, detail="invite not found")
+    return {"revoked": token}
 
 
 @app.post("/api/join/{token}")
 def join_by_invite(token: str, response: Response) -> dict:
-    """Гостевой вход по приглашению: cookie auth-сессии, ограниченной сессией интервью."""
+    """Гостевой вход по приглашению: cookie auth-сессии, ограниченной сессией интервью.
+
+    404 — нет такой ссылки; 410 — отозвана или истекла.
+    """
     invite = db.get_invite(token)
     if invite is None or db.get_session(invite["session_id"], invite["tenant_id"]) is None:
         raise HTTPException(status_code=404, detail="invite not found")
+    if invite_state(invite) != "active":
+        raise HTTPException(status_code=410, detail=f"invite {invite_state(invite)}")
     cookie = db.create_guest_auth_session(invite)
     response.set_cookie(COOKIE_NAME, cookie, httponly=True, samesite="lax", path="/", max_age=SESSION_MAX_AGE)
     session = db.get_session(invite["session_id"], invite["tenant_id"])

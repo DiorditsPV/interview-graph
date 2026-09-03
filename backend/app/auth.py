@@ -21,6 +21,8 @@ from typing import Callable
 import bcrypt
 from fastapi import Depends, HTTPException, Request
 
+from .db import invite_state
+
 COOKIE_NAME = "session"
 ROLE_RANK = {"viewer": 0, "member": 1, "owner": 2}
 
@@ -55,6 +57,13 @@ def current_user(request: Request) -> dict:
     sess = db.get_auth_session(token)
     if sess is None:
         raise HTTPException(status_code=401, detail="not authenticated")
+    # Гость: отозванное или истёкшее приглашение выкидывает сразу, а не по сроку cookie.
+    inv_token = sess.get("invite_token")
+    if inv_token:
+        inv = db.get_invite(inv_token)
+        if inv is None or invite_state(inv) != "active":
+            db.delete_auth_session(token)
+            raise HTTPException(status_code=401, detail="invite revoked or expired")
     user = db.get_user_by_id(sess["tenant_id"], sess["user_id"])
     if user is None:
         raise HTTPException(status_code=401, detail="not authenticated")

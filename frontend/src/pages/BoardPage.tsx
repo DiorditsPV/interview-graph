@@ -22,7 +22,7 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api, type NodeUpdate } from "../api";
+import { api, type Invite, type NodeUpdate } from "../api";
 import { BandsNode } from "../components/BandsNode";
 import { BlockGroupNode } from "../components/BlockGroupNode";
 import { LangSwitch } from "../components/LangSwitch";
@@ -320,8 +320,27 @@ export default function BoardPage({ pool, sessionFromUrl, guest = false }: { poo
   // Ссылка для коллеги: выбор роли → POST invite → абсолютный URL #/join/<token> с кнопкой «Скопировать».
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  const [inviteHours, setInviteHours] = useState(24); // срок ссылки: 1 ч / 24 ч / 7 дней
+  const [invites, setInvites] = useState<Invite[]>([]); // выданные ссылки этой сессии — для отзыва
   const closeInvite = useCallback(() => setInviteOpen(false), []);
   useDismiss(inviteOpen, closeInvite, ".tbdrop--invite");
+  const reloadInvites = useCallback(() => {
+    if (!session) return;
+    api.listInvites(session.id).then(setInvites).catch(() => setInvites([]));
+  }, [session]);
+  useEffect(() => {
+    if (inviteOpen) reloadInvites();
+  }, [inviteOpen, reloadInvites]);
+  const revokeInvite = async (token: string) => {
+    if (!session) return;
+    try {
+      await api.revokeInvite(session.id, token);
+      setInviteUrl(null);
+      reloadInvites();
+    } catch {
+      alert(t("Не удалось отозвать ссылку"));
+    }
+  };
   // Dropdown'ы toolbar'а: «Экспорт» и «•••».
   const [exportOpen, setExportOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -822,8 +841,9 @@ export default function BoardPage({ pool, sessionFromUrl, guest = false }: { poo
   const makeInvite = async (role: "viewer" | "member") => {
     if (!session) return;
     try {
-      const inv = await api.invite(session.id, role);
+      const inv = await api.invite(session.id, role, inviteHours);
       setInviteUrl(`${window.location.origin}${window.location.pathname}${inv.url}`);
+      reloadInvites();
     } catch {
       alert(t("Не удалось создать ссылку"));
     }
@@ -994,6 +1014,14 @@ export default function BoardPage({ pool, sessionFromUrl, guest = false }: { poo
                       <div className="tbmenu invitemenu" role="menu">
                         {!inviteUrl ? (
                           <>
+                            <label className="invite__ttl">
+                              {t("Срок ссылки")}
+                              <select className="invite__hours" value={inviteHours} onChange={(e) => setInviteHours(Number(e.target.value))}>
+                                <option value={1}>{t("1 час")}</option>
+                                <option value={24}>{t("24 часа")}</option>
+                                <option value={168}>{t("7 дней")}</option>
+                              </select>
+                            </label>
                             <button className="tbmenu__item invite__member" role="menuitem" onClick={() => makeInvite("member")}>
                               {t("Интервьюер — может оценивать")}
                             </button>
@@ -1010,6 +1038,20 @@ export default function BoardPage({ pool, sessionFromUrl, guest = false }: { poo
                               </button>
                               <button className="tbbtn btn--quiet" onClick={() => setInviteUrl(null)}>{t("Другая ссылка")}</button>
                             </div>
+                          </div>
+                        )}
+                        {invites.some((i) => i.state === "active") && (
+                          <div className="invite__list">
+                            <div className="invite__list-head">{t("Действующие ссылки")}</div>
+                            {invites.filter((i) => i.state === "active").map((i) => (
+                              <div key={i.token} className="invite__row">
+                                <span className="invite__role">{i.role === "member" ? t("Интервьюер") : t("Наблюдатель")}</span>
+                                <span className="invite__exp muted">
+                                  {i.expires_at ? t("до {when}", { when: i.expires_at.slice(0, 16).replace("T", " ") }) : ""}
+                                </span>
+                                <button className="tbbtn btn--quiet invite__revoke" onClick={() => revokeInvite(i.token)}>{t("Отозвать")}</button>
+                              </div>
+                            ))}
                           </div>
                         )}
                       </div>
