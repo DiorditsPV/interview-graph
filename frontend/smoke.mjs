@@ -523,15 +523,16 @@ await page.waitForSelector(".poolcard", { timeout: 10000 });
 if ((await page.locator(".errbar").count()) !== 1) fail("unknown pool should show a notice on the menu");
 console.log("OK: unknown pool falls back to menu");
 
-// 25. Второй пул рисует СВОИ колонки (независимый пул, не фильтр). Пул из PR 3 — если его ещё нет
-// в content/, шаг тихо пропускается.
-if (await page.locator('.poolcard[data-pool="system-analyst"]').count()) {
-  await page.goto(URL + "#/board/system-analyst", { waitUntil: "load" });
+// 25. Другие пулы рисуют СВОИ колонки: system-analyst и data-engineer-x5 (независимые пулы).
+// Регистронезависимо: дефолтный дизайн 37 переводит .bgroup__header в uppercase CSS'ом.
+for (const [pid, needle] of [["system-analyst", "требования"], ["data-engineer-x5", "python"]]) {
+  await page.goto(URL + "#/", { waitUntil: "load" });
+  await page.waitForSelector(`.poolcard[data-pool="${pid}"]`, { timeout: 10000 });
+  await page.goto(URL + `#/board/${pid}`, { waitUntil: "load" });
   await page.waitForSelector(".bgroup__header", { timeout: 10000 });
   const heads = await page.locator(".bgroup__header").allInnerTexts();
-  // регистронезависимо: дефолтный дизайн 37 переводит .bgroup__header в uppercase CSS'ом
-  if (!heads.some((h) => h.toLowerCase().includes("требования"))) fail(`SA board lacks its own blocks: ${heads.join(" | ")}`);
-  console.log(`OK: system-analyst board has its own blocks (${heads.length})`);
+  if (!heads.some((h) => h.toLowerCase().includes(needle))) fail(`${pid} board lacks its own blocks: ${heads.join(" | ")}`);
+  console.log(`OK: ${pid} board has its own blocks (${heads.length})`);
 }
 
 if (errors.length) fail(`console/page errors:\n${errors.join("\n")}`);

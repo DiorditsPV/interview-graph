@@ -52,14 +52,16 @@ Dev (hot reload): `uvicorn app.main:app --reload --port 8000` (из `backend/`, 
 ## Модель ноды и формат контента
 Frontmatter (ключи алфавитные, `tags` — block-style): `id`, `kind` (question|task), `block`
 (значения — блоки из `content/<pool>/pool.yaml` того пула; data-engineer: frameworks|databases|python|platform,
-system-analyst: requirements|modeling|data|integration), `subblock`, `topic`, `title` (короткий заголовок карточки),
+system-analyst: requirements|modeling|data|integration, data-engineer-x5: python|sql|spark|airflow|clickhouse|ai),
+`subblock`, `topic`, `title` (короткий заголовок карточки),
 `difficulty` (base|junior|middle|senior), `weight`, `tags` (1–3), для `task` — `starterCode`, `rubric`.
 Тело: `## Вопрос` / `## Ответ` (для задач — `## Задача` / `## Эталон`). Не начинай строки тела с `#`
 вне блоков кода (это маркеры разбиения). Полный текст — в drawer; на карточке только `title` + теги.
 
 **Под-колонки** внутри блока задаются полем `subblock`, порядок и подписи — в `subblocks` соответствующего
 блока в `content/<pool>/pool.yaml`: data-engineer → frameworks: `airflow|pyspark|dbt|streaming`,
-databases: `sql|dbms|storage|formats`; system-analyst — свои под-колонки по блокам, см. `pool.yaml`.
+databases: `sql|dbms|storage|formats`; data-engineer-x5 → sql: `queries|indexes`; system-analyst — свои
+под-колонки по блокам, см. `pool.yaml`.
 
 ## Конвенции и грабли (ВАЖНО)
 - **Ground truth — через `cat`/`grep`/`/api/graph`, НЕ через Read-инструмент**: контент-файлы

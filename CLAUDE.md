@@ -62,8 +62,8 @@ Dev hot-reload вручную: `uvicorn app.main:app --reload --port 8000` (из
 - `report.ts` — клиентская генерация самодостаточного HTML-отчёта по сессии («📥 Скачать»).
 
 **Под-колонки** внутри блока задаются полем `subblock` во frontmatter, порядок и подписи — в `subblocks`
-соответствующего блока в `pool.yaml`: frameworks → `airflow|pyspark|dbt|streaming`; databases →
-`sql|dbms|storage|formats`.
+соответствующего блока в `pool.yaml`: data-engineer — frameworks → `airflow|pyspark|dbt|streaming`; databases →
+`sql|dbms|storage|formats`; data-engineer-x5 — sql → `queries|indexes`; system-analyst — см. его `pool.yaml`.
 
 ## Грабли (важно)
 - **Ground truth контента — через `cat`/`grep`/`GET /api/graph`, НЕ через Read-инструмент.**
