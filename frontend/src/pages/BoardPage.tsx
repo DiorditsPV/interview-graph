@@ -360,6 +360,33 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
   }, [currentId, sessionStart]);
 
   const instance = useRef<ReactFlowInstance<Node, Edge> | null>(null);
+  const canvasRef = useRef<HTMLDivElement | null>(null);
+
+  // Стартовый viewport: зум 0.5 (карточки читаются), доска — по центру канвы. Если доска шире
+  // или выше канвы, прижимаем её к левому/верхнему краю с отступом, чтобы первая карточка была
+  // в кадре. Доска в board-координатах занимает x ∈ [-LABEL_W, width], y ∈ [0, height].
+  const centerBoard = useCallback(() => {
+    const inst = instance.current;
+    const el = canvasRef.current;
+    if (!inst || !el || !placement) return;
+    const zoom = 0.5;
+    const bw = (LABEL_W + placement.width) * zoom;
+    const bh = placement.height * zoom;
+    // Открытая панель фильтров лежит поверх канвы справа — центрируем в свободной части.
+    const panel = filtersOpen ? el.querySelector<HTMLElement>(".filterpanel") : null;
+    const cw = el.clientWidth - (panel ? panel.offsetWidth + 24 : 0);
+    const ch = el.clientHeight;
+    const x = (bw < cw - 40 ? (cw - bw) / 2 : 20) + LABEL_W * zoom;
+    const y = bh < ch - 40 ? (ch - bh) / 2 : 20;
+    inst.setViewport({ x, y, zoom });
+  }, [placement, filtersOpen]);
+  useEffect(() => {
+    centerBoard();
+  }, [centerBoard]);
+  useEffect(() => {
+    window.addEventListener("resize", centerBoard);
+    return () => window.removeEventListener("resize", centerBoard);
+  }, [centerBoard]);
   const nodeMap = useMemo(() => Object.fromEntries(graph.map((n) => [n.id, n])), [graph]);
   const allTags = useMemo(
     () => Array.from(new Set(graph.flatMap((n) => n.tags))).sort(),
@@ -844,7 +871,7 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
             )}
           </aside>
         )}
-        <div className="canvas">
+        <div className="canvas" ref={canvasRef}>
           {rfNodes.length === 0 ? (
             <div className="loading">{t("Загрузка графа…")}</div>
           ) : (
@@ -856,12 +883,12 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
               onNodeClick={onNodeClick}
               onInit={(inst) => {
                 instance.current = inst;
+                centerBoard();
               }}
               nodesDraggable={false}
               nodesConnectable={false}
-              // Читаемый дефолт: верхний-левый угол доски при зуме 0.5 (карточки ~140px,
-              // читаются при открытии). Не fitView — тот ужимает все 61 карту до ~62px.
-              // Все board-координаты ≥10 → первый .qnode остаётся в кадре (x,y ≥ 0).
+              // Первый кадр до centerBoard: зум 0.5 (карточки ~140px, читаются при открытии).
+              // Не fitView — тот ужимает все 61 карту до ~62px.
               defaultViewport={{ x: 20, y: 20, zoom: 0.5 }}
               minZoom={0.1}
               proOptions={{ hideAttribution: true }}
