@@ -664,3 +664,13 @@ kbd {
 .table__link { display: block; font-size: 12px; color: var(--accent); text-decoration: none; }
 .table__edit input { width: 100%; padding: 4px 6px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--surface); color: var(--text); }
 a.iconbtn { text-decoration: none; display: inline-block; }
+
+/* ---- pool-crud: карточка «+ Новое направление», кнопки изменить/удалить, модалка ---- */
+.poolcard--new {
+  align-items: center; justify-content: center; min-height: 120px; cursor: pointer;
+  font: inherit; font-weight: 700; color: var(--accent); border-style: dashed;
+}
+.poolcard__manage { margin-left: auto; display: inline-flex; gap: 4px; }
+.poolcard__edit, .poolcard__delete { font-size: 12px; padding: 2px 6px; }
+.poolform { display: grid; gap: 10px; min-width: min(360px, 90vw); }
+.poolform .drawer__field input, .poolform .drawer__field select { width: 100%; box-sizing: border-box; }

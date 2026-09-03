@@ -40,6 +40,31 @@ const poolCards = await page.locator(".poolcard").count();
 if (poolCards < 1) fail("main menu shows no pools");
 const deCard = page.locator('.poolcard[data-pool="data-engineer"]');
 if ((await deCard.count()) !== 1) fail("data-engineer pool card missing on main menu");
+// 0c. CRUD направлений (pool-crud): создать из пресета DE → карточка с тем же числом вопросов →
+//     переименовать → удалить (confirm принимается). Всё на главной, до ухода на доску.
+const deMeta = await deCard.locator(".poolcard__meta").innerText();
+await page.locator(".poolcard--new").click();
+await page.waitForSelector(".poolform", { timeout: 3000 });
+await page.fill(".poolform__label", "Smoke Pool");
+await page.locator(".pool-preset").selectOption("data-engineer");
+await page.locator(".poolform__submit").click();
+await page.waitForSelector('.poolcard[data-pool="smoke-pool"]', { timeout: 10000 });
+const smokeMeta = await page.locator('.poolcard[data-pool="smoke-pool"] .poolcard__meta').innerText();
+if (smokeMeta.split("·")[0].trim() !== deMeta.split("·")[0].trim()) fail(`preset copy mismatch: "${smokeMeta}" vs "${deMeta}"`);
+await page.locator('.poolcard[data-pool="smoke-pool"] .poolcard__edit').click();
+await page.waitForSelector(".poolform", { timeout: 3000 });
+await page.fill(".poolform__label", "Smoke Pool 2");
+await page.locator(".poolform__submit").click();
+await page.waitForFunction(
+  () => document.querySelector('.poolcard[data-pool="smoke-pool"] .poolcard__label')?.textContent === "Smoke Pool 2",
+  null,
+  { timeout: 5000 },
+);
+page.once("dialog", (d) => d.accept());
+await page.locator('.poolcard[data-pool="smoke-pool"] .poolcard__delete').click();
+await page.waitForSelector('.poolcard[data-pool="smoke-pool"]', { state: "detached", timeout: 5000 });
+console.log("OK: pool create from preset / rename / delete");
+
 // Кликаем по самой ссылке-«растяжке» (.poolcard__label), а не по всей карточке: внутри есть ещё
 // сиблинг .poolcard__bank (ссылка на банк) — клик по центру div'а рискует попасть мимо доски.
 await deCard.locator(".poolcard__label").click();

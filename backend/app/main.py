@@ -36,7 +36,15 @@ from .db import SESSION_MAX_AGE, Database
 from .hub import SessionHub
 from .importer import parse_file, validate_against_pool
 from .models import Difficulty, GraphResponse, Kind, Node
-from .pools import PoolCfg, block_weights, default_pool_id, load_pools
+from .pools import (
+    PoolCfg,
+    block_weights,
+    blocks_to_json,
+    default_pool_id,
+    load_pools,
+    pool_from_row,
+    slug_from_label,
+)
 from .sampler import build_interview
 from .seed import seed_interviewer_if_empty, seed_owner_if_empty, seed_pool_if_empty
 from .tenancy import resolve_tenant
@@ -83,12 +91,13 @@ db = Database(DB_PATH)
 app.state.db = db  # auth-зависимости берут db отсюда (request.app.state.db)
 hub = SessionHub()
 
-# Пулы направлений: content/<pool>/pool.yaml. Читаются при старте; сид — на каждый пул
-# отдельно (пустой засеивается из своего каталога, полный не трогается).
-POOLS: Dict[str, PoolCfg] = load_pools(CONTENT_DIR)
-if not POOLS:
-    log.warning("no pools found in %s — /api/pools will be empty", CONTENT_DIR)
-for _pool in POOLS.values():
+# Пулы направлений: content/<pool>/pool.yaml — сид таблицы pools (источник правды в рантайме —
+# БД, см. _pools: направления создаются/правятся/удаляются из UI). Сид — на каждый пул отдельно:
+# конфиг INSERT OR IGNORE, ноды — только в пустой пул.
+_CONTENT_POOLS: Dict[str, PoolCfg] = load_pools(CONTENT_DIR)
+if not _CONTENT_POOLS:
+    log.warning("no pools found in %s — /api/pools will be empty until a pool is created", CONTENT_DIR)
+for _pool in _CONTENT_POOLS.values():
     _seeded, _seed_errors = seed_pool_if_empty(db, resolve_tenant(), _pool)
     if _seeded:
         log.info("seeded %d nodes into pool %s", _seeded, _pool.id)
@@ -199,6 +208,21 @@ class NodeUpdate(BaseModel):
     answer: Optional[str] = None
 
 
+class PoolCreate(BaseModel):
+    """Новое направление из пресета: колонки и вопросы пресета копируются, id — из названия."""
+
+    label: str = Field(min_length=1)
+    description: str = ""
+    preset: str = Field(min_length=1)  # id существующего направления
+
+
+class PoolUpdate(BaseModel):
+    """Правка направления — только название/описание (колонки задаёт пресет при создании)."""
+
+    label: Optional[str] = Field(default=None, min_length=1)
+    description: Optional[str] = None
+
+
 # ---------- auth (login / logout / me) ----------
 def _public_user(user: dict) -> dict:
     """Поля пользователя наружу — без password_hash."""
@@ -267,12 +291,30 @@ def create_user(body: UserCreate, request: Request, _owner: dict = Depends(requi
 _NODE_FIELDS = set(Node.model_fields)
 
 
-def _pool_or_404(pool_id: Optional[str]) -> PoolCfg:
+def _pools(request: Request) -> Dict[str, PoolCfg]:
+    """Направления тенанта из БД (источник правды; content/ — сид), в порядке создания."""
+    return {row["id"]: pool_from_row(row) for row in db.list_pools(resolve_tenant(request))}
+
+
+def _pool_or_404(request: Request, pool_id: Optional[str]) -> PoolCfg:
     """Пул по id; без id — пул по умолчанию (data-engineer или первый по алфавиту)."""
-    pid = pool_id or default_pool_id(POOLS)
-    if pid is None or pid not in POOLS:
+    pools = _pools(request)
+    pid = pool_id or default_pool_id(pools)
+    if pid is None or pid not in pools:
         raise HTTPException(status_code=404, detail=f"pool '{pool_id}' not found")
-    return POOLS[pid]
+    return pools[pid]
+
+
+def _pool_out(request: Request, p: PoolCfg) -> dict:
+    """Форма направления для API: конфиг + счётчики вопросов и сессий."""
+    tenant = resolve_tenant(request)
+    return {
+        **p.to_dict(),
+        "counts": {
+            "nodes": db.count_nodes(tenant, pool=p.id),
+            "sessions": db.count_sessions(tenant, p.id),
+        },
+    }
 
 
 def _db_nodes(request: Request, pool: PoolCfg) -> List[Node]:
@@ -286,17 +328,60 @@ def _db_nodes(request: Request, pool: PoolCfg) -> List[Node]:
 
 @app.get("/api/pools")
 def get_pools(request: Request, _user: dict = Depends(current_user)) -> list:
+    return [_pool_out(request, p) for p in _pools(request).values()]
+
+
+@app.post("/api/pools")
+def create_pool(body: PoolCreate, request: Request, _user: dict = Depends(require_member)) -> dict:
+    """Новое направление из пресета: колонки и все вопросы пресета копируются (id с префиксом).
+
+    Id — транслитерация названия; занятый (в том числе tombstone удалённого) — с суффиксом -2, -3…
+    """
+    import sqlite3
+
     tenant = resolve_tenant(request)
-    return [
-        {
-            **p.to_dict(),
-            "counts": {
-                "nodes": db.count_nodes(tenant, pool=p.id),
-                "sessions": db.count_sessions(tenant, p.id),
-            },
-        }
-        for p in POOLS.values()
-    ]
+    label = body.label.strip()
+    if not label:
+        # Field(min_length=1) пропускает строку из пробелов — иначе родится пул с пустым названием и id 'pool'.
+        raise HTTPException(status_code=422, detail="label must not be blank")
+    preset = _pool_or_404(request, body.preset)
+    base = slug_from_label(label)
+    pid, n = base, 2
+    while db.get_pool(tenant, pid) is not None:
+        pid, n = f"{base}-{n}", n + 1
+    try:
+        row = db.create_pool(
+            tenant, pid, label, body.description.strip(), json.loads(blocks_to_json(preset.blocks)),
+            copy_from=preset.id,
+        )
+    except sqlite3.IntegrityError as exc:
+        # id копии ноды (<pool>-<id>) занят чужой нодой — транзакция откатилась, пул не создан.
+        raise HTTPException(status_code=409, detail=f"node id collision while copying preset: {exc}")
+    return _pool_out(request, pool_from_row(row))
+
+
+@app.put("/api/pools/{pool_id}")
+def update_pool(
+    pool_id: str, body: PoolUpdate, request: Request, _user: dict = Depends(require_member)
+) -> dict:
+    fields = {k: v.strip() for k, v in body.model_dump(exclude_none=True).items()}
+    if "label" in fields and not fields["label"]:
+        raise HTTPException(status_code=422, detail="label must not be blank")
+    row = db.update_pool(resolve_tenant(request), pool_id, fields)
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"pool '{pool_id}' not found")
+    return _pool_out(request, pool_from_row(row))
+
+
+@app.delete("/api/pools/{pool_id}")
+def delete_pool(pool_id: str, request: Request, _user: dict = Depends(require_member)) -> dict:
+    """Удалить направление: вопросы удаляются, сессии остаются в истории, id остаётся занятым."""
+    tenant = resolve_tenant(request)
+    kept = db.count_sessions(tenant, pool_id)
+    removed = db.delete_pool(tenant, pool_id)
+    if removed is None:
+        raise HTTPException(status_code=404, detail=f"pool '{pool_id}' not found")
+    return {"deleted": pool_id, "nodes_removed": removed, "sessions_kept": kept}
 
 
 @app.get("/api/graph", response_model=GraphResponse)
@@ -304,7 +389,7 @@ def get_graph(
     request: Request, pool: Optional[str] = None, _user: dict = Depends(current_user)
 ) -> GraphResponse:
     # Вопросы читаются из БД (а не с диска) — рантайм-правки переживают деплой.
-    return GraphResponse(nodes=_db_nodes(request, _pool_or_404(pool)), errors=[])
+    return GraphResponse(nodes=_db_nodes(request, _pool_or_404(request, pool)), errors=[])
 
 
 @app.post("/api/import")
@@ -323,7 +408,7 @@ def import_file(body: ImportFile, request: Request, _user: dict = Depends(requir
     from .importer import _fmt_error  # локально — внутренний хелпер форматирования ошибок
 
     tenant = resolve_tenant(request)
-    pool = _pool_or_404(body.pool)
+    pool = _pool_or_404(request, body.pool)
     added: List[dict] = []
     errors: List[dict] = []
     with tempfile.TemporaryDirectory() as td:
@@ -376,7 +461,7 @@ def _unique_node_id(tenant: str, base: str) -> str:
 def add_node(body: NodeCreate, request: Request, _user: dict = Depends(require_member)) -> dict:
     """Создать новый вопрос в банке пула (БД, source='user'). id генерится из topic/title."""
     tenant = resolve_tenant(request)
-    pool = _pool_or_404(body.pool)
+    pool = _pool_or_404(request, body.pool)
     base = _slugify(body.topic or body.title or body.block)
     node_id = _unique_node_id(tenant, base)
     node = Node.model_validate({**body.model_dump(exclude={"pool"}), "pool": pool.id, "id": node_id})
@@ -403,8 +488,9 @@ def edit_node(
     # валидируем только подмножество полей Node, а в БД пишем полный merged (db читает по .get).
     try:
         node = Node.model_validate({k: v for k, v in merged.items() if k in _NODE_FIELDS})
-        if merged["pool"] in POOLS:
-            validate_against_pool(node, POOLS[merged["pool"]])
+        pools = _pools(request)
+        if merged["pool"] in pools:
+            validate_against_pool(node, pools[merged["pool"]])
     except Exception as exc:  # noqa: BLE001 — pydantic ValidationError / block вне пула → 422
         raise HTTPException(status_code=422, detail=str(exc))
     saved = db.upsert_node(tenant, merged, source=existing.get("source", "user"))
@@ -424,7 +510,7 @@ def remove_node(node_id: str, request: Request, _user: dict = Depends(require_me
 def make_interview(
     req: InterviewRequest, request: Request, _user: dict = Depends(current_user)
 ) -> dict:
-    pool = _pool_or_404(req.pool)
+    pool = _pool_or_404(request, req.pool)
     order = build_interview(
         _db_nodes(request, pool),
         count=req.count,
@@ -486,7 +572,7 @@ def create_session(
         if cand is None:
             raise HTTPException(status_code=404, detail=f"candidate '{body.candidate_id}' not found")
         candidate_name = cand["name"]
-    pool = _pool_or_404(body.pool)
+    pool = _pool_or_404(request, body.pool)
     interviewer_id = body.interviewer_id
     if interviewer_id is None:
         # Интервьюер из UI больше не выбирается (старт сессии живёт на главной): сессии всё равно
@@ -507,7 +593,7 @@ def list_sessions(
     request: Request, pool: Optional[str] = None, _user: dict = Depends(current_user)
 ) -> list:
     tenant = resolve_tenant(request)
-    return db.list_sessions(tenant, pool=_pool_or_404(pool).id if pool else None)
+    return db.list_sessions(tenant, pool=_pool_or_404(request, pool).id if pool else None)
 
 
 @app.get("/api/sessions/{session_id}")
