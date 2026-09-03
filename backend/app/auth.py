@@ -60,15 +60,28 @@ def current_user(request: Request) -> dict:
         raise HTTPException(status_code=401, detail="not authenticated")
     request.state.tenant = user["tenant_id"]
     request.state.user = user
+    # Гость по ссылке: auth-сессия ограничена одной сессией интервью (см. db.create_guest_auth_session).
+    request.state.guest_scope = sess.get("scope_session_id")
     return user
 
 
-def require_role(min_role: str) -> Callable[..., dict]:
-    """Фабрика зависимости, требующей роль не ниже `min_role` (иначе 403)."""
+def guest_scope(request: Request) -> int | None:
+    """id сессии интервью, которой ограничен гость; None — полноценный пользователь."""
+    return getattr(request.state, "guest_scope", None)
 
-    def dep(user: dict = Depends(current_user)) -> dict:
+
+def require_role(min_role: str, allow_guest: bool = False) -> Callable[..., dict]:
+    """Фабрика зависимости, требующей роль не ниже `min_role` (иначе 403).
+
+    Гость по ссылке проходит только там, где allow_guest=True (ручки своей сессии интервью);
+    правки банка, направлений, кандидатов и создание сессий ему закрыты независимо от роли.
+    """
+
+    def dep(request: Request, user: dict = Depends(current_user)) -> dict:
         if ROLE_RANK.get(user["role"], -1) < ROLE_RANK[min_role]:
             raise HTTPException(status_code=403, detail="insufficient role")
+        if not allow_guest and guest_scope(request) is not None:
+            raise HTTPException(status_code=403, detail="guest access is limited to the invited session")
         return user
 
     return dep
@@ -76,3 +89,11 @@ def require_role(min_role: str) -> Callable[..., dict]:
 
 require_member = require_role("member")
 require_owner = require_role("owner")
+require_session_member = require_role("member", allow_guest=True)
+
+
+def check_session_scope(request: Request, session_id: int) -> None:
+    """Гость может работать только с сессией из приглашения; чужая → 403."""
+    scope = guest_scope(request)
+    if scope is not None and scope != session_id:
+        raise HTTPException(status_code=403, detail="guest access is limited to the invited session")
