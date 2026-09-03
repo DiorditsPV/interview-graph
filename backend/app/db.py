@@ -77,12 +77,14 @@ CREATE TABLE IF NOT EXISTS auth_sessions (
     created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS session_invites (
-    token      TEXT PRIMARY KEY,                -- часть ссылки #/join/<token>; многоразовая, не протухает
+    token      TEXT PRIMARY KEY,                -- часть ссылки #/join/<token>; многоразовая до истечения/отзыва
     tenant_id  TEXT NOT NULL,
     session_id INTEGER NOT NULL,
     role       TEXT NOT NULL DEFAULT 'viewer',  -- viewer | member (гость получает эту роль в рамках одной сессии)
     created_by TEXT,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    expires_at TEXT,                            -- NULL — бессрочная (не используется UI, задел)
+    revoked_at TEXT                             -- отозвана: вход по ссылке 410, гости выкидываются (401)
 );
 CREATE TABLE IF NOT EXISTS interviewers (
     tenant_id   TEXT NOT NULL DEFAULT 'default' REFERENCES tenants(id),
@@ -141,6 +143,16 @@ def _row_to_node(row: sqlite3.Row) -> Dict:
     return d
 
 
+def invite_state(inv: Dict) -> str:
+    """Состояние приглашения: revoked (отозвано) → expired (срок вышел) → active."""
+    if inv.get("revoked_at"):
+        return "revoked"
+    exp = inv.get("expires_at")
+    if exp and datetime.fromisoformat(exp) <= datetime.now(timezone.utc):
+        return "expired"
+    return "active"
+
+
 def _row_to_pool(row: sqlite3.Row) -> Dict:
     """Строка pools → dict направления: blocks из JSON в список."""
     d = dict(row)
@@ -160,10 +172,17 @@ class Database:
 
     @staticmethod
     def _migrate_auth_sessions(conn: sqlite3.Connection) -> None:
-        """Гостевой вход по ссылке: auth-сессия может быть ограничена одной сессией интервью."""
+        """Гостевой вход по ссылке: auth-сессия ограничена одной сессией интервью и помнит приглашение
+        (invite_token) — отзыв/истечение приглашения выкидывает гостя; у приглашений — срок и отзыв."""
         cols = {r["name"] for r in conn.execute("PRAGMA table_info(auth_sessions)").fetchall()}
         if "scope_session_id" not in cols:
             conn.execute("ALTER TABLE auth_sessions ADD COLUMN scope_session_id INTEGER")
+        if "invite_token" not in cols:
+            conn.execute("ALTER TABLE auth_sessions ADD COLUMN invite_token TEXT")
+        icols = {r["name"] for r in conn.execute("PRAGMA table_info(session_invites)").fetchall()}
+        if icols and "expires_at" not in icols:
+            conn.execute("ALTER TABLE session_invites ADD COLUMN expires_at TEXT")
+            conn.execute("ALTER TABLE session_invites ADD COLUMN revoked_at TEXT")
 
     @staticmethod
     def _migrate_sessions(conn: sqlite3.Connection) -> None:
@@ -306,13 +325,15 @@ class Database:
             conn.execute("DELETE FROM auth_sessions WHERE token = ?", (token,))
 
     # --- приглашения в сессию (гостевой вход по ссылке) ---
-    def create_invite(self, tenant_id: str, session_id: int, role: str, created_by: Optional[str]) -> str:
+    def create_invite(
+        self, tenant_id: str, session_id: int, role: str, created_by: Optional[str], expires_at: Optional[str]
+    ) -> str:
         token = secrets.token_urlsafe(24)
         with self._conn() as conn:
             conn.execute(
-                "INSERT INTO session_invites (token, tenant_id, session_id, role, created_by, created_at) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
-                (token, tenant_id, session_id, role, created_by, _now()),
+                "INSERT INTO session_invites (token, tenant_id, session_id, role, created_by, created_at, expires_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (token, tenant_id, session_id, role, created_by, _now(), expires_at),
             )
         return token
 
@@ -321,9 +342,34 @@ class Database:
             row = conn.execute("SELECT * FROM session_invites WHERE token = ?", (token,)).fetchone()
         return dict(row) if row else None
 
+    def list_invites(self, tenant_id: str, session_id: int) -> List[Dict]:
+        """Приглашения сессии, новые сверху, с вычисленным состоянием (active | expired | revoked)."""
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM session_invites WHERE tenant_id = ? AND session_id = ? ORDER BY created_at DESC",
+                (tenant_id, session_id),
+            ).fetchall()
+        out = []
+        for r in rows:
+            d = dict(r)
+            d["state"] = invite_state(d)
+            out.append(d)
+        return out
+
+    def revoke_invite(self, tenant_id: str, session_id: int, token: str) -> bool:
+        """Отозвать приглашение: вход по ссылке → 410, гости этой ссылки выкидываются (см. auth.current_user)."""
+        with self._conn() as conn:
+            cur = conn.execute(
+                "UPDATE session_invites SET revoked_at = COALESCE(revoked_at, ?) "
+                "WHERE token = ? AND tenant_id = ? AND session_id = ?",
+                (_now(), token, tenant_id, session_id),
+            )
+        return cur.rowcount > 0
+
     def create_guest_auth_session(self, invite: Dict) -> str:
         """Гость по приглашению: одноразовый пользователь без пароля с ролью приглашения и auth-сессия,
-        ограниченная одной сессией интервью (scope_session_id). Возвращает токен cookie."""
+        ограниченная одной сессией интервью (scope_session_id) и привязанная к приглашению (invite_token).
+        Возвращает токен cookie."""
         uid = f"guest-{secrets.token_hex(6)}"
         token = secrets.token_urlsafe(32)
         with self._conn() as conn:
@@ -332,9 +378,9 @@ class Database:
                 (invite["tenant_id"], uid, f"{uid}@invite.local", "!", invite["role"], _now()),
             )
             conn.execute(
-                "INSERT INTO auth_sessions (token, tenant_id, user_id, created_at, scope_session_id) "
-                "VALUES (?, ?, ?, ?, ?)",
-                (token, invite["tenant_id"], uid, _now(), invite["session_id"]),
+                "INSERT INTO auth_sessions (token, tenant_id, user_id, created_at, scope_session_id, invite_token) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (token, invite["tenant_id"], uid, _now(), invite["session_id"], invite["token"]),
             )
         return token
 

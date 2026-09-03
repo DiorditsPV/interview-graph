@@ -906,3 +906,11 @@ a.iconbtn { text-decoration: none; display: inline-block; }
 .invite__result { display: grid; gap: 6px; padding: 4px; }
 .invite__url { width: 100%; font-size: 12px; padding: 6px 8px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--bg); color: var(--text); }
 .invite__btns { display: flex; gap: 6px; }
+.invite__ttl { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; font-size: 12px; color: var(--text-muted); }
+.invite__hours { padding: 3px 6px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--surface); color: var(--text); font-size: 12px; }
+.invite__list { border-top: 1px solid var(--border); margin-top: 4px; padding-top: 4px; }
+.invite__list-head { padding: 4px 10px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-faint); }
+.invite__row { display: flex; align-items: center; gap: 8px; padding: 2px 10px; font-size: 12px; }
+.invite__role { font-weight: 600; }
+.invite__exp { flex: 1; }
+.invite__revoke { font-size: 12px; padding: 3px 8px; color: #b91c1c; }
