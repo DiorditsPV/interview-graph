@@ -2,6 +2,7 @@
 // Открывается в браузере, печатается в PDF. Светлый (документ для шаринга/печати).
 
 import { DIFFS, subOf } from "./layout";
+import { getLang, t } from "./i18n";
 import { blockColor, blockLabel, blockOrder, subLabel, DIFF_COLOR, type PoolConfig, type QNode } from "./types";
 
 const esc = (s: string) =>
@@ -77,7 +78,7 @@ export function buildReportHtml(
           const tags = n.tags.length
             ? `<div class="tags">${n.tags.map((t) => `<span class="tag">${esc(t)}</span>`).join("")}</div>`
             : "";
-          const kind = n.kind === "task" ? `<span class="kind">задача</span>` : "";
+          const kind = n.kind === "task" ? `<span class="kind">${t("задача")}</span>` : "";
           const nText = notes?.[n.id]?.trim();
           const noteHtml = nText ? `<div class="qnote">📝 ${esc(nText)}</div>` : "";
           return `<tr>
@@ -90,7 +91,7 @@ export function buildReportHtml(
         .join("\n");
       return `<section>
   <h2 style="border-left-color:${blockColor(pool, b)}">${esc(blockLabel(pool, b))}</h2>
-  <table><thead><tr><th>Сложность</th><th>Вопрос</th><th>Оценка</th></tr></thead>
+  <table><thead><tr><th>${t("Сложность")}</th><th>${t("Вопрос")}</th><th>${t("Оценка")}</th></tr></thead>
   <tbody>${rows}</tbody></table>
 </section>`;
     })
@@ -108,13 +109,13 @@ export function buildReportHtml(
 
   const body =
     scored.length === 0
-      ? `<div class="empty">Нет оценённых вопросов — выставьте оценки и скачайте отчёт снова.</div>`
+      ? `<div class="empty">${t("Нет оценённых вопросов — выставьте оценки и скачайте отчёт снова.")}</div>`
       : sections;
 
   return `<!doctype html>
-<html lang="ru"><head><meta charset="utf-8">
+<html lang="${getLang()}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Результаты интервью${candidate ? " — " + esc(candidate) : ""}</title>
+<title>${t("Результаты интервью")}${candidate ? " — " + esc(candidate) : ""}</title>
 <style>
   * { box-sizing: border-box; }
   body { font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #1f2937; background: #f1f5f9; margin: 0; padding: 24px; }
@@ -153,22 +154,22 @@ export function buildReportHtml(
 <body>
   <div class="sheet">
     <div class="head">
-      <h1>Результаты интервью</h1>
-      <div class="sub">Кандидат: <b>${esc(candidate || "—")}</b>${
+      <h1>${t("Результаты интервью")}</h1>
+      <div class="sub">${t("Кандидат")}: <b>${esc(candidate || "—")}</b>${
         people?.position || people?.seniority
           ? ` (${esc([people?.position, people?.seniority].filter(Boolean).join(", "))})`
           : ""
-      } · ${dateStr} · направление: <b>${esc(pool.label)}</b>${
-        people?.interviewer ? ` · интервьюер: <b>${esc(people.interviewer)}</b>` : ""
+      } · ${dateStr} · ${t("направление")}: <b>${esc(pool.label)}</b>${
+        people?.interviewer ? ` · ${t("интервьюер")}: <b>${esc(people.interviewer)}</b>` : ""
       }</div>
     </div>
     <div class="summary">
-      <div class="stat"><span class="lbl">Оценено</span><span class="num">${scored.length}<span style="font-size:15px;color:#9ca3af">/${nodes.length}</span></span></div>
-      <div class="stat"><span class="lbl">Средний балл</span><span class="num" style="color:${scored.length ? scoreColor(Math.round(avg)) : "#9ca3af"}">${scored.length ? avg.toFixed(1) : "—"}</span></div>
+      <div class="stat"><span class="lbl">${t("Оценено")}</span><span class="num">${scored.length}<span style="font-size:15px;color:#9ca3af">/${nodes.length}</span></span></div>
+      <div class="stat"><span class="lbl">${t("Средний балл")}</span><span class="num" style="color:${scored.length ? scoreColor(Math.round(avg)) : "#9ca3af"}">${scored.length ? avg.toFixed(1) : "—"}</span></div>
       <div class="bchips">${summaryChips}</div>
     </div>
     ${body}
-    <div class="foot">Сгенерировано локальным сервисом «Интервью · граф вопросов» · ${dateStr}</div>
+    <div class="foot">${t("Сгенерировано локальным сервисом «Интервью · граф вопросов»")} · ${dateStr}</div>
   </div>
 </body></html>`;
 }
@@ -209,16 +210,16 @@ export function buildBankHtml(nodes: QNode[], pool: PoolConfig): string {
       const cards = list
         .map((n) => {
           const sub = n.subblock ? `<span class="sub">${esc(subLabel(pool, n.block, n.subblock))}</span> ` : "";
-          const kind = n.kind === "task" ? `<span class="kind">задача</span>` : "";
+          const kind = n.kind === "task" ? `<span class="kind">${t("задача")}</span>` : "";
           const tags = n.tags.length
             ? `<div class="tags">${n.tags.map((t) => `<span class="tag">${esc(t)}</span>`).join("")}</div>`
             : "";
           const starter = n.starterCode
-            ? `<div class="lbl">Заготовка кода</div><pre class="code">${esc(n.starterCode)}</pre>`
+            ? `<div class="lbl">${t("Заготовка кода")}</div><pre class="code">${esc(n.starterCode)}</pre>`
             : "";
           const rubric =
             n.rubric && n.rubric.length
-              ? `<div class="lbl">Критерии</div><ul class="rubric">${n.rubric.map((r) => `<li>${esc(r)}</li>`).join("")}</ul>`
+              ? `<div class="lbl">${t("Критерии")}</div><ul class="rubric">${n.rubric.map((r) => `<li>${esc(r)}</li>`).join("")}</ul>`
               : "";
           return `<article class="card">
   <div class="card__head">
@@ -227,8 +228,8 @@ export function buildBankHtml(nodes: QNode[], pool: PoolConfig): string {
   </div>
   <div class="qt">${esc(n.title || n.question)}</div>
   <div class="topic">${esc(n.topic)}</div>
-  <div class="lbl">Вопрос</div><div class="text">${esc(n.question)}</div>
-  ${n.answer ? `<div class="lbl">Ответ</div><div class="text">${esc(n.answer)}</div>` : ""}
+  <div class="lbl">${t("Вопрос")}</div><div class="text">${esc(n.question)}</div>
+  ${n.answer ? `<div class="lbl">${t("Ответ")}</div><div class="text">${esc(n.answer)}</div>` : ""}
   ${starter}${rubric}${tags}
 </article>`;
         })
@@ -240,12 +241,12 @@ export function buildBankHtml(nodes: QNode[], pool: PoolConfig): string {
     })
     .join("\n");
 
-  const body = nodes.length === 0 ? `<div class="empty">Банк пуст.</div>` : sections;
+  const body = nodes.length === 0 ? `<div class="empty">${t("Банк пуст.")}</div>` : sections;
 
   return `<!doctype html>
-<html lang="ru"><head><meta charset="utf-8">
+<html lang="${getLang()}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Банк вопросов · интервью</title>
+<title>${t("Банк вопросов · интервью")}</title>
 <style>
   * { box-sizing: border-box; }
   body { font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #1f2937; background: #f1f5f9; margin: 0; padding: 24px; }
@@ -280,12 +281,12 @@ export function buildBankHtml(nodes: QNode[], pool: PoolConfig): string {
 <body>
   <div class="sheet">
     <div class="head">
-      <h1>Банк вопросов</h1>
-      <div class="sub">${nodes.length} вопросов · ${dateStr}</div>
+      <h1>${t("Банк вопросов")}</h1>
+      <div class="sub">${t("{n} вопросов", { n: nodes.length })} · ${dateStr}</div>
     </div>
     <div class="summary">${summaryChips}</div>
     ${body}
-    <div class="foot">Сгенерировано локальным сервисом «Интервью · граф вопросов» · ${dateStr}</div>
+    <div class="foot">${t("Сгенерировано локальным сервисом «Интервью · граф вопросов»")} · ${dateStr}</div>
   </div>
 </body></html>`;
 }
@@ -318,7 +319,7 @@ export function downloadReport(
   const url = URL.createObjectURL(blob);
   const now = new Date();
   const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-  const safe = (candidate || "кандидат").trim().replace(/[^\p{L}\p{N}_-]+/gu, "_") || "кандидат";
+  const safe = (candidate || t("кандидат")).trim().replace(/[^\p{L}\p{N}_-]+/gu, "_") || t("кандидат");
   const a = document.createElement("a");
   a.href = url;
   a.download = `interview_${safe}_${stamp}.html`;

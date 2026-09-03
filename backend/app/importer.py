@@ -117,7 +117,7 @@ def load_pool_content(pool: PoolCfg) -> Tuple[List[Node], List[ImportError_]]:
     errors: List[ImportError_] = []
     seen: Dict[str, str] = {}
 
-    if not pool.dir.exists():
+    if pool.dir is None or not pool.dir.exists():
         return nodes, [ImportError_(file=str(pool.dir), error="pool dir not found")]
 
     files = sorted(p for p in pool.dir.rglob("*") if p.suffix.lower() in {".md", ".json"})

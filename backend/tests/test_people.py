@@ -94,7 +94,8 @@ def test_session_backward_compat_free_text_via_api():
     sess = c.post("/api/sessions", json={"candidate": "Свободный Текст"}).json()
     assert sess["candidate"] == "Свободный Текст"
     assert sess["candidate_id"] is None
-    assert sess["interviewer_id"] is None
+    # home-session-start: интервьюер по умолчанию подставляется бэкендом (см. test_session_defaults_to_first_interviewer)
+    assert sess["interviewer_id"] is not None
 
 
 def test_session_unknown_candidate_404():
@@ -294,3 +295,13 @@ def test_seed_over_migrated_db_does_not_reseed_existing_pool(tmp_path):
 
     # Старый пул не тронут пересевом: то же количество нод, что было после миграции.
     assert db.count_nodes("default", pool="data-engineer") == old_count
+
+
+def test_session_defaults_to_first_interviewer():
+    """home-session-start: интервьюер из UI не выбирается — сессия получает первого интервьюера тенанта."""
+    c = _client()
+    ivs = c.get("/api/interviewers").json()
+    assert ivs, "seed interviewer expected"
+    r = c.post("/api/sessions", json={"candidate": "Default Iv"})
+    assert r.status_code == 200
+    assert r.json()["interviewer_id"] == ivs[0]["id"]

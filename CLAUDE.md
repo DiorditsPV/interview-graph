@@ -40,6 +40,8 @@ Dev hot-reload вручную: `uvicorn app.main:app --reload --port 8000` (из
 
 **Бэкенд** (`backend/app/`) — поток данных «контент-файлы → импорт → in-memory граф → API → SQLite-сессии»:
 - `pools.py` — читает `content/<pool>/pool.yaml` (блоки, под-колонки, цвета, веса) — таксономия пула.
+  `pool.yaml` — сид таблицы `pools` (как контент для `nodes`); в рантайме направления читаются из БД
+  (`db.list_pools`), создаются/правятся/удаляются через `POST/PUT/DELETE /api/pools`.
 - `importer.py` — парсит `content/<pool>/<block>/*.md|*.json` через `python-frontmatter` в `Node`,
   проверяя block/subblock по `pool.yaml`; `pool` ноды ставится по каталогу, не во frontmatter.
 - `models.py` — pydantic `Node` с `extra="forbid"`: добавление поля ноды = правка `models.py`
@@ -60,8 +62,8 @@ Dev hot-reload вручную: `uvicorn app.main:app --reload --port 8000` (из
 - `report.ts` — клиентская генерация самодостаточного HTML-отчёта по сессии («📥 Скачать»).
 
 **Под-колонки** внутри блока задаются полем `subblock` во frontmatter, порядок и подписи — в `subblocks`
-соответствующего блока в `pool.yaml`: frameworks → `airflow|pyspark|dbt|streaming`; databases →
-`sql|dbms|storage|formats`.
+соответствующего блока в `pool.yaml`: data-engineer — frameworks → `airflow|pyspark|dbt|streaming`; databases →
+`sql|dbms|storage|formats`; data-engineer-x5 — sql → `queries|indexes`; system-analyst — см. его `pool.yaml`.
 
 ## Грабли (важно)
 - **Ground truth контента — через `cat`/`grep`/`GET /api/graph`, НЕ через Read-инструмент.**
@@ -80,7 +82,7 @@ Dev hot-reload вручную: `uvicorn app.main:app --reload --port 8000` (из
 
 ## Проверка изменений
 Скилл **interview-verify** (или вручную): import 0 ошибок (`/api/graph`) → `pytest` →
-при правке фронта `npm run build` + `npm run smoke` (нужен сервер) → рестарт uvicorn.
+при правке фронта `npm run build` + `npm run i18n:check` (ключи `t("…")` есть в `src/i18n/en.ts`) + `npm run smoke` (нужен сервер) → рестарт uvicorn.
 При переименовании нод/тегов/классов, на которые опирается smoke, обнови `frontend/smoke.mjs`.
 
 ## Скиллы проекта (`.claude/skills/`)

@@ -13,10 +13,24 @@ from app.sampler import build_interview
 
 CONTENT_ROOT = Path(__file__).resolve().parent.parent.parent / "content"
 CONTENT = CONTENT_ROOT / "data-engineer"   # каталог пула по умолчанию
+ALL_POOLS = sorted(p.name for p in CONTENT_ROOT.iterdir() if (p / "pool.yaml").exists())
 
 
 def _de():
     return load_pools(CONTENT_ROOT)["data-engineer"]
+
+
+@pytest.mark.parametrize("pool_id", ALL_POOLS)
+def test_every_pool_imports_without_errors(pool_id):
+    nodes, errors = load_pool_content(load_pools(CONTENT_ROOT)[pool_id])
+    assert errors == [], f"{pool_id}: {errors}"
+    assert len(nodes) >= 10
+    assert all(n.pool == pool_id for n in nodes)
+    assert all(n.title and 1 <= len(n.tags) <= 3 for n in nodes)
+
+
+def test_x5_pool_present():
+    assert "data-engineer-x5" in ALL_POOLS
 
 
 def test_content_imports_without_errors():

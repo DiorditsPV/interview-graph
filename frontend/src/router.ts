@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 // (бэкенд раздаёт статику одним index.html, hash его не трогает).
 
 export type Route =
-  | { name: "home" }
+  | { name: "home"; start: string | null } // start — пул, для которого сразу открыть форму старта интервью
   | { name: "board"; pool: string; session: number | null }
   | { name: "bank"; pool: string }
   | { name: "candidates" }
@@ -17,7 +17,7 @@ export function parseHash(hash: string): Route {
   const [pathPart, queryPart = ""] = raw.split("?");
   const segs = pathPart.split("/").filter(Boolean);
   const query = new URLSearchParams(queryPart);
-  if (segs.length === 0) return { name: "home" };
+  if (segs.length === 0) return { name: "home", start: query.get("start") };
   if (segs[0] === "board" && segs[1]) {
     const s = query.get("session");
     return { name: "board", pool: decodeURIComponent(segs[1]), session: s ? Number(s) : null };
@@ -26,11 +26,12 @@ export function parseHash(hash: string): Route {
   if (segs[0] === "candidates") return { name: "candidates" };
   if (segs[0] === "sessions") return { name: "sessions" };
   if (segs[0] === "connect") return { name: "connect" };
-  return { name: "home" }; // неизвестный путь → меню
+  return { name: "home", start: null }; // неизвестный путь → меню
 }
 
 export const href = {
   home: "#/",
+  start: (pool: string) => `#/?start=${encodeURIComponent(pool)}`,
   board: (pool: string, session?: number | null) =>
     `#/board/${encodeURIComponent(pool)}${session != null ? `?session=${session}` : ""}`,
   bank: (pool: string) => `#/bank/${encodeURIComponent(pool)}`,

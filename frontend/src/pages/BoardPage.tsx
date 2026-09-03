@@ -13,7 +13,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type NodeUpdate } from "../api";
 import { BandsNode } from "../components/BandsNode";
 import { BlockGroupNode } from "../components/BlockGroupNode";
+import { LangSwitch } from "../components/LangSwitch";
 import { SettingsMenu } from "../components/SettingsMenu";
+import { useT } from "../i18n";
 import { DetailDrawer } from "../components/DetailDrawer";
 import { GuidesNode } from "../components/GuidesNode";
 import { QuestionNode } from "../components/QuestionNode";
@@ -34,15 +36,11 @@ import {
   blockLabel,
   blockOrder,
   DIFF_COLOR,
-  type Candidate,
   type Difficulty,
   type ImportErr,
-  type Interviewer,
   type PoolConfig,
   type QNode,
   type Session,
-  type SessionMeta,
-  type SessionSummary,
 } from "../types";
 import { href } from "../router";
 import { notesOf, scoresOf } from "../sessionUtils";
@@ -248,6 +246,7 @@ const KIND_COLOR: Record<string, string> = { question: "#2563eb", task: "#9333ea
 const ALL_KINDS: Record<string, boolean> = { question: true, task: true };
 
 export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; sessionFromUrl: number | null }) {
+  const t = useT();
   const [graph, setGraph] = useState<QNode[]>([]);
   const [errors, setErrors] = useState<ImportErr[]>([]);
   const [placement, setPlacement] = useState<Placement | null>(null);
@@ -258,17 +257,9 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
   // hide-local: скрытые с доски вопросы (клиентски) + тумблер показа.
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(() => readHiddenIds(pool.id));
   const [showHidden, setShowHidden] = useState(false);
+  // Сессия стартует с главной (StartSessionForm) и приходит сюда по ?session=<id>;
+  // своей строки кандидата у доски больше нет.
   const [session, setSession] = useState<Session | null>(null);
-  const [candidate, setCandidate] = useState("");
-  // people-schema: кандидаты/интервьюеры как сущности БД + выбор при старте сессии.
-  const [candidates, setCandidates] = useState<Candidate[]>([]);
-  const [interviewers, setInterviewers] = useState<Interviewer[]>([]);
-  const [pickedCandidateId, setPickedCandidateId] = useState<number | null>(null);
-  const [pickedInterviewerId, setPickedInterviewerId] = useState<number | null>(null);
-  const [candPosition, setCandPosition] = useState("");
-  const [candSeniority, setCandSeniority] = useState("");
-  const [pastSessions, setPastSessions] = useState<SessionSummary[]>([]);
-  const [sessions, setSessions] = useState<SessionMeta[]>([]);
   const [live, setLive] = useState(false);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [now, setNow] = useState(() => Date.now());
@@ -427,7 +418,7 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
       try {
         await api.deleteNode(id);
       } catch {
-        alert("Не удалось удалить вопрос");
+        alert(t("Не удалось удалить вопрос"));
         return;
       }
       await loadGraph();
@@ -449,17 +440,13 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
       try {
         await api.updateNode(id, fields);
       } catch {
-        alert("Не удалось сохранить изменения");
+        alert(t("Не удалось сохранить изменения"));
         return;
       }
       await loadGraph();
     },
     [loadGraph],
   );
-
-  useEffect(() => {
-    api.listSessions(pool.id).then(setPastSessions).catch(() => setPastSessions([]));
-  }, [pool.id]);
 
   const rfNodes = useMemo(
     () =>
@@ -599,58 +586,6 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
     [pool.id],
   );
 
-  const startSession = useCallback(async () => {
-    // people-schema: либо выбран существующий кандидат (pickedCandidateId), либо вводим имя.
-    let candidateId = pickedCandidateId;
-    let name = candidate.trim();
-    if (candidateId != null) {
-      name = candidates.find((c) => c.id === candidateId)?.name ?? name;
-    }
-    if (candidateId == null && !name) return;
-    // draft-autosave: именованная сессия персистит в БД — локальный черновик больше не нужен.
-    localStorage.removeItem(`draftScores:${pool.id}`);
-    // Новое имя без выбранной карточки → завести кандидата (с опц. позицией/грейдом).
-    if (candidateId == null && name) {
-      try {
-        const created = await api.createCandidate({
-          name,
-          position: candPosition.trim() || undefined,
-          seniority: candSeniority.trim() || undefined,
-        });
-        candidateId = created.id;
-        setCandidates((cs) => [...cs, created]);
-      } catch {
-        /* при сбое создания кандидата всё равно стартуем сессию по свободному имени */
-      }
-    }
-    const s = await api.createSession(
-      pool.id,
-      name || "—",
-      candidateId ?? undefined,
-      pickedInterviewerId ?? undefined,
-    );
-    setSession(s);
-    setScores(scoresOf(s));
-    setSessionParam(s.id);
-    // Обновляем оба списка сессий (loadsess-резюме и live-пикер).
-    api.listSessions(pool.id).then((ls) => {
-      setPastSessions(ls);
-      setSessions(ls);
-    }).catch(() => void 0);
-    const t = Date.now();
-    setSessionStart(t);
-    localStorage.setItem(`timerStart:${pool.id}`, String(t));
-  }, [
-    candidate,
-    candidates,
-    pickedCandidateId,
-    pickedInterviewerId,
-    candPosition,
-    candSeniority,
-    setSessionParam,
-    pool.id,
-  ]);
-
   // Подключиться к уже существующей сессии (другой интервьюер / HR): подтянуть оценки.
   const joinSession = useCallback(
     async (id: number) => {
@@ -673,23 +608,10 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
     setSessionParam(null);
   }, [setSessionParam]);
 
-  // Список сессий для пикера + авто-подключение по ?session=<id> при загрузке.
+  // Авто-подключение по ?session=<id> при загрузке (старт с главной и «Открыть» со страницы сессий).
   useEffect(() => {
-    api.listSessions(pool.id).then(setSessions).catch(() => void 0);
     if (sessionFromUrl) joinSession(sessionFromUrl);
-  }, [joinSession, pool.id, sessionFromUrl]);
-
-  // people-schema: подтянуть кандидатов и интервьюеров; преселект дефолтного интервьюера.
-  useEffect(() => {
-    api.listCandidates().then(setCandidates).catch(() => void 0);
-    api
-      .listInterviewers()
-      .then((iv) => {
-        setInterviewers(iv);
-        setPickedInterviewerId((cur) => cur ?? (iv.length ? iv[0].id : null));
-      })
-      .catch(() => void 0);
-  }, []);
+  }, [joinSession, sessionFromUrl]);
 
   // Live-синхронизация: подписка на SSE-поток активной сессии. Входящие снимки
   // сливаются объединением, чтобы не затирать только что выставленную локальную оценку.
@@ -715,16 +637,6 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
     };
   }, [session]);
 
-  // Загрузить прошлую сессию: восстановить оценки на доске.
-  const loadSession = useCallback(async (id: number) => {
-    if (!id) return;
-    const s = await api.getSession(id);
-    setSession(s);
-    setScores(scoresOf(s));
-    setNotes(notesOf(s));
-    setSessionParam(id);
-  }, [setSessionParam]);
-
   const toggleBlock = (b: string) => setActiveBlocks((s) => ({ ...s, [b]: !s[b] }));
   const toggleDiff = (d: Difficulty) => setActiveDiffs((s) => ({ ...s, [d]: !s[d] }));
   const toggleTag = (t: string) => setActiveTags((s) => ({ ...s, [t]: !s[t] }));
@@ -733,16 +645,26 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
 
   const scored = Object.keys(scores).length;
   const avg = scored > 0 ? (Object.values(scores).reduce((a, b) => a + b, 0) / scored).toFixed(1) : "—";
-  // people-schema: интервьюер + позиция/грейд кандидата для шапки отчёта.
-  const reportPeople = useMemo(() => {
-    const iv = interviewers.find((i) => i.id === session?.interviewer_id) ?? interviewers.find((i) => i.id === pickedInterviewerId);
-    const cand = candidates.find((c) => c.id === (session?.candidate_id ?? pickedCandidateId));
-    return {
-      interviewer: iv?.name ?? null,
-      position: cand?.position ?? null,
-      seniority: cand?.seniority ?? null,
+  // Позиция/грейд кандидата и имя интервьюера — для шапки отчёта; грузим по факту сессии.
+  const [reportPeople, setReportPeople] = useState<{ interviewer: string | null; position: string | null; seniority: string | null }>(
+    { interviewer: null, position: null, seniority: null },
+  );
+  useEffect(() => {
+    if (!session) {
+      setReportPeople({ interviewer: null, position: null, seniority: null });
+      return;
+    }
+    let alive = true; // ответ по уже сменившейся сессии не должен перетереть актуальный
+    Promise.all([api.listCandidates().catch(() => []), api.listInterviewers().catch(() => [])]).then(([cs, ivs]) => {
+      if (!alive) return;
+      const cand = cs.find((c) => c.id === session.candidate_id);
+      const iv = ivs.find((i) => i.id === session.interviewer_id);
+      setReportPeople({ interviewer: iv?.name ?? null, position: cand?.position ?? null, seniority: cand?.seniority ?? null });
+    });
+    return () => {
+      alive = false;
     };
-  }, [interviewers, candidates, session, pickedInterviewerId, pickedCandidateId]);
+  }, [session]);
   const progress = useMemo(() => {
     const out: Record<string, { done: number; total: number }> = {};
     for (const b of blockOrder(pool)) out[b] = { done: 0, total: 0 };
@@ -785,24 +707,25 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
       <header className="topbar">
         {/* ряд 1 — где мы: назад в меню, направление, прогресс, настройки */}
         <div className="topbar__row topbar__row--flow">
-          <a className="topbar__back" href={href.home} title="Главное меню">← Меню</a>
+          <a className="topbar__back" href={href.home} title={t("Главное меню")}>{t("← Меню")}</a>
           <h1 className="appname">{pool.label}</h1>
-          <span className="muted">{graph.length} вопросов</span>
-          <div className="progress" title="Оценено по текущему набору фильтров">
+          <span className="muted">{t("{n} вопросов", { n: graph.length })}</span>
+          <div className="progress" title={t("Оценено по текущему набору фильтров")}>
             <div className="progress__track">
               <div className="progress__fill" style={{ width: `${coverage.pct}%` }} />
             </div>
             <span className="progress__label">
-              оценено {coverage.done} / {coverage.total} ({coverage.pct}%)
+              {t("оценено {done} / {total} ({pct}%)", { done: coverage.done, total: coverage.total, pct: coverage.pct })}
             </span>
           </div>
+          <LangSwitch />
           <div className="settings topbar__settings">
             <button
               className={`iconbtn setbtn btn--quiet ${settingsOpen ? "setbtn--on" : ""}`}
               onClick={() => setSettingsOpen((v) => !v)}
               aria-expanded={settingsOpen}
               aria-haspopup="dialog"
-              title="Настройки"
+              title={t("Настройки")}
             >
               ⚙
             </button>
@@ -842,131 +765,40 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
             <>
               <span className="session__active">
                 👤 {session.candidate}
-                {(() => {
-                  const iv = interviewers.find((i) => i.id === session.interviewer_id);
-                  return iv ? ` · 🎤 ${iv.name}` : "";
-                })()}
-                {" · "}оценено {scored} · средн. {avg}
+                {" · "}{t("оценено {scored} · средн. {avg}", { scored, avg })}
               </span>
               <span
                 className={`livedot ${live ? "livedot--on" : ""}`}
-                title={live ? "Live: изменения синхронизируются с HR" : "Подключение к live…"}
+                title={live ? t("Live: изменения синхронизируются с HR") : t("Подключение к live…")}
               >
                 ● {live ? "LIVE" : "…"}
               </span>
-              <button className="iconbtn" onClick={leaveSession} title="Выйти из сессии">
-                Выйти
+              <button className="iconbtn" onClick={leaveSession} title={t("Выйти из сессии")}>
+                {t("Выйти")}
               </button>
             </>
           ) : (
             <>
-              {candidates.length > 0 && (
-                <select
-                  className="cand-pick"
-                  value={pickedCandidateId ?? ""}
-                  onChange={(e) => {
-                    const v = e.target.value ? Number(e.target.value) : null;
-                    setPickedCandidateId(v);
-                    if (v != null) setCandidate("");
-                  }}
-                  title="Выбрать существующего кандидата"
-                >
-                  <option value="">Новый кандидат…</option>
-                  {candidates.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                      {c.seniority ? ` · ${c.seniority}` : ""}
-                    </option>
-                  ))}
-                </select>
-              )}
-              {pickedCandidateId == null && (
-                <>
-                  <input
-                    placeholder="Кандидат…"
-                    value={candidate}
-                    onChange={(e) => setCandidate(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && startSession()}
-                  />
-                  <input
-                    className="cand-pos"
-                    placeholder="Позиция (опц.)"
-                    value={candPosition}
-                    onChange={(e) => setCandPosition(e.target.value)}
-                  />
-                  <input
-                    className="cand-sen"
-                    placeholder="Грейд (опц.)"
-                    value={candSeniority}
-                    onChange={(e) => setCandSeniority(e.target.value)}
-                  />
-                </>
-              )}
-              {interviewers.length > 0 && (
-                <select
-                  className="iv-pick"
-                  value={pickedInterviewerId ?? ""}
-                  onChange={(e) =>
-                    setPickedInterviewerId(e.target.value ? Number(e.target.value) : null)
-                  }
-                  title="Кто проводит интервью"
-                >
-                  {interviewers.map((iv) => (
-                    <option key={iv.id} value={iv.id}>
-                      {iv.name}
-                    </option>
-                  ))}
-                </select>
-              )}
-              <button className="btn--primary" onClick={startSession}>Начать сессию</button>
-              {pastSessions.length > 0 && (
-                <select
-                  className="loadsess"
-                  value=""
-                  onChange={(e) => e.target.value && loadSession(Number(e.target.value))}
-                  title="Загрузить прошлую сессию (восстановить оценки)"
-                >
-                  <option value="">Загрузить сессию…</option>
-                  {pastSessions.map((ps) => (
-                    <option key={ps.id} value={ps.id}>
-                      {ps.candidate} · {ps.created_at.slice(0, 16).replace("T", " ")}
-                    </option>
-                  ))}
-                </select>
-              )}
-              {sessions.length > 0 && (
-                <select
-                  className="session__pick"
-                  value=""
-                  onChange={(e) => e.target.value && joinSession(Number(e.target.value))}
-                  title="Подключиться к существующей сессии (live)"
-                >
-                  <option value="">Подключиться…</option>
-                  {sessions.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.candidate} · {s.created_at.slice(0, 10)}
-                    </option>
-                  ))}
-                </select>
-              )}
+              <span className="session__none muted">{t("Просмотр без сессии")}</span>
+              <a className="session__start" href={href.start(pool.id)}>{t("Начать интервью →")}</a>
             </>
           )}
           <span className="session__sep" aria-hidden="true" />
           <button
             className="iconbtn dlbtn"
-            onClick={() => downloadReport(session?.candidate ?? candidate, graph, scores, pool, notes, reportPeople)}
+            onClick={() => downloadReport(session?.candidate ?? "", graph, scores, pool, notes, reportPeople)}
             disabled={scored === 0}
-            title={scored === 0 ? "Сначала выставьте оценки" : "Скачать результаты (HTML)"}
+            title={scored === 0 ? t("Сначала выставьте оценки") : t("Скачать результаты (HTML)")}
           >
-            Скачать
+            {t("Скачать")}
           </button>
           {graph.length > 0 && scored === graph.length && (
             <button
               className="cta-done"
-              onClick={() => downloadReport(session?.candidate ?? candidate, graph, scores, pool, notes, reportPeople)}
-              title="Все вопросы оценены — скачать итоговый отчёт"
+              onClick={() => downloadReport(session?.candidate ?? "", graph, scores, pool, notes, reportPeople)}
+              title={t("Все вопросы оценены — скачать итоговый отчёт")}
             >
-              Завершить · Скачать отчёт
+              {t("Завершить · Скачать отчёт")}
             </button>
           )}
         </div>
@@ -975,7 +807,7 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
 
       {errors.length > 0 && (
         <div className="errbar">
-          ⚠ Ошибки импорта ({errors.length}):{" "}
+          {t("⚠ Ошибки импорта ({n}):", { n: errors.length })}{" "}
           {errors.map((e, i) => (
             <span key={i} className="erritem">
               {e.file}: {e.error}
@@ -987,7 +819,7 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
       <div className="main">
         {agendaOpen && placement && (
           <aside className="interview">
-            <h4>Агенда · {agendaRows.filter((r) => r.kind === "item").length}</h4>
+            <h4>{t("Агенда")} · {agendaRows.filter((r) => r.kind === "item").length}</h4>
             {agendaRows.map((r, i) =>
               r.kind === "head" ? (
                 <div key={`h-${r.block}-${i}`} className="iv-block" style={{ color: blockColor(pool, r.block) }}>
@@ -1014,7 +846,7 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
         )}
         <div className="canvas">
           {rfNodes.length === 0 ? (
-            <div className="loading">Загрузка графа…</div>
+            <div className="loading">{t("Загрузка графа…")}</div>
           ) : (
             <ReactFlow
               nodes={rfNodes}
@@ -1050,31 +882,31 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
                 <div
                   className={`filterpanel ${filtersOpen ? "" : "filterpanel--closed"}`}
                   role="region"
-                  aria-label="Фильтры вопросов"
+                  aria-label={t("Фильтры вопросов")}
                 >
                   <div className="fp__bar">
                     <button
                       className="fp__toggle"
                       onClick={() => setFiltersOpen((v) => !v)}
                       aria-expanded={filtersOpen}
-                      title={filtersOpen ? "Свернуть фильтры" : "Развернуть фильтры"}
+                      title={filtersOpen ? t("Свернуть фильтры") : t("Развернуть фильтры")}
                     >
-                      Фильтры
+                      {t("Фильтры")}
                       <span className="fp__chevron">{filtersOpen ? "▸" : "◂"}</span>
                     </button>
-                    {!filtersOpen && anyFilterOn && <span className="fp__badge" title="Фильтры активны" />}
+                    {!filtersOpen && anyFilterOn && <span className="fp__badge" title={t("Фильтры активны")} />}
                   </div>
                   {filtersOpen && (
                   <>
                   <input
                     className="fp__search"
-                    placeholder="Поиск по вопросам…"
-                    aria-label="Поиск по вопросам"
+                    placeholder={t("Поиск по вопросам…")}
+                    aria-label={t("Поиск по вопросам")}
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                   />
                   <div className="fp__group">
-                    <h2 className="fp__title">Блоки</h2>
+                    <h2 className="fp__title">{t("Блоки")}</h2>
                     {blockOrder(pool).map((b) => (
                       <button
                         key={b}
@@ -1091,7 +923,7 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
                     ))}
                   </div>
                   <div className="fp__group">
-                    <h2 className="fp__title">Сложность</h2>
+                    <h2 className="fp__title">{t("Сложность")}</h2>
                     {DIFFS.map((d) => (
                       <button
                         key={d}
@@ -1108,7 +940,7 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
                     ))}
                   </div>
                   <div className="fp__group">
-                    <h2 className="fp__title">Тип</h2>
+                    <h2 className="fp__title">{t("Тип")}</h2>
                     {KINDS.map((k) => (
                       <button
                         key={k}
@@ -1120,12 +952,12 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
                         }}
                         onClick={() => toggleKind(k)}
                       >
-                        {KIND_LABEL[k]}
+                        {t(KIND_LABEL[k])}
                       </button>
                     ))}
                   </div>
                   <div className="fp__group">
-                    <h2 className="fp__title">Прогресс</h2>
+                    <h2 className="fp__title">{t("Прогресс")}</h2>
                     <button
                       className={`fp__chip ${unscoredOnly ? "" : "fp__chip--off"}`}
                       style={{
@@ -1135,7 +967,7 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
                       }}
                       onClick={() => setUnscoredOnly((v) => !v)}
                     >
-                      Только неоценённые
+                      {t("Только неоценённые")}
                     </button>
                   </div>
                   <div className="fp__group fp__group--tags">
@@ -1143,13 +975,13 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
                       <button
                         className="fp__collapse"
                         onClick={() => setTagsCollapsed((v) => !v)}
-                        title={tagsCollapsed ? "Развернуть теги" : "Свернуть теги"}
+                        title={tagsCollapsed ? t("Развернуть теги") : t("Свернуть теги")}
                       >
-                        {tagsCollapsed ? "▸" : "▾"} Теги
+                        {tagsCollapsed ? "▸" : "▾"} {t("Теги")}
                       </button>
                       {anyTagActive && (
                         <button className="fp__clear" onClick={clearTags}>
-                          сбросить
+                          {t("сбросить")}
                         </button>
                       )}
                     </div>
@@ -1179,7 +1011,7 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
                       {currentNode.title || currentNode.question}
                     </span>
                     {showTimer && (
-                      <span className="hud__timer" title="Время на вопрос · вся сессия">
+                      <span className="hud__timer" title={t("Время на вопрос · вся сессия")}>
                         ⏱ {mmss(now - questionStart)}
                         {sessionStart != null && ` · ${mmss(now - sessionStart)}`}
                       </span>
@@ -1202,11 +1034,11 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
                         </button>
                       ))}
                     </span>
-                    <button onClick={() => setSelectedId(currentId)}>Открыть</button>
+                    <button onClick={() => setSelectedId(currentId)}>{t("Открыть")}</button>
                     <button className="btn--primary" onClick={nextQuestion}>
-                      Дальше →
+                      {t("Дальше →")}
                     </button>
-                    <button className="hud__cancel" onClick={() => setCurrentId(null)} title="Снять выбор (Esc)">
+                    <button className="hud__cancel" onClick={() => setCurrentId(null)} title={t("Снять выбор (Esc)")}>
                       ✕
                     </button>
                   </div>

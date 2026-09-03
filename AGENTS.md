@@ -41,7 +41,10 @@ Dev (hot reload): `uvicorn app.main:app --reload --port 8000` (из `backend/`, 
 
 ## API (FastAPI)
 Граф/контент: `GET /api/graph` (ноды + ошибки импорта), `GET /api/pools`, `GET /api/graph?pool=`,
-`POST /api/import`, `POST/PUT/DELETE /api/nodes`. Интервью/сессии: `POST /api/interview`,
+`POST /api/import`, `POST/PUT/DELETE /api/nodes`. Направления: `POST /api/pools` (из пресета —
+существующего направления: копируются колонки и вопросы, id — транслитерация названия),
+`PUT /api/pools/{id}` (название/описание), `DELETE /api/pools/{id}` (вопросы удаляются, сессии
+остаются, id остаётся занятым tombstone'ом). Интервью/сессии: `POST /api/interview`,
 `POST /api/sessions`, `GET /api/sessions`, `GET /api/sessions/{id}`, `POST /api/sessions/{id}/score`,
 `GET /api/sessions/{id}/events` (SSE). Люди: `GET/POST/PUT /api/candidates`,
 `GET/POST /api/interviewers`. Служебное: `GET /api/health`. Полные схемы — Swagger UI на `/docs`.
@@ -49,14 +52,16 @@ Dev (hot reload): `uvicorn app.main:app --reload --port 8000` (из `backend/`, 
 ## Модель ноды и формат контента
 Frontmatter (ключи алфавитные, `tags` — block-style): `id`, `kind` (question|task), `block`
 (значения — блоки из `content/<pool>/pool.yaml` того пула; data-engineer: frameworks|databases|python|platform,
-system-analyst: requirements|modeling|data|integration), `subblock`, `topic`, `title` (короткий заголовок карточки),
+system-analyst: requirements|modeling|data|integration, data-engineer-x5: python|sql|spark|airflow|clickhouse|ai),
+`subblock`, `topic`, `title` (короткий заголовок карточки),
 `difficulty` (base|junior|middle|senior), `weight`, `tags` (1–3), для `task` — `starterCode`, `rubric`.
 Тело: `## Вопрос` / `## Ответ` (для задач — `## Задача` / `## Эталон`). Не начинай строки тела с `#`
 вне блоков кода (это маркеры разбиения). Полный текст — в drawer; на карточке только `title` + теги.
 
 **Под-колонки** внутри блока задаются полем `subblock`, порядок и подписи — в `subblocks` соответствующего
 блока в `content/<pool>/pool.yaml`: data-engineer → frameworks: `airflow|pyspark|dbt|streaming`,
-databases: `sql|dbms|storage|formats`; system-analyst — свои под-колонки по блокам, см. `pool.yaml`.
+databases: `sql|dbms|storage|formats`; data-engineer-x5 → sql: `queries|indexes`; system-analyst — свои
+под-колонки по блокам, см. `pool.yaml`.
 
 ## Конвенции и грабли (ВАЖНО)
 - **Ground truth — через `cat`/`grep`/`/api/graph`, НЕ через Read-инструмент**: контент-файлы
@@ -74,7 +79,7 @@ databases: `sql|dbms|storage|formats`; system-analyst — свои под-кол
 
 ## Проверка изменений
 Используй скилл **interview-verify** (или вручную): import 0 ошибок (`/api/graph`) → `pytest` →
-при правке фронта `npm run build` + `npm run smoke` (нужен сервер :8000) → (пере)запуск uvicorn.
+при правке фронта `npm run build` + `npm run i18n:check` (ключи `t("…")` есть в `src/i18n/en.ts`) + `npm run smoke` (нужен сервер :8000) → (пере)запуск uvicorn.
 При переименовании нод/тегов/классов, на которые опирается smoke — обнови `frontend/smoke.mjs`.
 
 ## Скиллы проекта (`.claude/skills/`)

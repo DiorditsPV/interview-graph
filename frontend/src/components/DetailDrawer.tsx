@@ -4,6 +4,7 @@ import rehypeHighlight from "rehype-highlight";
 import remarkGfm from "remark-gfm";
 import { blockColor, blockLabel, type Difficulty, type PoolConfig, type QNode } from "../types";
 import type { NodeUpdate } from "../api";
+import { useT } from "../i18n";
 
 interface Props {
   node: QNode | null;
@@ -25,6 +26,7 @@ const DIFF_OPTS: Difficulty[] = ["base", "junior", "middle", "senior"];
 
 // Немодальный drawer: полный текст вопроса/ответа. Закрывается с клавиатуры (Esc).
 export function DetailDrawer({ node, pool, score, note, fullscreen, hidden, onToggleHide, onScore, onNote, onDelete, onUpdate, onToggleFullscreen, onClose }: Props) {
+  const t = useT();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<{ title: string; difficulty: Difficulty; question: string; answer: string }>(
     { title: "", difficulty: "middle", question: "", answer: "" },
@@ -65,7 +67,7 @@ export function DetailDrawer({ node, pool, score, note, fullscreen, hidden, onTo
     <aside
       className={`drawer ${fullscreen ? "drawer--full" : ""}`}
       role="dialog"
-      aria-label="Детали вопроса"
+      aria-label={t("Детали вопроса")}
       aria-modal="false"
       tabIndex={-1}
     >
@@ -74,36 +76,36 @@ export function DetailDrawer({ node, pool, score, note, fullscreen, hidden, onTo
           {blockLabel(pool, node.block)} · {node.topic}
         </span>
         <span className="drawer__diff" data-diff={node.difficulty}>
-          {node.kind === "task" ? "🛠 задача" : "❓ вопрос"} · {node.difficulty}
+          {node.kind === "task" ? t("🛠 задача") : t("❓ вопрос")} · {node.difficulty}
         </span>
         <div className="drawer__actions">
           <button
             className="drawer__hide"
             onClick={() => onToggleHide(node.id)}
-            title={hidden ? "Вернуть на доску" : "Скрыть с доски (локально, обратимо)"}
+            title={hidden ? t("Вернуть на доску") : t("Скрыть с доски (локально, обратимо)")}
           >
-            {hidden ? "Вернуть" : "Скрыть"}
+            {hidden ? t("Вернуть") : t("Скрыть")}
           </button>
           <button
             className="drawer__delete"
             onClick={() => {
-              if (window.confirm(`Удалить вопрос «${node.title || node.id}» из банка безвозвратно?`)) {
+              if (window.confirm(t("Удалить вопрос «{name}» из банка безвозвратно?", { name: node.title || node.id }))) {
                 onDelete(node.id);
               }
             }}
-            title="Удалить вопрос из банка (необратимо)"
+            title={t("Удалить вопрос из банка (необратимо)")}
           >
-            Удалить
+            {t("Удалить")}
           </button>
           {!editing && (
-            <button className="drawer__edit" onClick={startEdit} title="Редактировать вопрос (в банке)">
-              Редактировать
+            <button className="drawer__edit" onClick={startEdit} title={t("Редактировать вопрос (в банке)")}>
+              {t("Редактировать")}
             </button>
           )}
-          <button onClick={onToggleFullscreen} title="Развернуть/свернуть">
-            {fullscreen ? "Свернуть" : "На весь экран"}
+          <button onClick={onToggleFullscreen} title={t("Развернуть/свернуть")}>
+            {fullscreen ? t("Свернуть") : t("На весь экран")}
           </button>
-          <button onClick={onClose} title="Закрыть (Esc)">
+          <button onClick={onClose} title={t("Закрыть (Esc)")}>
             ✕
           </button>
         </div>
@@ -113,11 +115,11 @@ export function DetailDrawer({ node, pool, score, note, fullscreen, hidden, onTo
         {editing ? (
           <div className="drawer__editform">
             <label className="drawer__field">
-              Заголовок
+              {t("Заголовок")}
               <input value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
             </label>
             <label className="drawer__field">
-              Сложность
+              {t("Сложность")}
               <select
                 value={draft.difficulty}
                 onChange={(e) => setDraft({ ...draft, difficulty: e.target.value as Difficulty })}
@@ -128,18 +130,18 @@ export function DetailDrawer({ node, pool, score, note, fullscreen, hidden, onTo
               </select>
             </label>
             <label className="drawer__field">
-              {node.kind === "task" ? "Задача" : "Вопрос"}
+              {node.kind === "task" ? t("Задача") : t("Вопрос")}
               <textarea rows={4} value={draft.question} onChange={(e) => setDraft({ ...draft, question: e.target.value })} />
             </label>
             <label className="drawer__field">
-              {node.kind === "task" ? "Эталон / решение" : "Ответ"}
+              {node.kind === "task" ? t("Эталон / решение") : t("Ответ")}
               <textarea rows={8} value={draft.answer} onChange={(e) => setDraft({ ...draft, answer: e.target.value })} />
             </label>
             <div className="drawer__editbtns">
               <button className="btn--primary" onClick={saveEdit} disabled={!draft.question.trim()}>
-                💾 Сохранить
+                {t("💾 Сохранить")}
               </button>
-              <button onClick={() => setEditing(false)}>Отмена</button>
+              <button onClick={() => setEditing(false)}>{t("Отмена")}</button>
             </div>
           </div>
         ) : (
@@ -157,7 +159,7 @@ export function DetailDrawer({ node, pool, score, note, fullscreen, hidden, onTo
         )}
 
         <section>
-          <h2>{node.kind === "task" ? "Задача" : "Вопрос"}</h2>
+          <h2>{node.kind === "task" ? t("Задача") : t("Вопрос")}</h2>
           <div className="md">
             <Markdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
               {node.question}
@@ -167,7 +169,7 @@ export function DetailDrawer({ node, pool, score, note, fullscreen, hidden, onTo
 
         {node.starterCode && (
           <section>
-            <h3>Стартовый код</h3>
+            <h3>{t("Стартовый код")}</h3>
             <div className="md">
               <Markdown rehypePlugins={[rehypeHighlight]}>
                 {"```python\n" + node.starterCode + "\n```"}
@@ -177,7 +179,7 @@ export function DetailDrawer({ node, pool, score, note, fullscreen, hidden, onTo
         )}
 
         <section>
-          <h2>{node.kind === "task" ? "Эталон / решение" : "Ответ"}</h2>
+          <h2>{node.kind === "task" ? t("Эталон / решение") : t("Ответ")}</h2>
           <div className="md">
             <Markdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
               {node.answer}
@@ -187,7 +189,7 @@ export function DetailDrawer({ node, pool, score, note, fullscreen, hidden, onTo
 
         {node.rubric.length > 0 && (
           <section>
-            <h3>Критерии оценки</h3>
+            <h3>{t("Критерии оценки")}</h3>
             <ul className="rubric">
               {node.rubric.map((r, i) => (
                 <li key={i}>{r}</li>
@@ -197,14 +199,14 @@ export function DetailDrawer({ node, pool, score, note, fullscreen, hidden, onTo
         )}
 
         <section className="drawer__scoring">
-          <h3>Оценка</h3>
+          <h3>{t("Оценка")}</h3>
           <div className="scorebar">
             {[1, 2, 3, 4, 5].map((i) => (
               <button
                 key={i}
                 className={score != null && i <= score ? "scorebtn scorebtn--on" : "scorebtn"}
                 onClick={() => onScore(node.id, i)}
-                aria-label={`Оценка ${i}`}
+                aria-label={t("Оценка {n}", { n: i })}
               >
                 ●
               </button>
@@ -213,7 +215,7 @@ export function DetailDrawer({ node, pool, score, note, fullscreen, hidden, onTo
           </div>
           <textarea
             className="drawer__note"
-            placeholder="Заметка интервьюера…"
+            placeholder={t("Заметка интервьюера…")}
             value={note ?? ""}
             onChange={(e) => onNote(node.id, e.target.value)}
           />

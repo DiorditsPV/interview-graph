@@ -7,22 +7,33 @@
 
 from __future__ import annotations
 
+import json
 from typing import Tuple
 
 from .auth import hash_password
 from .db import Database
 from .importer import load_pool_content
-from .pools import PoolCfg
+from .pools import PoolCfg, blocks_to_json
 
 
 def seed_pool_if_empty(db: Database, tenant_id: str, pool: PoolCfg) -> Tuple[int, list]:
-    """Если у тенанта нет нод этого пула — залить их из каталога пула.
+    """Сид направления: конфиг (pool.yaml → таблица pools) и, если нод пула нет, его ноды.
 
-    Проверка по count_nodes(tenant, pool): полный пул не трогается, пустой — засеивается.
+    Конфиг — INSERT OR IGNORE: правки названия/описания из UI и tombstone удалённого
+    направления переживают рестарт; удалённое направление не воскрешается и не пересеивается.
+    Ноды — по count_nodes(tenant, pool): полный пул не трогается, пустой — засеивается.
     Так после миграции старой БД (все ноды → 'data-engineer') DE не пересеивается,
     а новый пул засеивается при первом старте. Возвращает (вставлено, ошибки импорта).
     """
     db.ensure_tenant(tenant_id)
+    db.upsert_pool_seed(
+        tenant_id,
+        {"id": pool.id, "label": pool.label, "description": pool.description,
+         "blocks": json.loads(blocks_to_json(pool.blocks))},
+    )
+    existing = db.get_pool(tenant_id, pool.id)
+    if existing is not None and existing["deleted_at"] is not None:
+        return 0, []
     if db.count_nodes(tenant_id, pool=pool.id) > 0:
         return 0, []
     nodes, errors = load_pool_content(pool)

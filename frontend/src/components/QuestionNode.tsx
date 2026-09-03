@@ -1,6 +1,7 @@
 import { type NodeProps } from "@xyflow/react";
 import { memo } from "react";
 import { type QNode } from "../types";
+import { useT } from "../i18n";
 
 export interface QuestionNodeData {
   node: QNode;
@@ -15,6 +16,7 @@ export interface QuestionNodeData {
 // Компактная карточка: короткий заголовок (title) вместо полного текста вопроса —
 // полный текст/код живёт в drawer. Теги показываем чипами.
 function QuestionNodeImpl({ data, selected }: NodeProps) {
+  const t = useT();
   const { node, color, score, current, dimmed, hidden } = data as QuestionNodeData;
   const isTask = node.kind === "task";
   const heading = node.title || node.question;
@@ -34,8 +36,8 @@ function QuestionNodeImpl({ data, selected }: NodeProps) {
     >
       <div className="qnode__head">
         <span className={`qnode__kind ${isTask ? "qnode__kind--task" : ""}`}>
-          {hidden ? "скрыт · " : ""}
-          {isTask ? "задача" : "вопрос"}
+          {hidden ? t("скрыт · ") : ""}
+          {isTask ? t("задача") : t("вопрос")}
         </span>
         <span className="qnode__diff" data-diff={node.difficulty}>
           {node.difficulty}
