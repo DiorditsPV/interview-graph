@@ -163,3 +163,61 @@ def test_seed_does_not_resurrect_deleted_pool(tmp_path):
     assert seed_pool_if_empty(db, "default", cfg) == (0, [])
     assert db.list_pools("default") == []
     assert db.count_nodes("default", pool="system-analyst") == 0
+
+
+# --- pool-blocks-editor: правка колонок направления ---
+def test_update_pool_blocks_prunes_nodes(tmp_path):
+    db = _db(tmp_path)
+    blocks = [
+        {"id": "a", "label": "A", "color": "#111111", "weight": 1, "subblocks": [{"id": "a1", "label": "A1"}, {"id": "a2", "label": "A2"}]},
+        {"id": "b", "label": "B", "color": "#222222", "weight": 1, "subblocks": []},
+    ]
+    db.create_pool("t", "p", "P", "", blocks)
+    for nid, blk, sub in (("n1", "a", "a1"), ("n2", "a", "a2"), ("n3", "b", None)):
+        db.upsert_node("t", {"id": nid, "pool": "p", "block": blk, "subblock": sub, "topic": "x", "question": "Q?", "answer": ""})
+    # убираем колонку b и под-колонку a2: n3 удаляется, n2 остаётся без под-колонки
+    new_blocks = [{"id": "a", "label": "A!", "color": "#111111", "weight": 1, "subblocks": [{"id": "a1", "label": "A1"}]}]
+    row = db.update_pool("t", "p", {"blocks": new_blocks})
+    assert [b["id"] for b in row["blocks"]] == ["a"] and row["blocks"][0]["label"] == "A!"
+    assert db.get_node("t", "n3") is None
+    assert db.get_node("t", "n1")["subblock"] == "a1"
+    assert db.get_node("t", "n2")["subblock"] is None
+    assert db.count_nodes("t", pool="p") == 2
+
+
+def test_api_create_pool_without_preset_and_edit_blocks():
+    c = _client()
+    r = c.post("/api/pools", json={"label": "Продажник", "blocks": [
+        {"label": "Переговоры", "color": "#2563eb", "subblocks": [{"label": "Холодные звонки"}]},
+        {"label": "Продукт", "color": "#16a34a"},
+    ]})
+    assert r.status_code == 200, r.text
+    p = r.json()
+    pid = p["id"]
+    assert pid == "prodazhnik" and p["counts"]["nodes"] == 0
+    assert [b["id"] for b in p["blocks"]] == ["peregovory", "produkt"]
+    assert p["blocks"][0]["subblocks"] == [{"id": "holodnye-zvonki", "label": "Холодные звонки"}]
+    # вопрос в колонку «Продукт», затем колонку удаляем → вопрос удалён; под-колонку убираем → вопрос остаётся
+    n1 = c.post("/api/nodes", json={"pool": pid, "block": "produkt", "topic": "t", "question": "Q", "answer": "A", "tags": []}).json()["id"]
+    r = c.put(f"/api/pools/{pid}", json={"blocks": [
+        {"id": "peregovory", "label": "Переговоры", "color": "#2563eb", "subblocks": []},
+        {"label": "Возражения", "color": "#9333ea"},
+    ]})
+    assert r.status_code == 200, r.text
+    assert [b["id"] for b in r.json()["blocks"]] == ["peregovory", "vozrazheniya"]
+    assert r.json()["counts"]["nodes"] == 0
+    ids = {n["id"] for n in c.get(f"/api/graph?pool={pid}").json()["nodes"]}
+    assert n1 not in ids
+    # невалидные правки → 422, направление не тронуто
+    assert c.put(f"/api/pools/{pid}", json={"blocks": []}).status_code == 422
+    assert c.put(f"/api/pools/{pid}", json={"blocks": [{"label": "X", "color": "red"}]}).status_code == 422
+    assert c.put(f"/api/pools/{pid}", json={"blocks": [{"label": "", "color": "#000000"}]}).status_code == 422
+    assert [b["id"] for b in c.get("/api/pools").json() if b["id"] == pid] == [pid]
+    c.delete(f"/api/pools/{pid}")
+
+
+def test_api_create_pool_requires_preset_xor_blocks():
+    c = _client()
+    assert c.post("/api/pools", json={"label": "X"}).status_code == 422
+    assert c.post("/api/pools", json={"label": "X", "preset": "data-engineer", "blocks": [{"label": "A", "color": "#000000"}]}).status_code == 422
+    assert c.post("/api/pools", json={"label": "X", "blocks": []}).status_code == 422

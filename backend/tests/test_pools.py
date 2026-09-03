@@ -150,3 +150,39 @@ def test_pool_from_row_validates():
 ])
 def test_slug_from_label(label, slug):
     assert slug_from_label(label) == slug
+
+
+# --- pool-blocks-editor: колонки из UI → id/weight по правилам, затем обычная валидация ---
+from app.pools import BlockCfg, SubblockCfg, normalize_blocks
+
+
+def test_normalize_blocks_generates_ids_and_keeps_weights():
+    existing = (
+        BlockCfg(id="python", label="Python", color="#d97706", weight=30, subblocks=()),
+        BlockCfg(id="sql", label="SQL", color="#16a34a", weight=25, subblocks=(SubblockCfg("queries", "Запросы"),)),
+    )
+    raw = [
+        {"id": "sql", "label": "SQL и индексы", "color": "#16a34a", "subblocks": [
+            {"id": "queries", "label": "Запросы"}, {"label": "Индексы и планы"}]},
+        {"label": "Переговоры", "color": "#2563eb"},
+        {"label": "Переговоры", "color": "#9333ea", "subblocks": [{"label": "Холодные"}, {"label": "Холодные"}]},
+    ]
+    out = normalize_blocks(raw, existing)
+    assert [b["id"] for b in out] == ["sql", "peregovory", "peregovory-2"]
+    assert out[0]["weight"] == 25 and out[1]["weight"] == 1          # прежний вес сохраняется, новый — 1
+    assert [s["id"] for s in out[0]["subblocks"]] == ["queries", "indeksy-i-plany"]
+    assert [s["id"] for s in out[2]["subblocks"]] == ["holodnye", "holodnye-2"]
+    assert parse_blocks(out)[2].subblocks[1].id == "holodnye-2"
+
+
+def test_normalize_blocks_bad_input():
+    with pytest.raises(PoolConfigError):
+        normalize_blocks({"label": "x"}, ())
+    with pytest.raises(PoolConfigError):
+        normalize_blocks(["x"], ())
+    with pytest.raises(PoolConfigError):
+        parse_blocks(normalize_blocks([{"label": "", "color": "#000000"}], ()))   # пустое название
+    with pytest.raises(PoolConfigError):
+        parse_blocks(normalize_blocks([{"label": "A", "color": "red"}], ()))       # цвет не #rrggbb
+    with pytest.raises(PoolConfigError):
+        parse_blocks(normalize_blocks([], ()))                                       # ни одной колонки
