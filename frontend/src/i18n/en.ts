@@ -208,6 +208,13 @@ export const EN: Record<string, string> = {
   "Комментарий интервьюера": "Interviewer's comment",
   "Решение: {decision}": "Decision: {decision}",
   "Интервью завершено": "Interview finished",
+  // --- приглашение в сессию ---
+  "Ссылка для коллеги": "Link for a colleague",
+  "Интервьюер — может оценивать": "Interviewer — can score",
+  "Наблюдатель — только смотрит": "Observer — view only",
+  "Скопировать": "Copy",
+  "Другая ссылка": "Another link",
+  "Не удалось создать ссылку": "Could not create the link",
   // --- SetupPage (настройка интервью) ---
   "Настройка интервью · {pool}": "Interview setup · {pool}",
   "Разделы": "Sections",

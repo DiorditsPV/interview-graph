@@ -11,9 +11,15 @@ import { useRoute } from "./router";
 import { useT } from "./i18n";
 import type { PoolConfig } from "./types";
 
+// Гость по ссылке-приглашению: единственная доступная страница — доска его сессии.
+export interface GuestTarget {
+  pool: string;
+  session: number;
+}
+
 // Раздаёт страницы по маршруту. Список пулов грузится один раз на вход: он нужен и меню,
 // и доске (таксономия колонок), и банку. Неизвестный пул в адресе → меню с пометкой.
-export default function Router() {
+export default function Router({ guest = null }: { guest?: GuestTarget | null }) {
   const t = useT();
   const route = useRoute();
   const [pools, setPools] = useState<PoolConfig[] | null>(null);
@@ -28,6 +34,13 @@ export default function Router() {
   if (!pools) return <div className="loading">{t("Загрузка…")}</div>;
 
   const poolOf = (id: string) => pools.find((p) => p.id === id) ?? null;
+
+  // Гость: любой адрес ведёт на доску его сессии (другие страницы и сессии ему закрыты API).
+  if (guest) {
+    const pool = poolOf(guest.pool);
+    if (!pool) return <div className="loading">{t("Направления «{pool}» нет", { pool: guest.pool })}</div>;
+    return <BoardPage key={`guest-${guest.session}`} pool={pool} sessionFromUrl={guest.session} guest />;
+  }
 
   switch (route.name) {
     case "board": {
