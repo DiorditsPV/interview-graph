@@ -1,6 +1,7 @@
 import type {
   Block,
   Candidate,
+  Decision,
   Difficulty,
   GraphResponse,
   ImportResult,
@@ -113,6 +114,13 @@ export const api = {
     }).then(json<Session>),
   getSession: (sessionId: number) =>
     fetch(`${BASE}/sessions/${sessionId}`).then(json<Session>),
+  // Итог сессии: статус finished + решение и комментарий; повторный вызов правит итог.
+  finishSession: (sessionId: number, data: { decision: Decision; summary?: string }) =>
+    fetch(`${BASE}/sessions/${sessionId}/finish`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }).then(json<Session>),
   listSessions: (pool?: string) =>
     fetch(`${BASE}/sessions${pool ? `?pool=${encodeURIComponent(pool)}` : ""}`).then(json<SessionMeta[]>),
   importFile: (pool: string, filename: string, content: string) =>

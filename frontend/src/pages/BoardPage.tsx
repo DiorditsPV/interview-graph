@@ -25,6 +25,7 @@ import { api, type NodeUpdate } from "../api";
 import { BandsNode } from "../components/BandsNode";
 import { BlockGroupNode } from "../components/BlockGroupNode";
 import { LangSwitch } from "../components/LangSwitch";
+import { FinishModal, decisionLabel } from "../components/FinishModal";
 import { SettingsMenu } from "../components/SettingsMenu";
 import { nWord, useT } from "../i18n";
 import { DetailDrawer } from "../components/DetailDrawer";
@@ -313,6 +314,7 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
   const [questionStart, setQuestionStart] = useState<number>(() => Date.now());
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [finishOpen, setFinishOpen] = useState(false); // итог интервью (решение + комментарий)
   // Dropdown'ы toolbar'а: «Экспорт» и «•••».
   const [exportOpen, setExportOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -808,7 +810,18 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
   const selectedNode = selectedId ? nodeMap[selectedId] : null;
 
   const nQuestions = `${graph.length} ${nWord(graph.length, ["вопрос", "вопроса", "вопросов"], ["question", "questions"])}`;
-  const doReport = () => downloadReport(session?.candidate ?? "", graph, scores, pool, notes, reportPeople);
+  const doReport = () => downloadReport(session?.candidate ?? "", graph, scores, pool, notes, reportPeople, session);
+  // Завершение: статус finished + решение и комментарий; сессия остаётся открытой для просмотра/правки итога.
+  const finishSession = async (decision: "hire" | "no_hire" | "hold", summary: string) => {
+    if (!session) return;
+    try {
+      const s = await api.finishSession(session.id, { decision, summary });
+      setSession(s);
+      setFinishOpen(false);
+    } catch {
+      alert(t("Не удалось завершить интервью"));
+    }
+  };
 
   return (
     <div className="app">
@@ -944,15 +957,19 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
                 ● {live ? "LIVE" : "…"}
               </span>
               <div className="session__actions">
-                {graph.length > 0 && scored === graph.length && (
-                  <button
-                    className="tbbtn cta-done"
-                    onClick={doReport}
-                    title={t("Все вопросы оценены — скачать итоговый отчёт")}
-                  >
-                    {t("Завершить · Скачать отчёт")}
-                  </button>
+                {session.status === "finished" && (
+                  <span className={`session__status badge badge--${session.decision ?? "done"}`} title={session.summary ?? ""}>
+                    {t("Завершена")} · {decisionLabel(t, session.decision)}
+                  </span>
                 )}
+                {/* «Завершить» доступно всегда: итог можно подвести и по части плана; у завершённой — правка итога. */}
+                <button
+                  className={`tbbtn cta-done ${session.status !== "finished" && coverage.total > 0 && coverage.done === coverage.total ? "btn--primary" : ""}`}
+                  onClick={() => setFinishOpen(true)}
+                  title={session.status === "finished" ? t("Итог") : t("Завершить интервью")}
+                >
+                  {session.status === "finished" ? t("Итог") : t("Завершить")}
+                </button>
                 <button className="tbbtn btn--quiet session__leave" onClick={leaveSession} title={t("Выйти из сессии")}>
                   <X size={15} {...ICON} aria-hidden="true" />
                   {t("Выйти")}
@@ -962,6 +979,16 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
           </div>
         )}
       </header>
+
+      {finishOpen && session && (
+        <FinishModal
+          session={session}
+          scored={coverage.done}
+          total={coverage.total}
+          onClose={() => setFinishOpen(false)}
+          onFinish={finishSession}
+        />
+      )}
 
       {errors.length > 0 && (
         <div className="errbar">

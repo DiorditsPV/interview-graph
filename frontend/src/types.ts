@@ -121,7 +121,14 @@ export interface SessionMeta {
   interviewer_id?: number | null;
   created_at: string;
   plan_count?: number | null; // в списках вместо самого плана
+  // Итог сессии: active → finished с решением и комментарием интервьюера.
+  status?: "active" | "finished";
+  decision?: Decision | null;
+  summary?: string | null;
+  finished_at?: string | null;
 }
+
+export type Decision = "hire" | "no_hire" | "hold";
 
 export interface Session extends SessionMeta {
   plan?: SessionPlan | null;

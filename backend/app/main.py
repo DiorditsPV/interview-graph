@@ -153,6 +153,13 @@ class PlanIn(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class FinishIn(BaseModel):
+    """Итог сессии: решение и общий комментарий интервьюера."""
+
+    decision: str = Field(pattern="^(hire|no_hire|hold)$")
+    summary: str = ""
+
+
 class SessionCreate(BaseModel):
     candidate: str = Field(min_length=1)
     candidate_id: Optional[int] = Field(default=None, alias="candidateId")
@@ -692,6 +699,22 @@ async def set_score(
     if db.get_session(session_id, tenant) is None:
         raise HTTPException(status_code=404, detail="session not found")
     session = db.set_score(session_id, body.node_id, body.score, body.note, tenant_id=tenant)
+    hub.publish(session_id, session)
+    return session
+
+
+@app.post("/api/sessions/{session_id}/finish")
+async def finish_session(
+    session_id: int, body: FinishIn, request: Request, _user: dict = Depends(require_member)
+) -> dict:
+    """Завершить интервью: статус finished, решение и комментарий. Повторный вызов правит итог.
+
+    Публикуется в SSE-поток сессии — второй интервьюер видит итог без перезагрузки.
+    """
+    tenant = resolve_tenant(request)
+    session = db.finish_session(session_id, tenant, body.decision, body.summary.strip())
+    if session is None:
+        raise HTTPException(status_code=404, detail="session not found")
     hub.publish(session_id, session)
     return session
 
