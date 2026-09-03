@@ -684,37 +684,7 @@ a.iconbtn { text-decoration: none; display: inline-block; }
 /* ---- i18n: переключатель языка (в шапках главной, страниц и доски) ---- */
 .langswitch { font-size: 11px; letter-spacing: .08em; font-weight: 700; }
 /* ---- pool-crud: карточка «+ Новое направление», кнопки изменить/удалить, модалка ---- */
-.poolform { display: grid; gap: 10px; min-width: min(520px, 92vw); max-height: 85vh; overflow: auto; }
 .poolform .drawer__field input, .poolform .drawer__field select { width: 100%; box-sizing: border-box; }
-.poolform__blocks { display: grid; gap: 6px; margin-bottom: 10px; }
-.poolform__blocks-title { font-size: 12px; color: var(--text-muted); }
-
-/* ---- pool-blocks-editor: колонки направления в форме (цвет · название · под-колонки · ↑ ↓ ✕) ---- */
-.blocks-editor { display: grid; gap: 6px; }
-.blocks-editor__row { display: grid; grid-template-columns: 28px 1fr auto; gap: 8px; align-items: start; }
-/* Свотч: клик листает палитру; inline background = цвет колонки перекрывает button:hover. */
-.blocks-editor__color {
-  width: 22px; height: 22px; padding: 0; margin-top: 5px; border: 1px solid var(--border-strong); border-radius: 6px;
-}
-.blocks-editor__color:hover { filter: brightness(1.12); }
-.blocks-editor__main { display: grid; gap: 4px; min-width: 0; }
-.blocks-editor__label {
-  width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid var(--border-strong); border-radius: 6px;
-  background: var(--surface); color: var(--text); font-size: 14px; font-family: inherit;
-}
-.blocks-editor__subs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
-/* Чип под-колонки — как .poolcard__block, плюс «×»; заливка = цвет колонки (inline). */
-.blocks-editor__sub { display: inline-flex; align-items: center; gap: 2px; font-size: 11px; color: #fff; padding: 1px 3px 1px 7px; border-radius: 4px; }
-.blocks-editor__subdel { border: none; background: none; color: inherit; padding: 0 4px; font-size: 12px; line-height: 1.2; opacity: .8; }
-.blocks-editor__subdel:hover { opacity: 1; background: rgba(255, 255, 255, .25); }
-.blocks-editor__subadd {
-  width: 130px; box-sizing: border-box; padding: 2px 6px; font-size: 12px; font-family: inherit;
-  border: 1px dashed var(--border-strong); border-radius: 4px; background: transparent; color: var(--text);
-}
-.blocks-editor__subadd::placeholder { color: var(--text-faint); }
-.blocks-editor__btns { display: inline-flex; gap: 2px; margin-top: 2px; }
-.blocks-editor__btns .iconbtn { padding: 5px 7px; font-size: 13px; }
-.blocks-editor__add { justify-self: start; font-size: 13px; }
 
 /* ---- главная v2 (ТЗ 2026-09-03): сетка 3/2/1, нейтральные чипы колонок, меню •••,
    primary «Начать интервью →» + secondary «Открыть вопросы →», разделы отделены линией ---- */
@@ -779,3 +749,108 @@ a.iconbtn { text-decoration: none; display: inline-block; }
 .menucard__text { flex: 1; min-width: 0; display: grid; gap: 3px; }
 .menucard__arrow { flex: 0 0 auto; color: var(--text); }
 .menucard__text strong { font-size: 15px; }
+
+/* ---- главная: акцент направления (ТЗ 2.2) — на hover/focus тонкая рамка цветом тинта иконки, без заливок ---- */
+.poolcard--blue:hover,   .poolcard--blue:focus-within   { border-color: #2563eb; }
+.poolcard--teal:hover,   .poolcard--teal:focus-within   { border-color: #059669; }
+.poolcard--violet:hover, .poolcard--violet:focus-within { border-color: #7c3aed; }
+.poolcard--amber:hover,  .poolcard--amber:focus-within  { border-color: #d97706; }
+.poolcard--slate:hover,  .poolcard--slate:focus-within  { border-color: #64748b; }
+.poolcard__dropdown-sep { height: 1px; margin: 4px 6px; background: var(--border); }
+
+/* ---- мастер направления (ТЗ 4, 8): шаги → тело со скроллом → футер с кнопками.
+   Карточка не шире 92vw — на 390px без горизонтального скролла, вертикальный внутри тела. ---- */
+.poolform {
+  display: flex; flex-direction: column; width: 600px; max-width: min(92vw, 100%); max-height: 88vh; overflow: hidden;
+}
+.poolform .drawer__field input, .poolform .drawer__field select { width: 100%; box-sizing: border-box; }
+.poolform h3 { margin-bottom: 10px; overflow-wrap: anywhere; }
+.wizard__steps { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: 0 0 14px; padding: 0; list-style: none; }
+.wizard__step { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-faint); }
+.wizard__step + .wizard__step::before { content: ""; width: 16px; height: 1px; margin-right: 2px; background: var(--border-strong); }
+.wizard__step-n {
+  width: 20px; height: 20px; display: grid; place-items: center; border-radius: 999px; font-size: 11px; font-weight: 700;
+  border: 1px solid var(--border-strong); color: var(--text-muted);
+}
+.wizard__step--on { color: var(--heading); font-weight: 600; }
+.wizard__step--on .wizard__step-n { background: var(--accent); border-color: var(--accent); color: #fff; }
+.wizard__step--done { color: var(--text-muted); }
+.wizard__step--done .wizard__step-n { color: var(--accent); border-color: var(--accent); }
+.wizard__body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 2px; margin: 0 -2px; }
+.wizard__hint { display: block; margin-top: 4px; font-size: 12px; line-height: 1.45; color: var(--text-faint); }
+.wizard__hint--top { margin: 0 0 10px; }
+.wizard__foot { display: flex; justify-content: space-between; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.wizard__foot .btn--primary { padding: 7px 16px; }
+/* Предпросмотр: цветная точка + название раздела капителью, под ним подкатегории через « | ». */
+.wizard__preview { display: grid; gap: 10px; }
+.wizard__preview-row { display: grid; grid-template-columns: 10px 1fr; gap: 10px; align-items: start; }
+.wizard__preview-dot { width: 10px; height: 10px; margin-top: 4px; border-radius: 999px; }
+.wizard__preview-text { min-width: 0; display: grid; gap: 2px; }
+.wizard__preview-title { font-size: 12px; font-weight: 700; letter-spacing: .06em; color: var(--heading); overflow-wrap: anywhere; }
+.wizard__preview-subs { font-size: 13px; color: var(--text); overflow-wrap: anywhere; }
+.wizard__preview-sep { color: var(--text-faint); }
+.wizard__summary { margin-top: 4px; padding-top: 10px; border-top: 1px dashed var(--border); font-size: 13px; color: var(--text-muted); overflow-wrap: anywhere; }
+.wizard__summary strong { color: var(--heading); }
+
+/* ---- структурный редактор направления (ТЗ 5–7): раздел = ⠿ · точка (палитра) · название · •••,
+   под ним подкатегории (⠿ · название · ×). Порядок — drag & drop, стрелки только в меню •••. ---- */
+.struct { display: grid; gap: 8px; }
+.struct__section { position: relative; padding: 6px 8px 6px 4px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+.struct__section--dragging { opacity: .45; }
+/* Место вставки: линия над целью (тащим снизу вверх) или под ней (сверху вниз). */
+.struct__section--over { box-shadow: 0 -2px 0 0 var(--accent), 0 -1px 0 0 var(--accent); }
+.struct__section--over-after { box-shadow: 0 2px 0 0 var(--accent), 0 1px 0 0 var(--accent); }
+.struct__head { display: flex; align-items: center; gap: 4px; }
+.struct__grip, .struct__subgrip {
+  display: inline-flex; flex: 0 0 auto; padding: 3px 1px; border-radius: 4px; color: var(--text-faint); cursor: grab; touch-action: none; user-select: none;
+}
+.struct__grip:hover, .struct__subgrip:hover { color: var(--text-muted); background: var(--hover); }
+.struct__grip:active, .struct__subgrip:active { cursor: grabbing; }
+.struct__dotwrap, .struct__menuwrap { position: relative; display: inline-flex; flex: 0 0 auto; }
+.struct__dot { width: 20px; height: 20px; padding: 0; margin: 0 4px; border: 2px solid var(--surface); border-radius: 999px; box-shadow: 0 0 0 1px var(--border-strong); }
+.struct__dot:hover, .struct__dot[aria-expanded="true"] { box-shadow: 0 0 0 2px var(--text-muted); }
+.struct__palette {
+  position: absolute; top: 26px; left: 0; z-index: 4; display: grid; grid-template-columns: repeat(4, 24px); gap: 6px; padding: 8px;
+  background: var(--surface); border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: 0 6px 16px var(--shadow-strong);
+}
+.struct__swatch { width: 24px; height: 24px; padding: 0; display: grid; place-items: center; border: 2px solid transparent; border-radius: 999px; color: #fff; }
+.struct__swatch:hover { filter: brightness(1.1); }
+.struct__swatch[aria-pressed="true"] { border-color: var(--surface); box-shadow: 0 0 0 2px var(--heading); }
+/* Название — inline-поле: рамка проявляется на hover/focus, в покое читается как заголовок. */
+.struct__name, .struct__subname {
+  flex: 1 1 auto; min-width: 0; padding: 5px 8px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--text); font-family: inherit;
+}
+.struct__name { font-size: 14px; font-weight: 700; color: var(--heading); }
+.struct__subname { font-size: 13px; padding: 4px 8px; }
+.struct__name:hover, .struct__subname:hover { border-color: var(--border); }
+.struct__name:focus, .struct__subname:focus { outline: none; border-color: var(--accent); background: var(--surface); }
+.struct__name::placeholder, .struct__subname::placeholder { color: var(--text-faint); font-weight: 400; }
+.struct__menu { display: inline-flex; padding: 3px 5px; border-color: transparent; background: transparent; color: var(--text-muted); }
+.struct__menu:hover, .struct__menu[aria-expanded="true"] { background: var(--hover); border-color: var(--border); color: var(--text); }
+.struct__dropdown {
+  position: absolute; top: 30px; right: 0; z-index: 4; display: grid; min-width: 170px; padding: 4px;
+  background: var(--surface); border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: 0 6px 16px var(--shadow-strong);
+}
+.struct__dropdown button { text-align: left; border: 0; background: transparent; padding: 7px 10px; border-radius: 6px; font-size: 13px; }
+.struct__dropdown button:hover:not(:disabled) { background: var(--hover); }
+.struct__dropdown-sep { height: 1px; margin: 4px 6px; background: var(--border); }
+.struct__del { color: #b91c1c; } /* destructive: отличается цветом, как «Удалить» в меню карточки */
+.struct__del:hover:not(:disabled) { background: rgba(185, 28, 28, .08); }
+.struct__subs { display: grid; gap: 1px; margin: 2px 0 0 26px; }
+.struct__sub { display: flex; align-items: center; gap: 2px; border-radius: 6px; }
+.struct__sub--dragging { opacity: .45; }
+.struct__sub--over { box-shadow: 0 -2px 0 0 var(--accent); }
+.struct__sub--over-after { box-shadow: 0 2px 0 0 var(--accent); }
+/* «×» подкатегории проявляется на hover/focus ряда, кликабелен всегда; на узком экране — виден. */
+.struct__subdel { padding: 2px 7px; border: 0; background: transparent; color: var(--text-muted); font-size: 15px; line-height: 1; opacity: 0; }
+.struct__sub:hover .struct__subdel, .struct__sub:focus-within .struct__subdel, .struct__subdel:focus { opacity: 1; }
+.struct__subdel:hover { color: #b91c1c; background: rgba(185, 28, 28, .08); }
+.struct__addsub { justify-self: start; margin-top: 2px; padding: 3px 8px; border: 0; background: transparent; color: var(--text-muted); font-size: 12px; }
+.struct__addsub:hover { color: var(--accent); background: transparent; }
+.struct__addsection { justify-self: start; font-size: 13px; }
+@media (max-width: 640px) {
+  .struct__subdel { opacity: 1; }
+  .struct__subs { margin-left: 18px; }
+  .wizard__step-name { display: none; }                      /* на узком экране — только номера шагов… */
+  .wizard__step--on .wizard__step-name { display: inline; } /* …и название текущего */
+}

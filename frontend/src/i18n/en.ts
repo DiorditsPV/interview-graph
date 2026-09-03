@@ -52,6 +52,9 @@ export const EN: Record<string, string> = {
   "Удалить направление «{label}»? Вопросы ({nodes}) будут удалены, сессии ({sessions}) останутся в истории.":
     "Delete track “{label}”? Its questions ({nodes}) will be deleted; sessions ({sessions}) stay in history.",
   "Не удалось удалить направление": "Could not delete track",
+  "Дублировать": "Duplicate",
+  "{label} (копия)": "{label} (copy)",
+  "Не удалось дублировать направление": "Could not duplicate track",
   "Справочник кандидатов и интервьюеров": "Directory of candidates and interviewers",
   "Все проведённые интервью, отчёты": "All past interviews, reports",
   "Подключение": "Connect",
@@ -143,27 +146,41 @@ export const EN: Record<string, string> = {
   "например, sql": "e.g. sql",
   "Теги (через запятую)": "Tags (comma-separated)",
 
-  // --- PoolFormModal ---
+  // --- PoolFormModal (мастер направления) ---
   "Не удалось создать направление": "Could not create track",
   "Не удалось сохранить направление": "Could not save track",
+  "Направление создано, но структуру сохранить не удалось": "Track created, but its structure could not be saved",
   "Новое направление": "New track",
   "Направление · {label}": "Track · {label}",
   "Название": "Name",
   "Описание": "Description",
   "Набор вопросов": "Question set",
-  "Без пресета — свои колонки": "No preset — custom columns",
-  "Колонки": "Columns",
+  "Без пресета — создать самостоятельно": "No preset — build from scratch",
+  "С пресетом копируются его разделы и вопросы; структуру можно поправить на следующем шаге.":
+    "A preset copies its sections and questions; the structure can be adjusted on the next step.",
+  "Разделы — колонки матрицы вопросов, подкатегории — под-колонки внутри раздела. Порядок меняется перетаскиванием за ⠿.":
+    "Sections are the columns of the question matrix, subcategories are sub-columns inside a section. Reorder by dragging ⠿.",
+  "Шаг {n} из {total}": "Step {n} of {total}",
+  "Основное": "Basics",
+  "Структура вопросов": "Question structure",
+  "Структура": "Structure",
+  "Проверка": "Review",
+  "Далее →": "Next →",
+  "← Назад": "← Back",
 
-  // --- BlocksEditor ---
-  "Цвет колонки": "Column color",
-  "Название колонки": "Column name",
-  "Убрать под-колонку «{label}»": "Remove sub-column “{label}”",
-  "+ под-колонка": "+ sub-column",
+  // --- BlocksEditor (структурный редактор: раздел → подкатегории) ---
+  "Цвет раздела": "Section color",
+  "Название раздела": "Section name",
+  "Название подкатегории": "Subcategory name",
+  "Меню раздела": "Section menu",
+  "Перетащите, чтобы изменить порядок": "Drag to reorder",
   "Вверх": "Up",
   "Вниз": "Down",
-  "Удалить колонку": "Delete column",
-  "Удалить колонку «{label}» и её вопросы ({n})?": "Delete column “{label}” and its questions ({n})?",
-  "+ Колонка": "+ Column",
+  "Удалить раздел": "Delete section",
+  "Удалить раздел «{label}» и его вопросы ({n})?": "Delete section “{label}” and its questions ({n})?",
+  "Убрать подкатегорию": "Remove subcategory",
+  "+ Добавить подкатегорию": "+ Add subcategory",
+  "+ Добавить раздел": "+ Add section",
 
   // --- StartSessionForm ---
   "Не удалось начать сессию": "Could not start session",
