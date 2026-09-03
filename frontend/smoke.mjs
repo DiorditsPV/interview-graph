@@ -394,15 +394,23 @@ const tagsAgain = await page.locator(".fp__tag").count();
 if (tagsAgain !== tagsBefore) fail(`filter panel did not restore tags (${tagsAgain} vs ${tagsBefore})`);
 console.log(`OK: filter panel close/reopen keeps ${tagsBefore} tags`);
 
-// 10. Старт сессии с главной (home-session-start): «Начать интервью» на карточке DE → форма
-//     кандидата (имя + грейд) → доска с ?session=<id> и активной сессией. Затем оценка в HUD.
+// 10. Старт сессии (v1-closure): «Начать интервью» на карточке DE → экран настройки интервью
+//     (кандидат, разделы, уровни, набор) → автоподбор 5 вопросов → доска с ?session=<id>: план ведёт
+//     (HUD «1/5», вопросы вне плана затемнены), затем оценка текущего в HUD.
 await page.goto(URL + "#/", { waitUntil: "load" });
 await page.waitForSelector('.poolcard[data-pool="data-engineer"] .poolcard__start', { timeout: 10000 });
 await page.locator('.poolcard[data-pool="data-engineer"] .poolcard__start').click();
-await page.waitForSelector(".poolcard__form", { timeout: 3000 });
-await page.locator(".poolcard__form input[placeholder='Кандидат…']").fill("Cmp Bot");
-await page.locator(".poolcard__form input[placeholder^='Грейд']").fill("middle");
-await page.locator(".poolcard__form button", { hasText: "Начать" }).click();
+await page.waitForFunction(() => location.hash.startsWith("#/setup/data-engineer"), null, { timeout: 5000 });
+await page.waitForSelector(".setup__name", { timeout: 5000 });
+await page.locator(".setup__name").fill("Cmp Bot");
+await page.locator(".setup .cand-sen").fill("middle");
+await page.locator(".setup__count").fill("5");
+await page.waitForFunction(
+  () => /войдёт 5 /.test(document.querySelector(".setup__summary")?.textContent ?? ""),
+  null,
+  { timeout: 5000 },
+);
+await page.locator(".setup__start").click();
 await page.waitForFunction(() => /^#\/board\/data-engineer\?session=\d+/.test(location.hash), null, { timeout: 5000 });
 await page.waitForSelector(".session__active", { timeout: 5000 });
 const activeHdr = await page.locator(".session__active").innerText();
@@ -411,10 +419,14 @@ if (!activeHdr.includes("Сессия #")) fail(`active session missing session 
 // board-toolbar: в сессии второй ряд шапки, кнопки старта в toolbar'е нет.
 if ((await page.locator(".topbar > .topbar__row").count()) !== 2) fail("active session must add a second topbar row");
 if ((await page.locator(".topbar .session__start").count()) !== 0) fail("start button must be hidden during a session");
-console.log(`OK: session starts from main menu (${activeHdr.replace(/\s+/g, " ").slice(0, 50)})`);
-// Доска смонтирована заново — текущего вопроса нет, HUD появляется после клика по ноде.
-await page.waitForSelector(".qnode", { timeout: 10000 });
-await page.locator(".qnode__title", { hasText: "ROW_NUMBER" }).first().click();
+console.log(`OK: session starts via setup page (${activeHdr.replace(/\s+/g, " ").slice(0, 50)})`);
+// План: первый вопрос плана становится текущим сам — HUD показывает позицию «1/5»; вне плана карточки гаснут.
+await page.waitForSelector(".hud__progress", { timeout: 10000 });
+const hudPlan = await page.locator(".hud__progress").innerText();
+if (!/^1\/5\b/.test(hudPlan)) fail(`HUD should show plan position 1/5: "${hudPlan}"`);
+const dimmedByPlan = await page.locator(".qnode--dimmed").count();
+if (dimmedByPlan < 50) fail(`nodes outside the plan must be dimmed (61 − 5 = 56), got ${dimmedByPlan}`);
+console.log(`OK: session plan drives the board (HUD ${hudPlan.split(" ")[0]}, ${dimmedByPlan} dimmed outside plan)`);
 await page.waitForSelector(".hud__score .scorebtn", { timeout: 3000 });
 await page.locator(".hud__score .scorebtn").nth(2).click(); // 3/5 → персист в сессию
 await page.waitForTimeout(400);
@@ -465,7 +477,7 @@ await page.waitForSelector(".exportmenu", { state: "detached", timeout: 3000 });
 await page.locator(".session button", { hasText: "Выйти" }).click();
 await page.waitForSelector(".topbar .session__start", { timeout: 3000 });
 const startHref = await page.locator(".topbar .session__start").getAttribute("href");
-if (!startHref?.startsWith("#/?start=data-engineer")) fail(`board without session must link to start form, got ${startHref}`);
+if (!startHref?.startsWith("#/setup/data-engineer")) fail(`board without session must link to interview setup, got ${startHref}`);
 console.log(`OK: session resume restores scores (${scoredCount} scored), no-session board links to start form`);
 
 // --- pools-main-menu: 13/15/17 остаются на доске (banks/help-модалка/агенда работают только там);

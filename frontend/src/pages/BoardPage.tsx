@@ -128,6 +128,7 @@ function buildNodes(
   guidesH: boolean,
   guidesV: boolean,
   dark: boolean,
+  planIds: Set<string> | null,
 ): Node[] {
   const nodes: Node[] = [];
   const anyTag = Object.values(activeTags).some(Boolean);
@@ -207,7 +208,9 @@ function buildNodes(
     const tagOk = !anyTag || n.tags.some((t) => activeTags[t]);
     // hide-local: скрытый вопрос гасится (если не показываем скрытые); при показе — помечается.
     const hidden = hiddenIds.has(n.id);
+    // План интервью (сессия с plan): вопросы вне набора гаснут и не выбираются, как отфильтрованные.
     const dimmed =
+      (planIds != null && !planIds.has(n.id)) ||
       activeBlocks[n.block] === false ||
       !activeDiffs[n.difficulty] ||
       !activeKinds[n.kind] ||
@@ -439,25 +442,37 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
     () => Array.from(new Set(graph.flatMap((n) => n.tags))).sort(),
     [graph],
   );
-  // Видимый срез (активные фильтры) — для навигации «Дальше».
+  // План интервью: порядок вопросов сессии (sessions.plan.order). null — сессия без плана / нет сессии:
+  // доска ведёт по всей матрице, как раньше.
+  const planOrder = useMemo(() => session?.plan?.order ?? null, [session]);
+  const planIds = useMemo(() => (planOrder ? new Set(planOrder) : null), [planOrder]);
+
+  // Видимый срез (активные фильтры и план) — для навигации «Дальше».
   const visibleIds = useMemo(() => {
     const anyTag = Object.values(activeTags).some(Boolean);
     const s = new Set<string>();
     for (const n of graph) {
       const tagOk = !anyTag || n.tags.some((t) => activeTags[t]);
-      if (activeBlocks[n.block] !== false && activeDiffs[n.difficulty] && activeKinds[n.kind] && tagOk) {
+      const inPlan = planIds == null || planIds.has(n.id);
+      if (inPlan && activeBlocks[n.block] !== false && activeDiffs[n.difficulty] && activeKinds[n.kind] && tagOk) {
         s.add(n.id);
       }
     }
     return s;
-  }, [graph, activeBlocks, activeDiffs, activeKinds, activeTags]);
+  }, [graph, activeBlocks, activeDiffs, activeKinds, activeTags, planIds]);
 
-  // Строки агенды в порядке клавиатурной навигации, с заголовком при смене блока.
+  // Порядок обхода: план сессии, иначе порядок сетки (колонка за колонкой).
+  const walkOrder = useMemo(
+    () => planOrder ?? (placement ? placement.order.flat() : []),
+    [planOrder, placement],
+  );
+
+  // Строки агенды в порядке обхода, с заголовком при смене блока.
   const agendaRows = useMemo(() => {
     if (!placement) return [] as ({ kind: "head"; block: string } | { kind: "item"; node: QNode })[];
     const rows: ({ kind: "head"; block: string } | { kind: "item"; node: QNode })[] = [];
     let last: string | null = null;
-    for (const id of placement.order.flat()) {
+    for (const id of walkOrder) {
       const n = nodeMap[id];
       if (!n) continue;
       if (n.block !== last) {
@@ -467,7 +482,7 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
       rows.push({ kind: "item", node: n });
     }
     return rows;
-  }, [placement, nodeMap]);
+  }, [placement, nodeMap, walkOrder]);
 
   const loadGraph = useCallback(
     () =>
@@ -525,9 +540,9 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
   const rfNodes = useMemo(
     () =>
       placement
-        ? buildNodes(graph, pool, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, query.toLowerCase().trim(), unscoredOnly, hiddenIds, showHidden, guidesH, guidesV, theme === "dark")
+        ? buildNodes(graph, pool, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, query.toLowerCase().trim(), unscoredOnly, hiddenIds, showHidden, guidesH, guidesV, theme === "dark", planIds)
         : [],
-    [graph, pool, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, query, unscoredOnly, hiddenIds, showHidden, guidesH, guidesV, theme],
+    [graph, pool, placement, scores, currentId, selectedId, activeBlocks, activeDiffs, activeTags, activeKinds, query, unscoredOnly, hiddenIds, showHidden, guidesH, guidesV, theme, planIds],
   );
 
   const centerOn = useCallback(
@@ -573,11 +588,11 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
     [centerOn],
   );
 
-  // «Дальше»: следующий НЕОЦЕНЁННЫЙ вопрос по порядку сетки (с переносом по кругу).
+  // «Дальше»: следующий НЕОЦЕНЁННЫЙ вопрос по порядку обхода (план или сетка), с переносом по кругу.
   const nextQuestion = useCallback(() => {
     if (!placement) return;
-    // только видимый срез (активные фильтры)
-    const flat = placement.order.flat().filter((id) => visibleIds.has(id));
+    // только видимый срез (активные фильтры и план)
+    const flat = walkOrder.filter((id) => visibleIds.has(id));
     if (!flat.length) return;
     const start = currentId ? flat.indexOf(currentId) : -1;
     for (let k = 1; k <= flat.length; k++) {
@@ -588,7 +603,15 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
       }
     }
     moveCurrent(flat[(start + 1 + flat.length) % flat.length]);
-  }, [placement, currentId, scores, moveCurrent, visibleIds]);
+  }, [placement, currentId, scores, moveCurrent, visibleIds, walkOrder]);
+
+  // Сессия с планом: стартуем с первого неоценённого вопроса плана, как только доска готова.
+  useEffect(() => {
+    if (!planOrder || !placement || currentId) return;
+    const first = planOrder.find((id) => scores[id] == null && placement.positions[id]) ?? planOrder[0];
+    if (first && placement.positions[first]) moveCurrent(first);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [planOrder, placement]);
 
   // Клавиатура: 1-5 — оценка, Enter — открыть, стрелки — навигация, n — далее, Esc — снять текущий.
   useEffect(() => {
@@ -761,9 +784,17 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
     KINDS.some((k) => !activeKinds[k]);
   // Прогресс по ТЕКУЩЕМУ отфильтрованному набору. Условие "проходит фильтры" держать в
   // синхроне с предикатом `dimmed` в buildNodes (block/diff/kind/tag).
+  // В сессии с планом прогресс считается по плану, а не по фильтрам.
   const coverage = useMemo(() => {
     let total = 0;
     let done = 0;
+    if (planOrder) {
+      for (const id of planOrder) {
+        total++;
+        if (scores[id] != null) done++;
+      }
+      return { done, total, pct: total ? Math.round((done / total) * 100) : 0 };
+    }
     for (const n of graph) {
       const tagOk = !anyTagActive || n.tags.some((t) => activeTags[t]);
       if (activeBlocks[n.block] !== false && activeDiffs[n.difficulty] && activeKinds[n.kind] && tagOk) {
@@ -772,7 +803,7 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
       }
     }
     return { done, total, pct: total ? Math.round((done / total) * 100) : 0 };
-  }, [graph, scores, activeBlocks, activeDiffs, activeKinds, activeTags, anyTagActive]);
+  }, [graph, scores, activeBlocks, activeDiffs, activeKinds, activeTags, anyTagActive, planOrder]);
   const currentNode = currentId ? nodeMap[currentId] : null;
   const selectedNode = selectedId ? nodeMap[selectedId] : null;
 
@@ -839,7 +870,14 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
             </div>
             {/* В сессии мы уже находимся — старт нового интервью из toolbar'а не предлагаем. */}
             {!session && (
-              <a className="tbbtn session__start btn--primary" href={href.start(pool.id)}>
+              <a
+                className="tbbtn session__start btn--primary"
+                // Настройка интервью получает текущие фильтры доски: выбранная область → набор вопросов.
+                href={href.setup(pool.id, {
+                  blocks: blockOrder(pool).filter((b) => activeBlocks[b] !== false),
+                  diffs: DIFFS.filter((d) => activeDiffs[d]),
+                })}
+              >
                 <Play size={15} strokeWidth={2} aria-hidden="true" />
                 {t("Начать интервью →")}
               </a>
@@ -1126,7 +1164,11 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
                       </span>
                     )}
                     <span className="hud__progress">
-                      {scored}/{graph.length} · {currentNode.topic}
+                      {planOrder
+                        ? `${Math.max(0, planOrder.indexOf(currentNode.id)) + 1}/${planOrder.length}`
+                        : `${scored}/${graph.length}`}
+                      {" · "}
+                      {currentNode.topic}
                     </span>
                     <span className="hud__score">
                       {[1, 2, 3, 4, 5].map((i) => (

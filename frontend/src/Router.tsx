@@ -6,6 +6,7 @@ import { CandidatesPage } from "./pages/CandidatesPage";
 import { ConnectPage } from "./pages/ConnectPage";
 import { HomePage } from "./pages/HomePage";
 import { SessionsPage } from "./pages/SessionsPage";
+import { SetupPage } from "./pages/SetupPage";
 import { useRoute } from "./router";
 import { useT } from "./i18n";
 import type { PoolConfig } from "./types";
@@ -40,13 +41,22 @@ export default function Router() {
       if (!pool) return <HomePage pools={pools} notice={t("Направления «{pool}» нет", { pool: route.pool })} onChanged={reloadPools} />;
       return <BankPage key={pool.id} pool={pool} onChanged={reloadPools} />;
     }
+    case "setup": {
+      const pool = poolOf(route.pool);
+      if (!pool) return <HomePage pools={pools} notice={t("Направления «{pool}» нет", { pool: route.pool })} onChanged={reloadPools} />;
+      return <SetupPage key={pool.id} pool={pool} initial={route.init} />;
+    }
     case "candidates":
       return <CandidatesPage pools={pools} />;
     case "sessions":
       return <SessionsPage pools={pools} />;
     case "connect":
       return <ConnectPage pools={pools} />;
-    default:
-      return <HomePage pools={pools} startPool={route.name === "home" ? route.start : null} onChanged={reloadPools} />;
+    default: {
+      // Старый deep-link #/?start=<pool> — та же настройка интервью.
+      const startPool = route.name === "home" && route.start ? poolOf(route.start) : null;
+      if (startPool) return <SetupPage key={startPool.id} pool={startPool} initial={{}} />;
+      return <HomePage pools={pools} onChanged={reloadPools} />;
+    }
   }
 }

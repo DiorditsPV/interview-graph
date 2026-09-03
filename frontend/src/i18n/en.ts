@@ -182,6 +182,15 @@ export const EN: Record<string, string> = {
   "+ Добавить подкатегорию": "+ Add subcategory",
   "+ Добавить раздел": "+ Add section",
 
+  // --- SetupPage (настройка интервью) ---
+  "Настройка интервью · {pool}": "Interview setup · {pool}",
+  "Разделы": "Sections",
+  "Уровни": "Levels",
+  "Автоподбор по весам разделов": "Auto-pick by section weights",
+  "Все подходящие в порядке матрицы": "All matching, in matrix order",
+  "В интервью войдёт {n}": "The interview will include {n}",
+  "Под выбранные условия нет вопросов": "No questions match the selected conditions",
+  "подходит {n}": "{n} match",
   // --- StartSessionForm ---
   "Не удалось начать сессию": "Could not start session",
   "Выбрать существующего кандидата": "Pick an existing candidate",

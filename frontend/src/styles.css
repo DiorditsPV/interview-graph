@@ -854,3 +854,26 @@ a.iconbtn { text-decoration: none; display: inline-block; }
   .wizard__step-name { display: none; }                      /* на узком экране — только номера шагов… */
   .wizard__step--on .wizard__step-name { display: inline; } /* …и название текущего */
 }
+
+/* ---- настройка интервью (#/setup/<pool>): кандидат → разделы → уровни → набор → старт ---- */
+.setup { display: grid; gap: 18px; max-width: 880px; }
+.setup__section { display: grid; gap: 10px; padding: 14px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+.setup__h3 { margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--text-faint); }
+.setup__row { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+.setup__row input, .setup__row select { padding: 6px 10px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--surface); color: var(--text); }
+.setup__name { min-width: 220px; }
+.setup__blocks { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px 18px; }
+.setup__block { display: grid; gap: 6px; }
+.setup__check { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.setup__check--block { font-weight: 600; }
+.setup__check input[type="checkbox"], .setup__check input[type="radio"] { margin: 0; }
+.setup__dot { width: 10px; height: 10px; border-radius: 999px; flex: 0 0 auto; }
+.setup__subs { display: grid; gap: 4px; padding-left: 24px; }
+.setup__subs .setup__check { font-size: 12px; color: var(--text-muted); }
+.setup__modes { display: grid; gap: 8px; }
+.setup__count { width: 64px; margin-left: 6px; padding: 3px 6px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--surface); color: var(--text); }
+.setup__summary { font-size: 13px; color: var(--text); }
+.setup__summary--empty { color: #b91c1c; }
+.setup__actions { display: flex; justify-content: flex-end; gap: 10px; }
+.setup__actions .iconbtn { text-decoration: none; }
+.setup__start { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; font-size: 14px; }

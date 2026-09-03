@@ -48,7 +48,7 @@ from .pools import (
     pool_from_row,
     slug_from_label,
 )
-from .sampler import build_interview
+from .sampler import build_interview, filter_nodes, matrix_order
 from .seed import seed_interviewer_if_empty, seed_owner_if_empty, seed_pool_if_empty
 from .tenancy import resolve_tenant
 
@@ -136,11 +136,29 @@ class UserCreate(BaseModel):
     role: str = Field(default="member", pattern="^(owner|member|viewer)$")
 
 
+class PlanIn(BaseModel):
+    """План интервью: какие вопросы войдут в сессию.
+
+    manual — `nodeIds` в заданном порядке, либо (без nodeIds) все подходящие под фильтры в порядке
+    матрицы; auto — сэмплер по весам разделов: `count` вопросов из отфильтрованных.
+    """
+
+    mode: str = Field(pattern="^(manual|auto)$")
+    blocks: Optional[List[str]] = None
+    subblocks: Optional[Dict[str, List[str]]] = None
+    difficulties: Optional[List[str]] = None
+    count: int = Field(default=7, ge=1, le=200)
+    node_ids: Optional[List[str]] = Field(default=None, alias="nodeIds")
+    seed: Optional[int] = None
+    model_config = {"populate_by_name": True}
+
+
 class SessionCreate(BaseModel):
     candidate: str = Field(min_length=1)
     candidate_id: Optional[int] = Field(default=None, alias="candidateId")
     interviewer_id: Optional[int] = Field(default=None, alias="interviewerId")
     pool: Optional[str] = None  # id пула; None → пул по умолчанию (совместимость со старым фронтом)
+    plan: Optional[PlanIn] = None  # без плана — сессия по всей матрице (как раньше)
     model_config = {"populate_by_name": True}
 
 
@@ -604,13 +622,50 @@ def create_session(
         # нужен проводивший для отчёта и страницы сессий — берём первого интервьюера тенанта (сид «Я»).
         ivs = db.list_interviewers(tenant)
         interviewer_id = ivs[0]["id"] if ivs else None
+    plan = _build_plan(request, pool, body.plan) if body.plan else None
     return db.create_session(
         candidate_name,
         tenant_id=tenant,
         candidate_id=body.candidate_id,
         interviewer_id=interviewer_id,
         pool=pool.id,
+        plan=plan,
     )
+
+
+def _build_plan(request: Request, pool: PoolCfg, p: PlanIn) -> dict:
+    """Собрать `order` плана из условий (см. PlanIn). Пустой набор или чужие id → 422.
+
+    В плане храним и условия, и итоговый порядок: доска ведёт по `order`, отчёт и повтор
+    интервью опираются на условия.
+    """
+    nodes = _db_nodes(request, pool)
+    if p.mode == "manual" and p.node_ids:
+        known = {n.id for n in nodes}
+        unknown = [i for i in p.node_ids if i not in known]
+        if unknown:
+            raise HTTPException(status_code=422, detail=f"unknown node ids: {', '.join(unknown)}")
+        order = list(dict.fromkeys(p.node_ids))  # порядок как передали, без дублей
+    else:
+        picked = filter_nodes(nodes, blocks=p.blocks, subblocks=p.subblocks, difficulties=p.difficulties)
+        if p.mode == "auto":
+            order = build_interview(picked, count=p.count, block_weights=block_weights(pool), seed=p.seed)
+        else:
+            order = matrix_order(
+                picked,
+                block_order=[b.id for b in pool.blocks],
+                sub_order={b.id: [s.id for s in b.subblocks] for b in pool.blocks},
+            )
+    if not order:
+        raise HTTPException(status_code=422, detail="no questions match the plan")
+    return {
+        "mode": p.mode,
+        "blocks": p.blocks,
+        "subblocks": p.subblocks,
+        "difficulties": p.difficulties,
+        "count": p.count if p.mode == "auto" else len(order),
+        "order": order,
+    }
 
 
 @app.get("/api/sessions")

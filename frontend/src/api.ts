@@ -10,6 +10,18 @@ import type {
   SessionMeta,
 } from "./types";
 
+// План интервью для POST /api/sessions: manual — nodeIds или все подходящие в порядке матрицы,
+// auto — сэмплер по весам разделов (count вопросов).
+export interface PlanIn {
+  mode: "manual" | "auto";
+  blocks?: string[];
+  subblocks?: Record<string, string[]>;
+  difficulties?: string[];
+  count?: number;
+  nodeIds?: string[];
+  seed?: number;
+}
+
 // question-management: правка/создание вопроса банка (бэкенд пишет в БД, не в content/*.md).
 export interface NodeUpdate {
   title?: string;
@@ -86,11 +98,12 @@ export const api = {
     ),
   graph: (pool: string) =>
     fetch(`${BASE}/graph?pool=${encodeURIComponent(pool)}`).then(json<GraphResponse>),
-  createSession: (pool: string, candidate: string, candidateId?: number, interviewerId?: number) =>
+  // plan — набор вопросов сессии (см. SetupPage); без него сессия идёт по всей матрице.
+  createSession: (pool: string, candidate: string, candidateId?: number, interviewerId?: number, plan?: PlanIn) =>
     fetch(`${BASE}/sessions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pool, candidate, candidateId, interviewerId }),
+      body: JSON.stringify({ pool, candidate, candidateId, interviewerId, plan }),
     }).then(json<Session>),
   setScore: (sessionId: number, nodeId: string, score: number, note?: string) =>
     fetch(`${BASE}/sessions/${sessionId}/score`, {
