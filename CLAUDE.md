@@ -41,7 +41,10 @@ Dev hot-reload вручную: `uvicorn app.main:app --reload --port 8000` (из
 **Бэкенд** (`backend/app/`) — поток данных «контент-файлы → импорт → in-memory граф → API → SQLite-сессии»:
 - `pools.py` — читает `content/<pool>/pool.yaml` (блоки, под-колонки, цвета, веса) — таксономия пула.
   `pool.yaml` — сид таблицы `pools` (как контент для `nodes`); в рантайме направления читаются из БД
-  (`db.list_pools`), создаются/правятся/удаляются через `POST/PUT/DELETE /api/pools`.
+  (`db.list_pools`), создаются/правятся/удаляются через `POST/PUT/DELETE /api/pools`. Колонки —
+  данные направления: `POST` принимает ровно одно из `preset` / `blocks`, `PUT` — `blocks`
+  (`[{id?, label, color, subblocks?}]`; колонка вне списка удаляется с вопросами, исчезнувшая
+  под-колонка оставляет вопросы в колонке). Редактор — `frontend/src/components/BlocksEditor.tsx`.
 - `importer.py` — парсит `content/<pool>/<block>/*.md|*.json` через `python-frontmatter` в `Node`,
   проверяя block/subblock по `pool.yaml`; `pool` ноды ставится по каталогу, не во frontmatter.
 - `models.py` — pydantic `Node` с `extra="forbid"`: добавление поля ноды = правка `models.py`

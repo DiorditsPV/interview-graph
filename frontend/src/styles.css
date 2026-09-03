@@ -674,5 +674,34 @@ a.iconbtn { text-decoration: none; display: inline-block; }
 }
 .poolcard__manage { margin-left: auto; display: inline-flex; gap: 4px; }
 .poolcard__edit, .poolcard__delete { font-size: 12px; padding: 2px 6px; }
-.poolform { display: grid; gap: 10px; min-width: min(360px, 90vw); }
+.poolform { display: grid; gap: 10px; min-width: min(520px, 92vw); max-height: 85vh; overflow: auto; }
 .poolform .drawer__field input, .poolform .drawer__field select { width: 100%; box-sizing: border-box; }
+.poolform__blocks { display: grid; gap: 6px; margin-bottom: 10px; }
+.poolform__blocks-title { font-size: 12px; color: var(--text-muted); }
+
+/* ---- pool-blocks-editor: колонки направления в форме (цвет · название · под-колонки · ↑ ↓ ✕) ---- */
+.blocks-editor { display: grid; gap: 6px; }
+.blocks-editor__row { display: grid; grid-template-columns: 28px 1fr auto; gap: 8px; align-items: start; }
+/* Свотч: клик листает палитру; inline background = цвет колонки перекрывает button:hover. */
+.blocks-editor__color {
+  width: 22px; height: 22px; padding: 0; margin-top: 5px; border: 1px solid var(--border-strong); border-radius: 6px;
+}
+.blocks-editor__color:hover { filter: brightness(1.12); }
+.blocks-editor__main { display: grid; gap: 4px; min-width: 0; }
+.blocks-editor__label {
+  width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid var(--border-strong); border-radius: 6px;
+  background: var(--surface); color: var(--text); font-size: 14px; font-family: inherit;
+}
+.blocks-editor__subs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+/* Чип под-колонки — как .poolcard__block, плюс «×»; заливка = цвет колонки (inline). */
+.blocks-editor__sub { display: inline-flex; align-items: center; gap: 2px; font-size: 11px; color: #fff; padding: 1px 3px 1px 7px; border-radius: 4px; }
+.blocks-editor__subdel { border: none; background: none; color: inherit; padding: 0 4px; font-size: 12px; line-height: 1.2; opacity: .8; }
+.blocks-editor__subdel:hover { opacity: 1; background: rgba(255, 255, 255, .25); }
+.blocks-editor__subadd {
+  width: 130px; box-sizing: border-box; padding: 2px 6px; font-size: 12px; font-family: inherit;
+  border: 1px dashed var(--border-strong); border-radius: 4px; background: transparent; color: var(--text);
+}
+.blocks-editor__subadd::placeholder { color: var(--text-faint); }
+.blocks-editor__btns { display: inline-flex; gap: 2px; margin-top: 2px; }
+.blocks-editor__btns .iconbtn { padding: 5px 7px; font-size: 13px; }
+.blocks-editor__add { justify-self: start; font-size: 13px; }

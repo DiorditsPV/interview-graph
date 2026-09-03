@@ -53,16 +53,27 @@ async function json<T>(res: Response, opts?: { skipAuthReload?: boolean }): Prom
   return res.json() as Promise<T>;
 }
 
+// pool-blocks-editor: колонка направления из формы. id — только у существующих (сервер сохраняет
+// их как есть), у новых id генерится из названия; weight из UI не правится.
+export interface BlockDraft {
+  id?: string;
+  label: string;
+  color: string;
+  subblocks?: { id?: string; label: string }[];
+}
+
 export const api = {
   pools: () => fetch(`${BASE}/pools`).then(json<PoolConfig[]>),
-  // pool-crud: направления живут в БД; пресет = существующее направление (колонки + вопросы копируются).
-  createPool: (data: { label: string; description?: string; preset: string }) =>
+  // pool-crud: направления живут в БД; ровно одно из preset (существующее направление: колонки +
+  // вопросы копируются) / blocks (свои колонки, без вопросов).
+  createPool: (data: { label: string; description?: string; preset?: string; blocks?: BlockDraft[] }) =>
     fetch(`${BASE}/pools`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     }).then(json<PoolConfig>),
-  updatePool: (id: string, fields: { label?: string; description?: string }) =>
+  // blocks: колонка вне списка удаляется вместе с вопросами, под-колонка — вопросы остаются в колонке.
+  updatePool: (id: string, fields: { label?: string; description?: string; blocks?: BlockDraft[] }) =>
     fetch(`${BASE}/pools/${encodeURIComponent(id)}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },

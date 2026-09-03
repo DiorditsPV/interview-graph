@@ -60,8 +60,56 @@ await page.waitForFunction(
   null,
   { timeout: 5000 },
 );
+// 0c'. Редактор колонок (pool-blocks-editor): «изменить» → добавить колонку «Продажи» с под-колонкой
+//      «Холодные» → чип на карточке, колонка и под-колонка на доске направления; затем удалить первую
+//      колонку пресета (у неё есть вопросы → confirm с числом) → чипов на один меньше, вопросов меньше.
+const smokeCard = page.locator('.poolcard[data-pool="smoke-pool"]');
+const chipsBefore = await smokeCard.locator(".poolcard__block").count();
+const nodesBefore = parseInt(await smokeCard.locator(".poolcard__meta").innerText(), 10);
+await smokeCard.locator(".poolcard__edit").click();
+await page.waitForSelector(".blocks-editor", { timeout: 3000 });
+await page.locator(".blocks-editor__add").click();
+await page.locator(".blocks-editor__label").last().fill("Продажи");
+await page.locator(".blocks-editor__subadd").last().fill("Холодные");
+await page.locator(".blocks-editor__subadd").last().press("Enter");
+if ((await page.locator(".blocks-editor__sub").last().innerText()).replace("×", "").trim() !== "Холодные") fail("sub-column chip not added");
+await page.locator(".poolform__submit").click();
+await page.waitForFunction(
+  () => [...document.querySelectorAll('.poolcard[data-pool="smoke-pool"] .poolcard__block')].some((e) => e.textContent === "Продажи"),
+  null,
+  { timeout: 5000 },
+);
+if ((await smokeCard.locator(".poolcard__block").count()) !== chipsBefore + 1) fail("column chip count did not grow by one");
+await page.goto(URL + "#/board/smoke-pool");
+await page.waitForSelector(".bgroup__header", { timeout: 10000 });
+const smokeHeaders = await page.locator(".bgroup__header").allInnerTexts();
+if (!smokeHeaders.some((h) => h.toLowerCase().includes("продажи"))) fail(`board lacks new column: ${JSON.stringify(smokeHeaders)}`);
+const smokeSubs = await page.locator(".subhead").allInnerTexts();
+if (!smokeSubs.some((s) => s.includes("Холодные"))) fail(`board lacks new sub-column: ${JSON.stringify(smokeSubs)}`);
+console.log("OK: pool blocks editor — added column + sub-column, board shows them");
+await page.goto(URL + "#/");
+await page.waitForSelector('.poolcard[data-pool="smoke-pool"]', { timeout: 10000 });
+await smokeCard.locator(".poolcard__edit").click();
+await page.waitForSelector(".blocks-editor", { timeout: 3000 });
+let colConfirm = "";
+page.once("dialog", (d) => {
+  colConfirm = d.message();
+  d.accept();
+});
+await page.locator(".blocks-editor__del").first().click(); // ждёт enabled: счётчики вопросов подгружаются
+if (!/\(\d+\)/.test(colConfirm)) fail(`expected confirm with question count, got: "${colConfirm}"`);
+await page.locator(".poolform__submit").click();
+await page.waitForFunction(
+  (n) => document.querySelectorAll('.poolcard[data-pool="smoke-pool"] .poolcard__block').length === n,
+  chipsBefore,
+  { timeout: 5000 },
+);
+const nodesAfter = parseInt(await smokeCard.locator(".poolcard__meta").innerText(), 10);
+if (!(nodesAfter < nodesBefore)) fail(`deleting a column did not drop questions: ${nodesBefore} → ${nodesAfter}`);
+console.log(`OK: pool blocks editor — column deleted with confirm, questions ${nodesBefore} → ${nodesAfter}`);
+
 page.once("dialog", (d) => d.accept());
-await page.locator('.poolcard[data-pool="smoke-pool"] .poolcard__delete').click();
+await smokeCard.locator(".poolcard__delete").click();
 await page.waitForSelector('.poolcard[data-pool="smoke-pool"]', { state: "detached", timeout: 5000 });
 console.log("OK: pool create from preset / rename / delete");
 
@@ -76,6 +124,8 @@ console.log("OK: RU/EN switch");
 
 // Кликаем по самой ссылке-«растяжке» (.poolcard__label), а не по всей карточке: внутри есть ещё
 // сиблинг .poolcard__bank (ссылка на банк) — клик по центру div'а рискует попасть мимо доски.
+// После переходов шага 0c' на доску и обратно убеждаемся, что мы снова на главной.
+await page.waitForSelector('.poolcard[data-pool="data-engineer"]', { timeout: 5000 });
 await deCard.locator(".poolcard__label").click();
 await page.waitForFunction(() => location.hash.startsWith("#/board/data-engineer"), null, { timeout: 5000 });
 console.log(`OK: main menu lists ${poolCards} pool(s), DE opens the board`);
