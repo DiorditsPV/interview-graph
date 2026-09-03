@@ -4,11 +4,13 @@ import { AddQuestionModal } from "../components/AddQuestionModal";
 import { BankBrowser } from "../components/BankBrowser";
 import { UploadModal } from "../components/UploadModal";
 import { downloadBank } from "../report";
+import { useT } from "../i18n";
 import type { PoolConfig, QNode } from "../types";
 import { PageShell } from "./PageShell";
 
 // Банк вопросов направления как страница: просмотр (BankBrowser embedded) + правки контента.
 export function BankPage({ pool, onChanged }: { pool: PoolConfig; onChanged: () => void }) {
+  const t = useT();
   const [nodes, setNodes] = useState<QNode[]>([]);
   const [addOpen, setAddOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -22,12 +24,12 @@ export function BankPage({ pool, onChanged }: { pool: PoolConfig; onChanged: () 
 
   return (
     <PageShell
-      title={`Банк вопросов · ${pool.label}`}
+      title={`${t("Банк вопросов")} · ${pool.label}`}
       actions={
         <>
-          <button className="iconbtn addbtn" onClick={() => setAddOpen(true)}>Добавить вопрос</button>
-          <button className="iconbtn uploadbtn" onClick={() => setUploadOpen(true)}>Загрузить файл</button>
-          <button className="iconbtn bankbtn" onClick={() => downloadBank(nodes, pool)} disabled={!nodes.length}>Скачать HTML</button>
+          <button className="iconbtn addbtn" onClick={() => setAddOpen(true)}>{t("Добавить вопрос")}</button>
+          <button className="iconbtn uploadbtn" onClick={() => setUploadOpen(true)}>{t("Загрузить файл")}</button>
+          <button className="iconbtn bankbtn" onClick={() => downloadBank(nodes, pool)} disabled={!nodes.length}>{t("Скачать HTML")}</button>
         </>
       }
     >

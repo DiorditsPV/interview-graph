@@ -41,7 +41,10 @@ Dev (hot reload): `uvicorn app.main:app --reload --port 8000` (из `backend/`, 
 
 ## API (FastAPI)
 Граф/контент: `GET /api/graph` (ноды + ошибки импорта), `GET /api/pools`, `GET /api/graph?pool=`,
-`POST /api/import`, `POST/PUT/DELETE /api/nodes`. Интервью/сессии: `POST /api/interview`,
+`POST /api/import`, `POST/PUT/DELETE /api/nodes`. Направления: `POST /api/pools` (из пресета —
+существующего направления: копируются колонки и вопросы, id — транслитерация названия),
+`PUT /api/pools/{id}` (название/описание), `DELETE /api/pools/{id}` (вопросы удаляются, сессии
+остаются, id остаётся занятым tombstone'ом). Интервью/сессии: `POST /api/interview`,
 `POST /api/sessions`, `GET /api/sessions`, `GET /api/sessions/{id}`, `POST /api/sessions/{id}/score`,
 `GET /api/sessions/{id}/events` (SSE). Люди: `GET/POST/PUT /api/candidates`,
 `GET/POST /api/interviewers`. Служебное: `GET /api/health`. Полные схемы — Swagger UI на `/docs`.
@@ -76,7 +79,7 @@ databases: `sql|dbms|storage|formats`; data-engineer-x5 → sql: `queries|indexe
 
 ## Проверка изменений
 Используй скилл **interview-verify** (или вручную): import 0 ошибок (`/api/graph`) → `pytest` →
-при правке фронта `npm run build` + `npm run smoke` (нужен сервер :8000) → (пере)запуск uvicorn.
+при правке фронта `npm run build` + `npm run i18n:check` (ключи `t("…")` есть в `src/i18n/en.ts`) + `npm run smoke` (нужен сервер :8000) → (пере)запуск uvicorn.
 При переименовании нод/тегов/классов, на которые опирается smoke — обнови `frontend/smoke.mjs`.
 
 ## Скиллы проекта (`.claude/skills/`)

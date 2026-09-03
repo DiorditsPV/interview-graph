@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../api";
 import { downloadReport } from "../report";
 import { href } from "../router";
+import { useT } from "../i18n";
 import { notesOf, scoresOf } from "../sessionUtils";
 import type { Interviewer, PoolConfig, Session, SessionMeta } from "../types";
 import { PageShell } from "./PageShell";
@@ -9,6 +10,7 @@ import { PageShell } from "./PageShell";
 // Все сессии всех направлений: открыть на доске или скачать отчёт. «Оценено» — из детали
 // сессии (одна подгрузка на строку; для локального инструмента это дёшево).
 export function SessionsPage({ pools }: { pools: PoolConfig[] }) {
+  const t = useT();
   const [rows, setRows] = useState<SessionMeta[]>([]);
   const [details, setDetails] = useState<Record<number, Session>>({});
   const [ivs, setIvs] = useState<Interviewer[]>([]);
@@ -33,10 +35,10 @@ export function SessionsPage({ pools }: { pools: PoolConfig[] }) {
   };
 
   return (
-    <PageShell title="Сессии">
+    <PageShell title={t("Сессии")}>
       <div className="table-wrap">
         <table className="table sessions">
-          <thead><tr><th>Направление</th><th>Кандидат</th><th>Интервьюер</th><th>Дата</th><th>Оценено</th><th></th></tr></thead>
+          <thead><tr><th>{t("Направление")}</th><th>{t("Кандидат")}</th><th>{t("Интервьюер")}</th><th>{t("Дата")}</th><th>{t("Оценено")}</th><th></th></tr></thead>
           <tbody>
             {rows.map((s) => {
               const pool = poolOf(s.pool);
@@ -49,8 +51,8 @@ export function SessionsPage({ pools }: { pools: PoolConfig[] }) {
                   <td>{s.created_at.slice(0, 16).replace("T", " ")}</td>
                   <td>{scored == null ? "…" : `${scored} / ${pool?.counts?.nodes ?? "?"}`}</td>
                   <td>
-                    <a className="iconbtn" href={href.board(s.pool, s.id)}>Открыть</a>{" "}
-                    <button className="iconbtn" onClick={() => report(s)} disabled={!details[s.id] || scored === 0}>Отчёт</button>
+                    <a className="iconbtn" href={href.board(s.pool, s.id)}>{t("Открыть")}</a>{" "}
+                    <button className="iconbtn" onClick={() => report(s)} disabled={!details[s.id] || scored === 0}>{t("Отчёт")}</button>
                   </td>
                 </tr>
               );
@@ -58,7 +60,7 @@ export function SessionsPage({ pools }: { pools: PoolConfig[] }) {
           </tbody>
         </table>
       </div>
-      {rows.length === 0 && <p className="muted">Сессий пока нет — начните интервью с доски направления.</p>}
+      {rows.length === 0 && <p className="muted">{t("Сессий пока нет — начните интервью с главной.")}</p>}
     </PageShell>
   );
 }

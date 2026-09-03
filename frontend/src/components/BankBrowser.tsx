@@ -4,6 +4,7 @@ import rehypeHighlight from "rehype-highlight";
 import remarkGfm from "remark-gfm";
 import { blockColor, blockLabel, blockOrder, subLabel, DIFF_COLOR, type Difficulty, type Kind, type PoolConfig, type QNode } from "../types";
 import { DIFFS, subOf } from "../layout";
+import { useT } from "../i18n";
 
 const KIND_LABEL: Record<Kind, string> = { question: "вопрос", task: "задача" };
 
@@ -17,6 +18,7 @@ interface Props {
 // Полноэкранный оверлей «Все вопросы»: просмотр всего банка (поиск + фильтры + раскрытие
 // вопрос/ответ/критерии). Читает уже загруженный graph; данные/бэк/персист не трогает.
 export function BankBrowser({ nodes, pool, onClose, embedded }: Props) {
+  const t = useT();
   const [q, setQ] = useState("");
   const [blocks, setBlocks] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(blockOrder(pool).map((b) => [b, true])),
@@ -83,27 +85,27 @@ export function BankBrowser({ nodes, pool, onClose, embedded }: Props) {
     });
 
   return (
-    <div className={embedded ? "bankbrowser bankbrowser--embedded" : "bankbrowser"} role={embedded ? undefined : "dialog"} aria-label="Все вопросы" aria-modal={embedded ? undefined : "true"}>
+    <div className={embedded ? "bankbrowser bankbrowser--embedded" : "bankbrowser"} role={embedded ? undefined : "dialog"} aria-label={t("Все вопросы")} aria-modal={embedded ? undefined : "true"}>
       <header className="bankbrowser__bar">
-        <strong>Все вопросы</strong>
+        <strong>{t("Все вопросы")}</strong>
         <span className="bankbrowser__count">
-          показано {filtered.length} из {nodes.length}
+          {t("показано {shown} из {total}", { shown: filtered.length, total: nodes.length })}
         </span>
         <input
           className="bankbrowser__search"
-          placeholder="Поиск по тексту, теме, тегам…"
+          placeholder={t("Поиск по тексту, теме, тегам…")}
           value={q}
           onChange={(e) => setQ(e.target.value)}
           autoFocus
         />
         <button className="iconbtn" onClick={() => setOpen(new Set(filtered.map((n) => n.id)))}>
-          Развернуть всё
+          {t("Развернуть всё")}
         </button>
         <button className="iconbtn" onClick={() => setOpen(new Set())}>
-          Свернуть всё
+          {t("Свернуть всё")}
         </button>
         {onClose && (
-          <button className="iconbtn bankbrowser__close" onClick={onClose} title="Закрыть (Esc)">
+          <button className="iconbtn bankbrowser__close" onClick={onClose} title={t("Закрыть (Esc)")}>
             ✕
           </button>
         )}
@@ -149,14 +151,14 @@ export function BankBrowser({ nodes, pool, onClose, embedded }: Props) {
               className={`fp__chip ${kinds[k] ? "" : "fp__chip--off"}`}
               onClick={() => setKinds((s) => ({ ...s, [k]: !s[k] }))}
             >
-              {KIND_LABEL[k]}
+              {t(KIND_LABEL[k])}
             </button>
           ))}
         </div>
       </div>
 
       <div className="bankbrowser__body">
-        {filtered.length === 0 && <p className="bankbrowser__empty">Ничего не найдено</p>}
+        {filtered.length === 0 && <p className="bankbrowser__empty">{t("Ничего не найдено")}</p>}
         {grouped.map((g) => (
           <section key={g.block} className="bankblock">
             <h2 className="bankblock__head" style={{ borderColor: blockColor(pool, g.block) }}>
@@ -177,7 +179,7 @@ export function BankBrowser({ nodes, pool, onClose, embedded }: Props) {
                         <span className="bankrow__diff" style={{ background: DIFF_COLOR[n.difficulty] }}>
                           {n.difficulty}
                         </span>
-                        <span className="bankrow__kind">{KIND_LABEL[n.kind]}</span>
+                        <span className="bankrow__kind">{t(KIND_LABEL[n.kind])}</span>
                         <span className="bankrow__title">{n.title || n.question}</span>
                         {n.tags.length > 0 && (
                           <span className="bankrow__tags">
@@ -193,7 +195,7 @@ export function BankBrowser({ nodes, pool, onClose, embedded }: Props) {
                       {isOpen && (
                         <div className="bankrow__body">
                           <section>
-                            <h4>{n.kind === "task" ? "Задача" : "Вопрос"}</h4>
+                            <h4>{n.kind === "task" ? t("Задача") : t("Вопрос")}</h4>
                             <div className="md">
                               <Markdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
                                 {n.question}
@@ -202,7 +204,7 @@ export function BankBrowser({ nodes, pool, onClose, embedded }: Props) {
                           </section>
                           {n.starterCode && (
                             <section>
-                              <h4>Стартовый код</h4>
+                              <h4>{t("Стартовый код")}</h4>
                               <div className="md">
                                 <Markdown rehypePlugins={[rehypeHighlight]}>
                                   {"```python\n" + n.starterCode + "\n```"}
@@ -211,7 +213,7 @@ export function BankBrowser({ nodes, pool, onClose, embedded }: Props) {
                             </section>
                           )}
                           <section>
-                            <h4>{n.kind === "task" ? "Эталон / решение" : "Ответ"}</h4>
+                            <h4>{n.kind === "task" ? t("Эталон / решение") : t("Ответ")}</h4>
                             <div className="md">
                               <Markdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
                                 {n.answer}
@@ -220,7 +222,7 @@ export function BankBrowser({ nodes, pool, onClose, embedded }: Props) {
                           </section>
                           {n.rubric.length > 0 && (
                             <section>
-                              <h4>Критерии оценки</h4>
+                              <h4>{t("Критерии оценки")}</h4>
                               <ul className="rubric">
                                 {n.rubric.map((r, i) => (
                                   <li key={i}>{r}</li>

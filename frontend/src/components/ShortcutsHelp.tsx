@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useT } from "../i18n";
 
 // Шпаргалка горячих клавиш. Пока открыта — перехватывает ВСЮ клавиатуру в capture-фазе
 // (stopImmediatePropagation), чтобы прочие хоткеи не срабатывали; Esc/«?» закрывают. Capture-фаза
@@ -13,6 +14,7 @@ const SHORTCUTS: [string[], string][] = [
 ];
 
 export function ShortcutsHelp({ onClose }: { onClose: () => void }) {
+  const t = useT();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       e.stopImmediatePropagation(); // захват: глушим прочие хоткеи, пока шпаргалка открыта
@@ -29,8 +31,8 @@ export function ShortcutsHelp({ onClose }: { onClose: () => void }) {
     <div className="help-modal" onClick={onClose}>
       <div className="help-modal__card" onClick={(e) => e.stopPropagation()}>
         <div className="help-modal__head">
-          <strong>Горячие клавиши</strong>
-          <button className="help-modal__close" onClick={onClose} title="Закрыть (Esc)">
+          <strong>{t("Горячие клавиши")}</strong>
+          <button className="help-modal__close" onClick={onClose} title={t("Закрыть (Esc)")}>
             ✕
           </button>
         </div>
@@ -42,7 +44,7 @@ export function ShortcutsHelp({ onClose }: { onClose: () => void }) {
                   <kbd key={k}>{k}</kbd>
                 ))}
               </span>
-              <span className="help-row__desc">{desc}</span>
+              <span className="help-row__desc">{t(desc)}</span>
             </div>
           ))}
         </div>

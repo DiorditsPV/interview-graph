@@ -10,11 +10,12 @@ docs/superpowers/specs/2026-09-02-pools-and-main-menu-design.md). Отсюда �
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, Tuple
+from typing import Dict, Iterable, List, Optional, Tuple
 
 import yaml
 
@@ -49,7 +50,8 @@ class PoolCfg:
     label: str
     description: str
     blocks: Tuple[BlockCfg, ...]
-    dir: Path
+    # Каталог content/<pool>/ — только у пулов-сидов; у направлений, созданных из UI, его нет.
+    dir: Optional[Path] = None
 
     @property
     def block_ids(self) -> frozenset:
@@ -87,15 +89,8 @@ def _req_str(d: dict, key: str, where: str) -> str:
     return v.strip()
 
 
-def _parse_pool(data: dict, pool_dir: Path) -> PoolCfg:
-    if not isinstance(data, dict):
-        raise PoolConfigError("pool.yaml must be a mapping")
-    pid = _req_str(data, "id", "pool")
-    if not _ID_RE.match(pid):
-        raise PoolConfigError(f"pool id '{pid}' must match [a-z0-9-]+")
-    if pid != pool_dir.name:
-        raise PoolConfigError(f"pool id '{pid}' must equal directory name '{pool_dir.name}'")
-    raw_blocks = data.get("blocks")
+def parse_blocks(raw_blocks: object) -> Tuple[BlockCfg, ...]:
+    """Список блоков из YAML (`blocks:`) или из JSON таблицы pools — одна валидация на оба пути."""
     if not isinstance(raw_blocks, list) or not raw_blocks:
         raise PoolConfigError("pool must declare a non-empty 'blocks' list")
 
@@ -137,13 +132,71 @@ def _parse_pool(data: dict, pool_dir: Path) -> PoolCfg:
                 subblocks=tuple(subs),
             )
         )
+    return tuple(blocks)
+
+
+def _parse_pool(data: dict, pool_dir: Path) -> PoolCfg:
+    if not isinstance(data, dict):
+        raise PoolConfigError("pool.yaml must be a mapping")
+    pid = _req_str(data, "id", "pool")
+    if not _ID_RE.match(pid):
+        raise PoolConfigError(f"pool id '{pid}' must match [a-z0-9-]+")
+    if pid != pool_dir.name:
+        raise PoolConfigError(f"pool id '{pid}' must equal directory name '{pool_dir.name}'")
     return PoolCfg(
         id=pid,
         label=_req_str(data, "label", "pool"),
         description=str(data.get("description") or "").strip(),
-        blocks=tuple(blocks),
+        blocks=parse_blocks(data.get("blocks")),
         dir=pool_dir,
     )
+
+
+def blocks_to_json(blocks: Tuple[BlockCfg, ...]) -> str:
+    """Блоки в JSON для столбца pools.blocks (та же форма, что в /api/pools)."""
+    return json.dumps(
+        [
+            {
+                "id": b.id,
+                "label": b.label,
+                "color": b.color,
+                "weight": b.weight,
+                "subblocks": [{"id": s.id, "label": s.label} for s in b.subblocks],
+            }
+            for b in blocks
+        ],
+        ensure_ascii=False,
+    )
+
+
+def pool_from_row(row: dict) -> PoolCfg:
+    """Пул из строки таблицы pools (`blocks` — уже распарсенный список). Валидация та же, что для YAML."""
+    return PoolCfg(
+        id=row["id"],
+        label=row["label"],
+        description=str(row.get("description") or "").strip(),
+        blocks=parse_blocks(row.get("blocks")),
+        dir=None,
+    )
+
+
+_TRANSLIT = {
+    "а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e", "ё": "e", "ж": "zh", "з": "z",
+    "и": "i", "й": "y", "к": "k", "л": "l", "м": "m", "н": "n", "о": "o", "п": "p", "р": "r",
+    "с": "s", "т": "t", "у": "u", "ф": "f", "х": "h", "ц": "c", "ч": "ch", "ш": "sh", "щ": "sch",
+    "ъ": "", "ы": "y", "ь": "", "э": "e", "ю": "yu", "я": "ya",
+}
+
+
+def slug_from_label(label: str) -> str:
+    """Id направления из названия: транслитерация ru→lat, [a-z0-9-]+; пусто → 'pool'.
+
+    Id живёт в URL, БД и localStorage, поэтому только латиница; занятость id
+    (в том числе tombstone удалённого направления) разрешает вызывающий суффиксом.
+    """
+    s = "".join(_TRANSLIT.get(ch, ch) for ch in label.strip().lower())
+    s = re.sub(r"[^a-z0-9]+", "-", s).strip("-")
+    return s or "pool"
 
 
 def load_pool(pool_dir: Path) -> PoolCfg:
