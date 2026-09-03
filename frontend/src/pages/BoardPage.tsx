@@ -15,6 +15,7 @@ import {
   CircleHelp,
   Download,
   Ellipsis,
+  Link2,
   Play,
   Settings,
   SlidersHorizontal,
@@ -289,7 +290,8 @@ const KIND_LABEL: Record<string, string> = { question: "вопрос", task: "з
 const KIND_COLOR: Record<string, string> = { question: "#2563eb", task: "#9333ea" };
 const ALL_KINDS: Record<string, boolean> = { question: true, task: true };
 
-export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; sessionFromUrl: number | null }) {
+// guest — вход по ссылке-приглашению: только эта сессия, без выхода из неё и без выдачи новых ссылок.
+export default function BoardPage({ pool, sessionFromUrl, guest = false }: { pool: PoolConfig; sessionFromUrl: number | null; guest?: boolean }) {
   const t = useT();
   const [graph, setGraph] = useState<QNode[]>([]);
   const [errors, setErrors] = useState<ImportErr[]>([]);
@@ -315,6 +317,11 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [finishOpen, setFinishOpen] = useState(false); // итог интервью (решение + комментарий)
+  // Ссылка для коллеги: выбор роли → POST invite → абсолютный URL #/join/<token> с кнопкой «Скопировать».
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  const closeInvite = useCallback(() => setInviteOpen(false), []);
+  useDismiss(inviteOpen, closeInvite, ".tbdrop--invite");
   // Dropdown'ы toolbar'а: «Экспорт» и «•••».
   const [exportOpen, setExportOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -812,6 +819,15 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
   const nQuestions = `${graph.length} ${nWord(graph.length, ["вопрос", "вопроса", "вопросов"], ["question", "questions"])}`;
   const doReport = () => downloadReport(session?.candidate ?? "", graph, scores, pool, notes, reportPeople, session);
   // Завершение: статус finished + решение и комментарий; сессия остаётся открытой для просмотра/правки итога.
+  const makeInvite = async (role: "viewer" | "member") => {
+    if (!session) return;
+    try {
+      const inv = await api.invite(session.id, role);
+      setInviteUrl(`${window.location.origin}${window.location.pathname}${inv.url}`);
+    } catch {
+      alert(t("Не удалось создать ссылку"));
+    }
+  };
   const finishSession = async (decision: "hire" | "no_hire" | "hold", summary: string) => {
     if (!session) return;
     try {
@@ -962,6 +978,44 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
                     {t("Завершена")} · {decisionLabel(t, session.decision)}
                   </span>
                 )}
+                {!guest && (
+                  <div className="tbdrop tbdrop--invite">
+                    <button
+                      className="tbbtn invitebtn"
+                      onClick={() => setInviteOpen((v) => !v)}
+                      aria-haspopup="menu"
+                      aria-expanded={inviteOpen}
+                      title={t("Ссылка для коллеги")}
+                    >
+                      <Link2 size={15} {...ICON} aria-hidden="true" />
+                      {t("Ссылка для коллеги")}
+                    </button>
+                    {inviteOpen && (
+                      <div className="tbmenu invitemenu" role="menu">
+                        {!inviteUrl ? (
+                          <>
+                            <button className="tbmenu__item invite__member" role="menuitem" onClick={() => makeInvite("member")}>
+                              {t("Интервьюер — может оценивать")}
+                            </button>
+                            <button className="tbmenu__item invite__viewer" role="menuitem" onClick={() => makeInvite("viewer")}>
+                              {t("Наблюдатель — только смотрит")}
+                            </button>
+                          </>
+                        ) : (
+                          <div className="invite__result">
+                            <input className="invite__url" readOnly value={inviteUrl} onFocus={(e) => e.currentTarget.select()} />
+                            <div className="invite__btns">
+                              <button className="tbbtn invite__copy" onClick={() => navigator.clipboard?.writeText(inviteUrl)}>
+                                {t("Скопировать")}
+                              </button>
+                              <button className="tbbtn btn--quiet" onClick={() => setInviteUrl(null)}>{t("Другая ссылка")}</button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
                 {/* «Завершить» доступно всегда: итог можно подвести и по части плана; у завершённой — правка итога. */}
                 <button
                   className={`tbbtn cta-done ${session.status !== "finished" && coverage.total > 0 && coverage.done === coverage.total ? "btn--primary" : ""}`}
@@ -970,10 +1024,12 @@ export default function BoardPage({ pool, sessionFromUrl }: { pool: PoolConfig; 
                 >
                   {session.status === "finished" ? t("Итог") : t("Завершить")}
                 </button>
-                <button className="tbbtn btn--quiet session__leave" onClick={leaveSession} title={t("Выйти из сессии")}>
-                  <X size={15} {...ICON} aria-hidden="true" />
-                  {t("Выйти")}
-                </button>
+                {!guest && (
+                  <button className="tbbtn btn--quiet session__leave" onClick={leaveSession} title={t("Выйти из сессии")}>
+                    <X size={15} {...ICON} aria-hidden="true" />
+                    {t("Выйти")}
+                  </button>
+                )}
               </div>
             </div>
           </div>

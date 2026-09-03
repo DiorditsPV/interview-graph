@@ -900,3 +900,9 @@ a.iconbtn { text-decoration: none; display: inline-block; }
 .tabs { display: flex; gap: 6px; margin: 0 0 12px; }
 .tabs__tab { font-size: 13px; padding: 5px 12px; border-radius: 999px; border-color: transparent; background: transparent; color: var(--text-muted); }
 .tabs__tab--on { background: var(--hover); color: var(--text); border-color: var(--border); }
+
+/* ---- ссылка-приглашение в сессию ---- */
+.invitemenu { min-width: 320px; }
+.invite__result { display: grid; gap: 6px; padding: 4px; }
+.invite__url { width: 100%; font-size: 12px; padding: 6px 8px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--bg); color: var(--text); }
+.invite__btns { display: flex; gap: 6px; }

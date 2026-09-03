@@ -26,10 +26,13 @@ from pydantic import BaseModel, Field
 
 from .auth import (
     COOKIE_NAME,
+    check_session_scope,
     current_user,
+    guest_scope,
     hash_password,
     require_member,
     require_owner,
+    require_session_member,
     verify_password,
 )
 from .db import SESSION_MAX_AGE, Database
@@ -290,8 +293,10 @@ def logout(request: Request, response: Response) -> dict:
 
 
 @app.get("/api/auth/me")
-def auth_me(user: dict = Depends(current_user)) -> dict:
-    return _public_user(user)
+def auth_me(request: Request, user: dict = Depends(current_user)) -> dict:
+    scope = guest_scope(request)
+    # guest: вошёл по ссылке-приглашению, доступ ограничен одной сессией (фронт показывает только её доску).
+    return {**_public_user(user), "guest": scope is not None, "scope_session_id": scope}
 
 
 # ---------- users (управление пользователями — owner) ----------
@@ -680,11 +685,14 @@ def list_sessions(
     request: Request, pool: Optional[str] = None, _user: dict = Depends(current_user)
 ) -> list:
     tenant = resolve_tenant(request)
-    return db.list_sessions(tenant, pool=_pool_or_404(request, pool).id if pool else None)
+    rows = db.list_sessions(tenant, pool=_pool_or_404(request, pool).id if pool else None)
+    scope = guest_scope(request)
+    return rows if scope is None else [s for s in rows if s["id"] == scope]
 
 
 @app.get("/api/sessions/{session_id}")
 def get_session(session_id: int, request: Request, _user: dict = Depends(current_user)) -> dict:
+    check_session_scope(request, session_id)
     session = db.get_session(session_id, resolve_tenant(request))
     if session is None:
         raise HTTPException(status_code=404, detail="session not found")
@@ -693,8 +701,9 @@ def get_session(session_id: int, request: Request, _user: dict = Depends(current
 
 @app.post("/api/sessions/{session_id}/score")
 async def set_score(
-    session_id: int, body: ScoreIn, request: Request, _user: dict = Depends(require_member)
+    session_id: int, body: ScoreIn, request: Request, _user: dict = Depends(require_session_member)
 ) -> dict:
+    check_session_scope(request, session_id)
     tenant = resolve_tenant(request)
     if db.get_session(session_id, tenant) is None:
         raise HTTPException(status_code=404, detail="session not found")
@@ -703,14 +712,46 @@ async def set_score(
     return session
 
 
+class InviteIn(BaseModel):
+    role: str = Field(default="viewer", pattern="^(viewer|member)$")
+
+
+@app.post("/api/sessions/{session_id}/invite")
+def invite_to_session(
+    session_id: int, body: InviteIn, request: Request, user: dict = Depends(require_member)
+) -> dict:
+    """Ссылка для коллеги: гость входит по #/join/<token> без аккаунта и видит только эту сессию.
+
+    member — может оценивать и подводить итог, viewer — только смотреть. Ссылка многоразовая.
+    """
+    tenant = resolve_tenant(request)
+    if db.get_session(session_id, tenant) is None:
+        raise HTTPException(status_code=404, detail="session not found")
+    token = db.create_invite(tenant, session_id, body.role, user.get("id"))
+    return {"token": token, "role": body.role, "session_id": session_id, "url": f"#/join/{token}"}
+
+
+@app.post("/api/join/{token}")
+def join_by_invite(token: str, response: Response) -> dict:
+    """Гостевой вход по приглашению: cookie auth-сессии, ограниченной сессией интервью."""
+    invite = db.get_invite(token)
+    if invite is None or db.get_session(invite["session_id"], invite["tenant_id"]) is None:
+        raise HTTPException(status_code=404, detail="invite not found")
+    cookie = db.create_guest_auth_session(invite)
+    response.set_cookie(COOKIE_NAME, cookie, httponly=True, samesite="lax", path="/", max_age=SESSION_MAX_AGE)
+    session = db.get_session(invite["session_id"], invite["tenant_id"])
+    return {"session_id": invite["session_id"], "pool": session["pool"], "role": invite["role"]}
+
+
 @app.post("/api/sessions/{session_id}/finish")
 async def finish_session(
-    session_id: int, body: FinishIn, request: Request, _user: dict = Depends(require_member)
+    session_id: int, body: FinishIn, request: Request, _user: dict = Depends(require_session_member)
 ) -> dict:
     """Завершить интервью: статус finished, решение и комментарий. Повторный вызов правит итог.
 
     Публикуется в SSE-поток сессии — второй интервьюер видит итог без перезагрузки.
     """
+    check_session_scope(request, session_id)
     tenant = resolve_tenant(request)
     session = db.finish_session(session_id, tenant, body.decision, body.summary.strip())
     if session is None:
@@ -731,6 +772,7 @@ async def session_events(
 
     Позволяет интервьюеру и HR одновременно видеть изменения по одному кандидату.
     """
+    check_session_scope(request, session_id)
     session = db.get_session(session_id, resolve_tenant(request))
     if session is None:
         raise HTTPException(status_code=404, detail="session not found")

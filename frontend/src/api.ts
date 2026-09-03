@@ -49,6 +49,8 @@ export interface AuthUser {
   email: string;
   role: "owner" | "member" | "viewer";
   tenant_id: string;
+  guest?: boolean; // вошёл по ссылке-приглашению: доступ только к одной сессии
+  scope_session_id?: number | null;
 }
 
 // В dev /api проксируется Vite на :8000; в прод тот же origin (раздаёт FastAPI).
@@ -190,5 +192,16 @@ export const api = {
   me: () =>
     fetch(`${BASE}/auth/me`, { credentials: "include" }).then((res) =>
       json<AuthUser>(res, { skipAuthReload: true }),
+    ),
+  // Приглашение коллеги в сессию: ссылка #/join/<token>; гость входит без аккаунта.
+  invite: (sessionId: number, role: "viewer" | "member") =>
+    fetch(`${BASE}/sessions/${sessionId}/invite`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role }),
+    }).then(json<{ token: string; role: string; session_id: number; url: string }>),
+  join: (token: string) =>
+    fetch(`${BASE}/join/${encodeURIComponent(token)}`, { method: "POST", credentials: "include" }).then((res) =>
+      json<{ session_id: number; pool: string; role: string }>(res, { skipAuthReload: true }),
     ),
 };
