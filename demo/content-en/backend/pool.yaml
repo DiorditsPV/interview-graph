@@ -1,0 +1,27 @@
+# English demo pool for showcase screenshots: backend engineer track.
+id: backend
+label: Backend Engineer
+description: APIs and services, databases, concurrency, operations
+blocks:
+  - id: api
+    label: APIs
+    color: "#2563eb"
+    weight: 30
+    subblocks:
+      - { id: rest, label: REST }
+      - { id: grpc, label: gRPC }
+  - id: databases
+    label: Databases
+    color: "#16a34a"
+    weight: 30
+    subblocks:
+      - { id: sql,   label: SQL }
+      - { id: nosql, label: NoSQL }
+  - id: runtime
+    label: Concurrency
+    color: "#d97706"
+    weight: 25
+  - id: ops
+    label: Operations
+    color: "#9333ea"
+    weight: 15

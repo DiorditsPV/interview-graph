@@ -1,0 +1,33 @@
+# English demo pool for showcase screenshots. Mirrors the taxonomy of the
+# production data-engineer pool; block order = column order, subblocks =
+# sub-column order, weight = share of the block in a sampled interview (%).
+id: data-engineer
+label: Data Engineer
+description: Airflow and Spark, SQL and storage, Python, platform
+blocks:
+  - id: frameworks
+    label: Frameworks
+    color: "#2563eb"
+    weight: 35
+    subblocks:
+      - { id: airflow,   label: Airflow }
+      - { id: pyspark,   label: PySpark }
+      - { id: dbt,       label: dbt }
+      - { id: streaming, label: Streaming }
+  - id: databases
+    label: Databases
+    color: "#16a34a"
+    weight: 30
+    subblocks:
+      - { id: sql,     label: SQL }
+      - { id: dbms,    label: Engines }
+      - { id: storage, label: Storage }
+      - { id: formats, label: Formats }
+  - id: python
+    label: Python
+    color: "#d97706"
+    weight: 23
+  - id: platform
+    label: Platform
+    color: "#9333ea"
+    weight: 12
