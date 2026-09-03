@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { api } from "../api";
 import { LangSwitch } from "../components/LangSwitch";
 import { PoolFormModal } from "../components/PoolFormModal";
-import { StartSessionForm } from "../components/StartSessionForm";
 import { nWord, useT } from "../i18n";
 import { poolIcon } from "../poolIcons";
 import { href } from "../router";
@@ -15,22 +14,16 @@ type PoolModal = { mode: "create" } | { mode: "edit"; pool: PoolConfig } | null;
 // подключение). Карточка направления: название, описание, статистика, нейтральные чипы колонок,
 // primary «Начать интервью →», secondary «Открыть вопросы →», меню ••• (редактировать/дублировать/удалить).
 // Пулов может не быть вовсе (content/ без pool.yaml) — говорим об этом, а не рисуем пустоту.
-// startPool — пул из deep-link #/?start=<pool>: форма старта интервью открывается сразу.
+// «Начать интервью» ведёт на экран настройки интервью (#/setup/<pool>): кандидат, разделы, уровни, набор.
 // onChanged — направления создаются/правятся/удаляются здесь же (pool-crud); список живёт в Router.
 export function HomePage({
   pools,
   notice,
-  startPool: startPool0,
   onChanged,
-}: { pools: PoolConfig[]; notice?: string; startPool?: string | null; onChanged: () => void }) {
+}: { pools: PoolConfig[]; notice?: string; onChanged: () => void }) {
   const t = useT();
-  const [startPool, setStartPool] = useState<string | null>(startPool0 ?? null);
   const [modal, setModal] = useState<PoolModal>(null);
   const [menuFor, setMenuFor] = useState<string | null>(null);
-  // Переход #/ → #/?start=<pool> не перемонтирует страницу — синхронизируем с пропом.
-  useEffect(() => {
-    if (startPool0) setStartPool(startPool0);
-  }, [startPool0]);
   // Меню ••• закрывается кликом мимо и Esc — как обычный dropdown.
   useEffect(() => {
     if (!menuFor) return;
@@ -152,16 +145,15 @@ export function HomePage({
               </div>
               {/* Действия лежат над «растяжкой»; margin-top:auto прижимает их к низу — карточки в ряду одной высоты. */}
               <div className="poolcard__actions">
-                <button className="poolcard__start btn--primary" onClick={() => setStartPool(p.id)}>
+                <a className="poolcard__start btn--primary" href={href.setup(p.id)}>
                   <Play size={15} strokeWidth={2} aria-hidden="true" />
                   {t("Начать интервью")}
-                </button>
+                </a>
                 <a className="poolcard__open" href={href.bank(p.id)}>
                   {t("Открыть вопросы")}
                   <ArrowRight size={16} {...ICON} aria-hidden="true" />
                 </a>
               </div>
-              {startPool === p.id && <StartSessionForm pool={p} onClose={() => setStartPool(null)} />}
             </div>
             );
           })}

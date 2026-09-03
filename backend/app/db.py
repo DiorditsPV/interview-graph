@@ -170,6 +170,10 @@ class Database:
             conn.execute("ALTER TABLE sessions ADD COLUMN interviewer_id INTEGER")
         if "pool" not in cols:
             conn.execute("ALTER TABLE sessions ADD COLUMN pool TEXT NOT NULL DEFAULT 'data-engineer'")
+        if "plan" not in cols:
+            # План интервью (JSON: mode, blocks, subblocks, difficulties, count, order). NULL — сессия
+            # по всей матрице, как до v1-closure.
+            conn.execute("ALTER TABLE sessions ADD COLUMN plan TEXT")
 
     @staticmethod
     def _migrate_nodes(conn: sqlite3.Connection) -> None:
@@ -663,17 +667,27 @@ class Database:
         candidate_id: Optional[int] = None,
         interviewer_id: Optional[int] = None,
         pool: str = "data-engineer",
+        plan: Optional[Dict] = None,
     ) -> Dict:
         with self._conn() as conn:
             cur = conn.execute(
                 """
-                INSERT INTO sessions (candidate, tenant_id, candidate_id, interviewer_id, pool, created_at)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO sessions (candidate, tenant_id, candidate_id, interviewer_id, pool, plan, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (candidate, tenant_id, candidate_id, interviewer_id, pool, _now()),
+                (candidate, tenant_id, candidate_id, interviewer_id, pool,
+                 json.dumps(plan, ensure_ascii=False) if plan else None, _now()),
             )
             sid = cur.lastrowid
         return self.get_session(sid, tenant_id)
+
+    @staticmethod
+    def _session_summary(row: sqlite3.Row) -> Dict:
+        """Строка sessions для списков: вместо JSON плана — его размер (plan_count, NULL без плана)."""
+        d = dict(row)
+        raw = d.pop("plan", None)
+        d["plan_count"] = len(json.loads(raw).get("order") or []) if raw else None
+        return d
 
     def sessions_by_candidate(self, tenant_id: str, candidate_id: int) -> List[Dict]:
         """Все сессии кандидата в тенанте (история), без оценок — для списка."""
@@ -686,7 +700,7 @@ class Database:
                 """,
                 (tenant_id, candidate_id),
             ).fetchall()
-        return [dict(r) for r in rows]
+        return [self._session_summary(r) for r in rows]
 
     def list_sessions(self, tenant_id: str, pool: Optional[str] = None) -> List[Dict]:
         sql, args = "SELECT * FROM sessions WHERE tenant_id = ?", [tenant_id]
@@ -696,7 +710,7 @@ class Database:
         sql += " ORDER BY created_at DESC"
         with self._conn() as conn:
             rows = conn.execute(sql, args).fetchall()
-        return [dict(r) for r in rows]
+        return [self._session_summary(r) for r in rows]
 
     def count_sessions(self, tenant_id: str, pool: str) -> int:
         with self._conn() as conn:
@@ -718,6 +732,7 @@ class Database:
                 (session_id,),
             ).fetchall()
         result = dict(row)
+        result["plan"] = json.loads(result["plan"]) if result.get("plan") else None
         result["scores"] = {s["node_id"]: dict(s) for s in scores}
         return result
 

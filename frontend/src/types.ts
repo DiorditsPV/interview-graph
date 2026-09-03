@@ -103,6 +103,16 @@ export interface Interviewer {
   created_at?: string;
 }
 
+// План интервью (sessions.plan): условия подбора и итоговый порядок вопросов. null — сессия по всей матрице.
+export interface SessionPlan {
+  mode: "manual" | "auto";
+  blocks?: string[] | null;
+  subblocks?: Record<string, string[]> | null;
+  difficulties?: string[] | null;
+  count: number;
+  order: string[];
+}
+
 export interface SessionMeta {
   id: number;
   candidate: string;
@@ -110,9 +120,11 @@ export interface SessionMeta {
   candidate_id?: number | null;
   interviewer_id?: number | null;
   created_at: string;
+  plan_count?: number | null; // в списках вместо самого плана
 }
 
 export interface Session extends SessionMeta {
+  plan?: SessionPlan | null;
   scores: Record<string, { node_id: string; score: number; note?: string; created_at: string }>;
 }
 
