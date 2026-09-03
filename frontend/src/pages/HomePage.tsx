@@ -57,7 +57,7 @@ export function HomePage({
 
         <h2 className="home__h2">{t("Направления")}</h2>
         {pools.length === 0 && (
-          <p className="muted">{t("Нет ни одного пула: положите каталог с `pool.yaml` в `content/`.")}</p>
+          <p className="muted">{t("Нет ни одного направления: создайте первое кнопкой «+ Новое направление» или положите каталог с `pool.yaml` в `content/`.")}</p>
         )}
         <div className="home__pools">
           {pools.map((p) => (

@@ -186,3 +186,28 @@ def test_normalize_blocks_bad_input():
         parse_blocks(normalize_blocks([{"label": "A", "color": "red"}], ()))       # цвет не #rrggbb
     with pytest.raises(PoolConfigError):
         parse_blocks(normalize_blocks([], ()))                                       # ни одной колонки
+
+
+def test_normalize_blocks_does_not_recycle_ids_of_removed_entries():
+    """Удалили колонку/под-колонку и в том же сохранении добавили новую с тем же названием:
+    id не переиспользуется, иначе вопросы удалённой «выживут» под новой."""
+    existing = (
+        BlockCfg(id="peregovory", label="Переговоры", color="#111111", weight=3,
+                 subblocks=(SubblockCfg("holodnye", "Холодные"), SubblockCfg("goryachie", "Горячие"))),
+    )
+    out = normalize_blocks([{"label": "Переговоры", "color": "#222222"}], existing)
+    assert out[0]["id"] == "peregovory-2" and out[0]["weight"] == 1
+    out = normalize_blocks(
+        [{"id": "peregovory", "label": "Переговоры", "color": "#111111",
+          "subblocks": [{"id": "goryachie", "label": "Горячие"}, {"label": "Холодные"}]}],
+        existing,
+    )
+    assert [s["id"] for s in out[0]["subblocks"]] == ["goryachie", "holodnye-2"]
+
+
+def test_normalize_blocks_ignores_bool_weight_and_rejects_non_list_subblocks():
+    existing = (BlockCfg(id="a", label="A", color="#111111", weight=7, subblocks=()),)
+    assert normalize_blocks([{"id": "a", "label": "A", "color": "#111111", "weight": True}], existing)[0]["weight"] == 7
+    assert normalize_blocks([{"id": "a", "label": "A", "color": "#111111", "weight": 4}], existing)[0]["weight"] == 4
+    with pytest.raises(PoolConfigError):
+        normalize_blocks([{"label": "A", "color": "#111111", "subblocks": 0}], ())

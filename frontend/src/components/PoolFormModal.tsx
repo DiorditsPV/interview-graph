@@ -22,7 +22,7 @@ export function PoolFormModal({ mode, pools, pool, onClose, onSaved }: {
   // id существующих колонок/под-колонок сохраняем — по ним сервер понимает, что удалено, а что переименовано.
   const [blocks, setBlocks] = useState<BlockDraft[]>(() =>
     pool
-      ? pool.blocks.map((b) => ({ id: b.id, label: b.label, color: b.color, subblocks: b.subblocks.map((s) => ({ id: s.id, label: s.label })) }))
+      ? pool.blocks.map((b) => ({ uid: b.id, id: b.id, label: b.label, color: b.color, subblocks: b.subblocks.map((s) => ({ id: s.id, label: s.label })) }))
       : [emptyBlock()],
   );
   // Число вопросов по колонке — для confirm при удалении колонки (её вопросы удалятся).
@@ -54,10 +54,12 @@ export function PoolFormModal({ mode, pools, pool, onClose, onSaved }: {
   const submit = async () => {
     if (!canSubmit) return;
     setBusy(true);
+    // Явные поля: клиентский uid в API не уходит.
     const payload = blocks.map((b) => ({
-      ...b,
+      id: b.id,
       label: b.label.trim(),
-      subblocks: (b.subblocks ?? []).map((s) => ({ ...s, label: s.label.trim() })),
+      color: b.color,
+      subblocks: (b.subblocks ?? []).map((s) => ({ id: s.id, label: s.label.trim() })),
     }));
     try {
       if (mode === "create") {

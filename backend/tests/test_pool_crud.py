@@ -221,3 +221,22 @@ def test_api_create_pool_requires_preset_xor_blocks():
     assert c.post("/api/pools", json={"label": "X"}).status_code == 422
     assert c.post("/api/pools", json={"label": "X", "preset": "data-engineer", "blocks": [{"label": "A", "color": "#000000"}]}).status_code == 422
     assert c.post("/api/pools", json={"label": "X", "blocks": []}).status_code == 422
+
+
+def test_api_removed_column_questions_do_not_survive_same_name_readd():
+    c = _client()
+    pid = c.post("/api/pools", json={"label": "Recycle", "blocks": [
+        {"label": "Альфа", "color": "#111111"}, {"label": "Переговоры", "color": "#222222"}]}).json()["id"]
+    c.post("/api/nodes", json={"pool": pid, "block": "peregovory", "topic": "t", "question": "Q", "answer": "A", "tags": []})
+    r = c.put(f"/api/pools/{pid}", json={"blocks": [
+        {"id": "alfa", "label": "Альфа", "color": "#111111"}, {"label": "Переговоры", "color": "#333333"}]})
+    assert r.status_code == 200
+    assert [b["id"] for b in r.json()["blocks"]] == ["alfa", "peregovory-2"]
+    assert r.json()["counts"]["nodes"] == 0
+    c.delete(f"/api/pools/{pid}")
+
+
+def test_api_create_pool_empty_preset_is_422():
+    c = _client()
+    assert c.post("/api/pools", json={"label": "X", "preset": ""}).status_code == 422
+    assert c.post("/api/pools", json={"label": "X", "preset": "  "}).status_code == 422

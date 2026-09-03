@@ -482,6 +482,8 @@ class Database:
                     (json.dumps(blocks, ensure_ascii=False), now, tenant_id, pool_id),
                 )
                 kept = [b["id"] for b in blocks]
+                if not kept:  # `NOT IN ()` удалил бы все вопросы; непустоту гарантирует parse_blocks у вызывающего
+                    raise ValueError("blocks must not be empty")
                 marks = ",".join("?" * len(kept))
                 conn.execute(
                     f"DELETE FROM nodes WHERE tenant_id = ? AND pool = ? AND block NOT IN ({marks})",

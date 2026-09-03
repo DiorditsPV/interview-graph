@@ -221,19 +221,24 @@ def normalize_blocks(raw: object, existing: Tuple[BlockCfg, ...] = ()) -> List[d
     if not isinstance(raw, list):
         raise PoolConfigError("blocks must be a list")
     old = {b.id: b for b in existing}
-    taken = {rb.get("id") for rb in raw if isinstance(rb, dict) and isinstance(rb.get("id"), str)}
+    # Занятые id — и переданные, и ВСЕ текущие: удалённая в этом же сохранении колонка не должна
+    # отдать свой id новой с тем же названием, иначе её вопросы «выживут» вместо обещанного удаления.
+    taken = set(old) | {rb.get("id") for rb in raw if isinstance(rb, dict) and isinstance(rb.get("id"), str)}
     out: List[dict] = []
     for rb in raw:
         if not isinstance(rb, dict):
             raise PoolConfigError("each block must be a mapping")
         bid = rb.get("id") if isinstance(rb.get("id"), str) else _unique_slug(rb.get("label"), taken, "block")
         weight = rb.get("weight")
-        if not isinstance(weight, int):
+        if not isinstance(weight, int) or isinstance(weight, bool):  # bool — подкласс int
             weight = old[bid].weight if bid in old else 1
-        raw_subs = rb.get("subblocks") or []
+        raw_subs = rb.get("subblocks")
+        if raw_subs is None:
+            raw_subs = []
         if not isinstance(raw_subs, list):
             raise PoolConfigError(f"block {bid}: subblocks must be a list")
-        sub_taken = {rs.get("id") for rs in raw_subs if isinstance(rs, dict) and isinstance(rs.get("id"), str)}
+        old_subs = {s.id for s in old[bid].subblocks} if bid in old else set()
+        sub_taken = old_subs | {rs.get("id") for rs in raw_subs if isinstance(rs, dict) and isinstance(rs.get("id"), str)}
         subs = []
         for rs in raw_subs:
             if not isinstance(rs, dict):

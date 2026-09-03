@@ -350,10 +350,12 @@ def create_pool(body: PoolCreate, request: Request, _user: dict = Depends(requir
         # Field(min_length=1) пропускает строку из пробелов — иначе родится пул с пустым названием и id 'pool'.
         raise HTTPException(status_code=422, detail="label must not be blank")
     # Ровно один источник колонок: пресет (копируются колонки и вопросы) или свои колонки (без вопросов).
-    if (body.preset is None) == (body.blocks is None):
+    # Пустой preset считается отсутствующим — иначе _pool_or_404("") подставил бы пул по умолчанию.
+    preset_id = (body.preset or "").strip()
+    if bool(preset_id) == (body.blocks is not None):
         raise HTTPException(status_code=422, detail="pass exactly one of 'preset' or 'blocks'")
-    if body.preset is not None:
-        preset = _pool_or_404(request, body.preset)
+    if preset_id:
+        preset = _pool_or_404(request, preset_id)
         blocks = json.loads(blocks_to_json(preset.blocks))
         copy_from: Optional[str] = preset.id
     else:

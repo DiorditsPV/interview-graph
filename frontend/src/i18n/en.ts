@@ -46,7 +46,8 @@ export const EN: Record<string, string> = {
   "Разделы": "Sections",
   "банк вопросов →": "question bank →",
   "+ Новое направление": "+ New track",
-  "Нет ни одного пула: положите каталог с `pool.yaml` в `content/`.": "No pools yet: put a directory with `pool.yaml` into `content/`.",
+  "Нет ни одного направления: создайте первое кнопкой «+ Новое направление» или положите каталог с `pool.yaml` в `content/`.":
+    "No tracks yet: create the first one with “+ New track” or put a directory with `pool.yaml` into `content/`.",
   "{nodes} вопросов · {sessions} сессий": "{nodes} questions · {sessions} sessions",
   "изменить": "edit",
   "удалить": "delete",

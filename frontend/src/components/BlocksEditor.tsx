@@ -7,7 +7,11 @@ export const BLOCK_PALETTE = ["#2563eb", "#16a34a", "#d97706", "#9333ea", "#dc26
 
 const nextColor = (c?: string): string => BLOCK_PALETTE[(BLOCK_PALETTE.indexOf(c ?? "") + 1) % BLOCK_PALETTE.length];
 
-export const emptyBlock = (after?: BlockDraft): BlockDraft => ({ label: "", color: nextColor(after?.color), subblocks: [] });
+// uid — клиентский ключ ряда (в API не уходит): по индексу React переиспользует DOM-узлы при ↑/↓/✕,
+// и недопечатанный текст в поле «+ под-колонка» уезжал бы в чужой ряд.
+export const newUid = (): string => `b-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
+export const emptyBlock = (after?: BlockDraft): BlockDraft => ({ uid: newUid(), label: "", color: nextColor(after?.color), subblocks: [] });
 
 /** Все колонки названы и хотя бы одна есть — иначе сервер ответит 422. */
 export const blocksValid = (blocks: BlockDraft[]): boolean => blocks.length > 0 && blocks.every((b) => b.label.trim() !== "");
@@ -45,7 +49,7 @@ export function BlocksEditor({ blocks, onChange, nodeCounts }: {
   return (
     <div className="blocks-editor">
       {blocks.map((b, i) => (
-        <div key={i} className="blocks-editor__row">
+        <div key={b.uid ?? b.id ?? i} className="blocks-editor__row">
           <button
             type="button"
             className="blocks-editor__color"

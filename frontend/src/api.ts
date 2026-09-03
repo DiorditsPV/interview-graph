@@ -56,6 +56,7 @@ async function json<T>(res: Response, opts?: { skipAuthReload?: boolean }): Prom
 // pool-blocks-editor: колонка направления из формы. id — только у существующих (сервер сохраняет
 // их как есть), у новых id генерится из названия; weight из UI не правится.
 export interface BlockDraft {
+  uid?: string; // клиентский ключ ряда в редакторе; в запрос не попадает
   id?: string;
   label: string;
   color: string;
